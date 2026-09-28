@@ -60,7 +60,9 @@ class DistributionService:
         ]
 
     @classmethod
-    def suggest_balanced_distribution(cls, submission_ids: list[int]) -> list[DistributionSuggestion]:
+    def suggest_balanced_distribution(
+        cls, submission_ids: list[int]
+    ) -> list[DistributionSuggestion]:
         """Calcula sugestão de distribuição round-robin ponderada pela carga atual dos analistas.
 
         Importante: apenas sugere; não altera nenhuma atribuição sem a confirmação explícita do usuário.
@@ -73,9 +75,8 @@ class DistributionService:
         simulated_counts = {w.analyst_id: w.active_count for w in workloads}
         analysts_map = {w.analyst_id: w for w in workloads}
 
-        submissions = (
-            Submission.objects.filter(id__in=submission_ids)
-            .order_by("received_at", "processo_sei")
+        submissions = Submission.objects.filter(id__in=submission_ids).order_by(
+            "received_at", "processo_sei"
         )
 
         suggestions: list[DistributionSuggestion] = []

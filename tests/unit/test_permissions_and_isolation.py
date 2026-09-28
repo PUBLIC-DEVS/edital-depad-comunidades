@@ -65,7 +65,9 @@ class TestPermissionsAndAnalystIsolation:
         mun = Municipality.objects.create(ibge_code="3550308", name="SP", state="SP")
         inst = Institution.objects.create(cnpj="00000000000191", name="OSC Alpha", municipality=mun)
         now = timezone.now()
-        edital = Edital.objects.create(name="Edital", number="01", year=2024, opens_at=now, closes_at=now)
+        edital = Edital.objects.create(
+            name="Edital", number="01", year=2024, opens_at=now, closes_at=now
+        )
 
         sub_a = Submission.objects.create(
             edital=edital,

@@ -32,6 +32,7 @@ class WorkflowService:
         },
         Submission.WorkflowStatus.ASSIGNED: {
             Submission.WorkflowStatus.UNDER_ANALYSIS,
+            Submission.WorkflowStatus.PENDING_REVIEW,
             Submission.WorkflowStatus.ASSIGNED,  # Redistribuição
             Submission.WorkflowStatus.CLOSED,
         },

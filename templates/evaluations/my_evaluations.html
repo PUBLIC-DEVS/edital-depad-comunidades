@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Minhas Análises — DEPED/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center pb-3 border-b border-slate-200">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Minhas Análises</h1>
+            <p class="text-sm text-slate-500">Processos atualmente distribuídos para sua análise documental técnica</p>
+        </div>
+        <div class="text-xs text-slate-600 bg-blue-50 px-3 py-1.5 rounded border border-blue-200">
+            <strong>{{ total_count }}</strong> processo(s) sob sua responsabilidade
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3">Processo SEI</th>
+                        <th class="px-4 py-3">Instituição / CNPJ</th>
+                        <th class="px-4 py-3">Município / UF</th>
+                        <th class="px-4 py-3">Status do Workflow</th>
+                        <th class="px-4 py-3">Status da Análise</th>
+                        <th class="px-4 py-3">Parecer Calculado</th>
+                        <th class="px-4 py-3 text-right">Ação</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white text-slate-700">
+                    {% for item in eval_items %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-4 py-3 font-semibold text-govblue-600">
+                                {{ item.submission.processo_sei }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="font-medium text-slate-900">{{ item.submission.institution.name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ item.submission.institution.formatted_cnpj }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                {{ item.submission.municipality.name }}/{{ item.submission.municipality.state }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="badge-status
+                                    {% if item.submission.workflow_status == 'UNDER_ANALYSIS' %}badge-emanalise
+                                    {% elif item.submission.workflow_status == 'ELIGIBLE_FOR_RANKING' %}badge-apta
+                                    {% elif item.submission.workflow_status == 'INELIGIBLE' %}badge-inapta
+                                    {% else %}badge-naoaplicavel{% endif %}">
+                                    {{ item.submission.get_workflow_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if item.evaluation %}
+                                    <span class="font-medium text-slate-700">{{ item.evaluation.get_status_display }}</span>
+                                {% else %}
+                                    <span class="text-slate-400 italic">Pendente de início</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if item.evaluation %}
+                                    <span class="badge-status
+                                        {% if item.evaluation.result == 'APTA' %}badge-apta
+                                        {% elif item.evaluation.result == 'INAPTA' %}badge-inapta
+                                        {% else %}badge-emanalise{% endif %}">
+                                        {{ item.evaluation.get_result_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-slate-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <a href="{% url 'evaluation-workspace' submission_id=item.submission.id %}" class="inline-flex items-center px-3 py-1 bg-govblue-600 hover:bg-govblue-700 text-white font-medium rounded shadow-sm text-xs transition">
+                                    Abrir Análise &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-slate-400">
+                                Nenhum processo atribuído a você no momento.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

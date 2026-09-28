@@ -112,7 +112,9 @@ def submission_detail_view(request: HttpRequest, submission_id: int) -> HttpResp
     """Exibição detalhada de um processo, atribuições, anomalias e histórico."""
     submission = enforce_submission_access(request, submission_id)
     alerts = SubmissionAnomalyDetector.check_submission(submission)
-    assignment_history = submission.assignments.select_related("analyst", "assigned_by").order_by("-assigned_at")
+    assignment_history = submission.assignments.select_related("analyst", "assigned_by").order_by(
+        "-assigned_at"
+    )
 
     assignment_form = None
     if RolePermissionPolicy.can_distribute_submissions(request.user):
@@ -169,9 +171,15 @@ def submission_bulk_assign_view(request: HttpRequest) -> HttpResponse:
                 assigned_by=request.user,
                 reason=reason,
             )
-            messages.success(request, f"{count} processos foram atribuídos com sucesso ao analista {analyst.username}.")
+            messages.success(
+                request,
+                f"{count} processos foram atribuídos com sucesso ao analista {analyst.username}.",
+            )
         else:
-            messages.error(request, "Erro ao processar atribuição em lote. Selecione processos e analista válidos.")
+            messages.error(
+                request,
+                "Erro ao processar atribuição em lote. Selecione processos e analista válidos.",
+            )
     return redirect("submission-list")
 
 
@@ -192,7 +200,9 @@ def submission_suggest_distribution_view(request: HttpRequest) -> HttpResponse:
 @login_required
 def submission_anomalies_view(request: HttpRequest) -> HttpResponse:
     """Fila de exceções e anomalias cadastrais/processuais."""
-    base_qs = ScopedQuerySetSelector.for_submissions(request.user).select_related("institution", "municipality", "edital")
+    base_qs = ScopedQuerySetSelector.for_submissions(request.user).select_related(
+        "institution", "municipality", "edital"
+    )
 
     anomalous_submissions = []
     for sub in base_qs:

@@ -30,9 +30,13 @@ class TestSubmissionsIntakeAndDistribution:
             role=User.Role.ANALISTA,
         )
         mun = Municipality.objects.create(ibge_code="3550308", name="São Paulo", state="SP")
-        inst = Institution.objects.create(cnpj="00000000000191", name="OSC Matriz", municipality=mun)
+        inst = Institution.objects.create(
+            cnpj="00000000000191", name="OSC Matriz", municipality=mun
+        )
         now = timezone.now()
-        edital = Edital.objects.create(name="Edital Intake", number="10", year=2024, opens_at=now, closes_at=now)
+        edital = Edital.objects.create(
+            name="Edital Intake", number="10", year=2024, opens_at=now, closes_at=now
+        )
 
         return {
             "distrib": distrib,

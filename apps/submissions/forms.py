@@ -39,7 +39,9 @@ class SubmissionIntakeForm(forms.ModelForm):
             "patrimonio_minimo",
         ]
         widgets = {
-            "received_at": forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-input"}),
+            "received_at": forms.DateTimeInput(
+                attrs={"type": "datetime-local", "class": "form-input"}
+            ),
             "edital": forms.Select(attrs={"class": "form-select"}),
             "municipality": forms.Select(attrs={"class": "form-select"}),
             "processo_sei": forms.TextInput(attrs={"class": "form-input"}),
@@ -107,5 +109,7 @@ class BulkAssignmentForm(forms.Form):
         max_length=255,
         required=False,
         label="Motivo",
-        widget=forms.TextInput(attrs={"placeholder": "Motivo da distribuição em lote", "class": "form-input"}),
+        widget=forms.TextInput(
+            attrs={"placeholder": "Motivo da distribuição em lote", "class": "form-input"}
+        ),
     )

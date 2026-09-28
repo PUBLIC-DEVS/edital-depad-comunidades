@@ -88,7 +88,10 @@ class SubmissionAnomalyDetector:
             )
 
         # 5. Vagas solicitadas acima da capacidade instalada
-        if submission.capacidade_total > 0 and submission.vagas_solicitadas > submission.capacidade_total:
+        if (
+            submission.capacidade_total > 0
+            and submission.vagas_solicitadas > submission.capacidade_total
+        ):
             alerts.append(
                 AnomalyAlert(
                     code="EXCESS_CAPACITY",

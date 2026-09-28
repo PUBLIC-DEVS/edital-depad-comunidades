@@ -1,0 +1,86 @@
+<div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4 sticky top-6">
+    <div class="border-b border-slate-100 pb-3 flex justify-between items-center">
+        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            Painel de Resumo
+        </h3>
+        <span class="text-[10px] text-slate-400">
+            {% if draft_saved %}&check; Rascunho salvo{% else %}Tempo Real{% endif %}
+        </span>
+    </div>
+
+    <!-- Calculated Result Badge -->
+    <div class="p-4 rounded-lg text-center
+        {% if assessment.result == 'APTA' %}bg-emerald-50 border border-emerald-200 text-emerald-800
+        {% elif assessment.result == 'INAPTA' %}bg-red-50 border border-red-200 text-red-800
+        {% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Resultado Oficial Calculado</div>
+        <div class="text-xl font-bold mt-1">
+            {% if assessment.result == 'APTA' %}APTA
+            {% elif assessment.result == 'INAPTA' %}INAPTA
+            {% else %}EM ANÁLISE{% endif %}
+        </div>
+        <div class="text-[11px] mt-1 text-slate-600">
+            Calculado pelo motor de regras (EvaluationService)
+        </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div>
+        <div class="flex justify-between text-xs text-slate-600 mb-1">
+            <span>Progresso das Checagens</span>
+            <span class="font-bold">{{ assessment.evaluated_checks }}/{{ assessment.total_checks }}</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div class="bg-govblue-600 h-2 rounded-full transition-all duration-300"
+                 style="width: {% if assessment.total_checks > 0 %}{% widthratio assessment.evaluated_checks assessment.total_checks 100 %}{% else %}0{% endif %}%;">
+            </div>
+        </div>
+        <div class="flex justify-between text-[11px] text-slate-500 mt-1">
+            <span>{{ assessment.pending_checks }} pendente(s)</span>
+            <span>{% if assessment.is_complete %}&check; Completo{% else %}Em andamento{% endif %}</span>
+        </div>
+    </div>
+
+    <!-- Problematic Requirements List -->
+    {% if assessment.failed_requirement_codes %}
+        <div class="bg-red-50 border border-red-200 p-3 rounded text-xs space-y-1">
+            <span class="font-bold text-red-900 block text-[11px] uppercase">Requisitos Obrigatórios Não Atendidos:</span>
+            <div class="flex flex-wrap gap-1 mt-1">
+                {% for code in assessment.failed_requirement_codes %}
+                    <span class="px-2 py-0.5 bg-red-200 text-red-900 font-bold rounded text-[11px]">
+                        {{ code }}
+                    </span>
+                {% endfor %}
+            </div>
+            <p class="text-[10px] text-red-700 mt-1">
+                A ocorrência de NAO_ATENDE ou NAO_ENVIADO em qualquer checagem obrigatória enseja parecer de inaptidão.
+            </p>
+        </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    {% if can_edit %}
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+            <button type="submit"
+                    form="evaluation-form"
+                    class="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold py-2 rounded transition border border-slate-300">
+                Salvar Rascunho
+            </button>
+
+            <form method="post" action="{% url 'evaluation-conclude' evaluation_id=evaluation.id %}">
+                {% csrf_token %}
+                <button type="submit"
+                        {% if not assessment.is_complete %}disabled title="Avalie todos os itens antes de concluir a análise"{% endif %}
+                        class="w-full text-xs font-bold py-2.5 rounded transition shadow-sm
+                        {% if assessment.is_complete %}bg-govblue-600 hover:bg-govblue-700 text-white cursor-pointer
+                        {% else %}bg-slate-200 text-slate-400 cursor-not-allowed{% endif %}">
+                    Concluir Análise Técnica
+                </button>
+            </form>
+        </div>
+    {% else %}
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded text-center text-xs text-slate-500">
+            Esta análise está em modo somente leitura (já concluída ou atribuída a outro usuário).
+        </div>
+    {% endif %}
+</div>

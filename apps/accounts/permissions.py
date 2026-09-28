@@ -81,7 +81,10 @@ class RolePermissionPolicy:
             ).exists()
         if user.role == User.Role.REVISOR:
             # Revisor acessa se houver revisão ativa ou pendente
-            return submission.reviews.exists() or submission.workflow_status == Submission.WorkflowStatus.PENDING_REVIEW
+            return (
+                submission.reviews.exists()
+                or submission.workflow_status == Submission.WorkflowStatus.PENDING_REVIEW
+            )
         return False
 
     @staticmethod
