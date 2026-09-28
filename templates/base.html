@@ -38,6 +38,10 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full flex flex-col text-slate-800 antialiased" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <div id="htmx-progress-bar"></div>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-govblue-700 focus:font-bold focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lg focus:ring-2 focus:ring-blue-600">
+        Pular para o conteúdo principal
+    </a>
     <header class="bg-govblue-700 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center">
@@ -94,7 +98,7 @@
         {% endif %}
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <main id="main-content" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {% if messages %}
             <div class="mb-4 space-y-2">
                 {% for message in messages %}
