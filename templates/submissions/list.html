@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Processos e Distribuição — DEPED/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with actions -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Processos e Distribuição</h1>
+            <p class="text-sm text-slate-500">Gestão integrada da fila de inscrições do edital</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <a href="{% url 'submission-anomalies' %}" class="inline-flex items-center px-3 py-1.5 border border-amber-300 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded transition shadow-sm">
+                Fila de Exceções & Alertas
+            </a>
+            {% if can_distribute %}
+                <a href="{% url 'submission-create' %}" class="inline-flex items-center px-3 py-1.5 bg-govblue-600 hover:bg-govblue-700 text-white text-xs font-semibold rounded transition shadow-sm">
+                    + Cadastrar Processo
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filters and Search Bar -->
+    <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+        <form method="get" action="{% url 'submission-list' %}"
+              hx-get="{% url 'submission-list' %}"
+              hx-target="#submissions-table-container"
+              hx-trigger="keyup changed delay:400ms from:#search-input, change from:select"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar processo / OSC / CNPJ</label>
+                <input type="text" name="q" id="search-input" value="{{ search_query }}"
+                       placeholder="Digite o SEI, OSC ou CNPJ..."
+                       class="w-full px-3 py-1.5 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Status Workflow</label>
+                <select name="status" class="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none">
+                    <option value="">Todos os status</option>
+                    {% for code, label in workflow_statuses %}
+                        <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Grupo</label>
+                <select name="group" class="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none">
+                    <option value="">Todos os grupos</option>
+                    {% for code, label in target_groups %}
+                        <option value="{{ code }}" {% if group_filter == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if can_distribute %}
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Analista Designado</label>
+                    <select name="analyst" class="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none">
+                        <option value="">Todos os analistas</option>
+                        {% for a in analysts %}
+                            <option value="{{ a.id }}" {% if analyst_filter == a.id|stringformat:"s" %}selected{% endif %}>{{ a.get_full_name|default:a.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Bulk Action Toolbar (when user is distributor/coordinator) -->
+    {% if can_distribute %}
+        <div x-data="{ selectedIds: [], analystId: '', reason: '' }" class="bg-blue-50 border border-blue-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center space-x-2">
+                <span class="font-semibold text-blue-900">Ações em Lote:</span>
+                <span class="text-blue-700" x-text="selectedIds.length + ' processo(s) selecionado(s)'"></span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button type="button"
+                        @click="
+                            if (selectedIds.length === 0) { alert('Selecione ao menos um processo na tabela abaixo.'); return; }
+                            htmx.ajax('GET', '{% url 'submission-suggest-distribution' %}?ids=' + selectedIds.join(','), '#suggestion-modal-content');
+                            $refs.suggestionModal.showModal();
+                        "
+                        class="px-2.5 py-1 bg-white border border-blue-300 text-blue-800 rounded hover:bg-blue-100 transition">
+                    Sugerir Balanceamento
+                </button>
+
+                <form method="post" action="{% url 'submission-bulk-assign' %}" class="flex items-center space-x-2"
+                      @submit="
+                          if (selectedIds.length === 0) { alert('Selecione processos na lista.'); $event.preventDefault(); return; }
+                          $refs.bulkIdsInput.value = selectedIds.join(',');
+                      ">
+                    {% csrf_token %}
+                    <input type="hidden" name="selected_ids" x-ref="bulkIdsInput">
+                    <select name="analyst" required class="px-2 py-1 border border-slate-300 rounded bg-white text-xs">
+                        <option value="">Atribuir a...</option>
+                        {% for a in analysts %}
+                            <option value="{{ a.id }}">{{ a.get_full_name|default:a.username }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="px-3 py-1 bg-govblue-600 hover:bg-govblue-700 text-white rounded font-medium transition">
+                        Atribuir em Lote
+                    </button>
+                </form>
+            </div>
+
+            <!-- Balanced suggestion modal dialog -->
+            <dialog x-ref="suggestionModal" class="p-6 rounded-lg shadow-xl border border-slate-200 max-w-lg w-full backdrop:bg-slate-900/50">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                    <h3 class="font-bold text-sm text-slate-800">Sugestão de Distribuição Balanceada</h3>
+                    <button type="button" @click="$refs.suggestionModal.close()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+                </div>
+                <div id="suggestion-modal-content" class="text-xs text-slate-600 space-y-3">
+                    Carregando sugestão balanceada...
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                    <button type="button" @click="$refs.suggestionModal.close()" class="px-3 py-1.5 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300">
+                        Fechar
+                    </button>
+                </div>
+            </dialog>
+        </div>
+    {% endif %}
+
+    <!-- Submissions Table Partial Container -->
+    <div id="submissions-table-container">
+        {% include "submissions/partials/table.html" %}
+    </div>
+</div>
+{% endblock %}

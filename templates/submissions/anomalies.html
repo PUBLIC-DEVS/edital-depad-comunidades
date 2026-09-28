@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Fila de Exceções & Alertas de Integridade — DEPED/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center pb-3 border-b border-slate-200">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Fila de Exceções & Validações Automáticas</h1>
+            <p class="text-sm text-slate-500">Substituição das abas manuais de conferência: processos com pendências cadastrais ou duplicidades</p>
+        </div>
+        <div>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold {% if total_anomalies > 0 %}bg-amber-100 text-amber-800{% else %}bg-green-100 text-green-800{% endif %}">
+                {{ total_anomalies }} processo(s) com apontamento(s)
+            </span>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3">Processo SEI</th>
+                        <th class="px-4 py-3">Instituição / CNPJ</th>
+                        <th class="px-4 py-3">Status Workflow</th>
+                        <th class="px-4 py-3">Analista</th>
+                        <th class="px-4 py-3">Alertas e Inconsistências</th>
+                        <th class="px-4 py-3 text-right">Ação</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white text-slate-700">
+                    {% for sub in submissions %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-4 py-3 font-semibold text-govblue-600">
+                                <a href="{% url 'submission-detail' submission_id=sub.id %}" class="hover:underline">
+                                    {{ sub.processo_sei }}
+                                </a>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="font-medium text-slate-900">{{ sub.institution.name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ sub.institution.formatted_cnpj }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="badge-status
+                                    {% if sub.workflow_status == 'UNDER_ANALYSIS' %}badge-emanalise
+                                    {% elif sub.workflow_status == 'ELIGIBLE_FOR_RANKING' %}badge-apta
+                                    {% elif sub.workflow_status == 'INELIGIBLE' %}badge-inapta
+                                    {% else %}badge-naoaplicavel{% endif %}">
+                                    {{ sub.get_workflow_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                {{ sub.assigned_analyst.get_full_name|default:sub.assigned_analyst.username|default:"Não atribuído" }}
+                            </td>
+                            <td class="px-4 py-3 space-y-1">
+                                {% for alert in sub.alerts %}
+                                    <div class="inline-block mr-2 px-2 py-0.5 rounded text-[11px]
+                                        {% if alert.severity == 'danger' %}bg-red-100 text-red-800 border border-red-200
+                                        {% elif alert.severity == 'warning' %}bg-amber-100 text-amber-800 border border-amber-200
+                                        {% else %}bg-blue-100 text-blue-800 border border-blue-200{% endif %}">
+                                        <strong>{{ alert.code }}:</strong> {{ alert.message }}
+                                    </div>
+                                {% endfor %}
+                            </td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <a href="{% url 'submission-detail' submission_id=sub.id %}" class="text-govblue-600 hover:text-govblue-800 font-semibold">
+                                    Inspecionar &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-4 py-8 text-center text-slate-400">
+                                Excelente! Nenhuma anomalia ou duplicidade ativa identificada no momento.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

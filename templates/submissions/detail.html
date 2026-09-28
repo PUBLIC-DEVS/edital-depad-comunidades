@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Processo {{ submission.processo_sei }} — DEPED/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb & Top bar -->
+    <div class="flex justify-between items-center pb-3 border-b border-slate-200">
+        <div class="flex items-center space-x-2 text-xs text-slate-500">
+            <a href="{% url 'submission-list' %}" class="hover:text-govblue-600">&larr; Voltar para Processos</a>
+            <span>/</span>
+            <span class="font-bold text-slate-700">{{ submission.processo_sei }}</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="badge-status
+                {% if submission.workflow_status == 'UNDER_ANALYSIS' %}badge-emanalise
+                {% elif submission.workflow_status == 'ELIGIBLE_FOR_RANKING' %}badge-apta
+                {% elif submission.workflow_status == 'INELIGIBLE' %}badge-inapta
+                {% elif submission.workflow_status == 'PENDING_REVIEW' %}badge-naoenviado
+                {% else %}badge-naoaplicavel{% endif %}">
+                {{ submission.get_workflow_status_display }}
+            </span>
+            <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">
+                {{ submission.target_group }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Anomaly Alerts Banner if any -->
+    {% if alerts %}
+        <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded shadow-sm">
+            <h3 class="text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Alertas e Inconsistências Detectadas</h3>
+            <ul class="space-y-1">
+                {% for alert in alerts %}
+                    <li class="text-xs text-amber-800 flex items-start space-x-2">
+                        <span>&#9888;</span>
+                        <span><strong>[{{ alert.code }}]</strong> {{ alert.message }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <!-- Main Overview Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: Process and Institution Info -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
+                <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
+                    Dados da Instituição e Protocolo
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <span class="text-slate-500 block">Razão Social:</span>
+                        <span class="font-semibold text-slate-900">{{ submission.institution.name }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">CNPJ:</span>
+                        <span class="font-mono font-semibold text-slate-900">{{ submission.institution.formatted_cnpj }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Município / UF da Execução:</span>
+                        <span class="font-medium text-slate-900">{{ submission.municipality.name }}/{{ submission.municipality.state }} (IBGE: {{ submission.municipality.ibge_code }})</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Data e Hora de Recebimento:</span>
+                        <span class="font-medium text-slate-900">{{ submission.received_at|date:"d/m/Y H:i:s" }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Edital de Referência:</span>
+                        <span class="font-medium text-slate-900">{{ submission.edital.number }}/{{ submission.edital.year }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Processo Administrativo SEI:</span>
+                        <span class="font-semibold text-slate-900">{{ submission.processo_sei }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vacancies & Financial Grid -->
+            <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
+                <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
+                    Vagas e Proposta Financeira
+                </h2>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                    <div class="bg-slate-50 p-3 rounded border border-slate-100 text-center">
+                        <span class="text-slate-500 block text-[11px]">Femininas</span>
+                        <span class="text-lg font-bold text-slate-800">{{ submission.vagas_femininas }}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded border border-slate-100 text-center">
+                        <span class="text-slate-500 block text-[11px]">Masculinas</span>
+                        <span class="text-lg font-bold text-slate-800">{{ submission.vagas_masculinas }}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded border border-slate-100 text-center">
+                        <span class="text-slate-500 block text-[11px]">Mães Nutrizes</span>
+                        <span class="text-lg font-bold text-slate-800">{{ submission.vagas_maes_nutrizes }}</span>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded border border-blue-100 text-center">
+                        <span class="text-blue-700 block text-[11px] font-semibold">Total Solicitado</span>
+                        <span class="text-lg font-bold text-blue-900">{{ submission.vagas_solicitadas }}</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
+                    <div>
+                        <span class="text-slate-500 block">Capacidade Total Declarada:</span>
+                        <span class="font-medium text-slate-900">{{ submission.capacidade_total }} vagas</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Valor Global da Proposta:</span>
+                        <span class="font-semibold text-slate-900">R$ {{ submission.valor_global|default:"0,00" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workspace Actions Link -->
+            <div class="bg-govblue-50 border border-blue-200 p-4 rounded-lg flex justify-between items-center">
+                <div>
+                    <h3 class="text-xs font-bold text-govblue-700">Análise Documental do Processo</h3>
+                    <p class="text-[11px] text-slate-600">Verificação de requisitos formais (4.2-I a 4.2-XVI) e emissão de parecer.</p>
+                </div>
+                <a href="/avaliacoes/processo/{{ submission.id }}/" class="px-4 py-2 bg-govblue-600 hover:bg-govblue-700 text-white text-xs font-semibold rounded shadow transition">
+                    Acessar Espaço de Análise &rarr;
+                </a>
+            </div>
+        </div>
+
+        <!-- Right: Assignment & History Panel -->
+        <div class="space-y-6">
+            <!-- Assignment Form (Distributors/Coordinators only) -->
+            {% if can_distribute %}
+                <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-3">
+                    <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Atribuição / Redistribuição
+                    </h2>
+                    <form method="post" action="{% url 'submission-assign' submission_id=submission.id %}" class="space-y-3 text-xs">
+                        {% csrf_token %}
+                        <div>
+                            <label class="block text-slate-600 mb-1 font-semibold">Designar Analista:</label>
+                            {{ assignment_form.analyst }}
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 mb-1">Motivo (opcional):</label>
+                            {{ assignment_form.reason }}
+                        </div>
+                        <button type="submit" class="w-full bg-govblue-600 hover:bg-govblue-700 text-white font-medium py-1.5 rounded transition">
+                            Atualizar Atribuição
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+
+            <!-- Assignment History Drawer -->
+            <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-3">
+                <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Histórico de Atribuições</h2>
+                <div class="divide-y divide-slate-100 text-xs">
+                    {% for asgn in assignment_history %}
+                        <div class="py-2.5 space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold text-slate-800">{{ asgn.analyst.get_full_name|default:asgn.analyst.username }}</span>
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold {% if asgn.status == 'ACTIVE' %}bg-green-100 text-green-800{% else %}bg-slate-100 text-slate-500{% endif %}">
+                                    {{ asgn.get_status_display }}
+                                </span>
+                            </div>
+                            <div class="text-[11px] text-slate-500">
+                                Atribuído por {{ asgn.assigned_by.username }} em {{ asgn.assigned_at|date:"d/m/Y H:i" }}
+                            </div>
+                            {% if asgn.reason %}
+                                <div class="text-[11px] text-slate-600 italic">"{{ asgn.reason }}"</div>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="py-4 text-center text-slate-400">Nenhuma atribuição registrada.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

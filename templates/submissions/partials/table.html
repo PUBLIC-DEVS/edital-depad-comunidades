@@ -1,0 +1,140 @@
+<div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                <tr>
+                    {% if can_distribute %}
+                        <th class="px-4 py-3 w-8">
+                            <input type="checkbox"
+                                   @change="
+                                       if ($event.target.checked) {
+                                           selectedIds = Array.from(document.querySelectorAll('.submission-checkbox')).map(cb => cb.value);
+                                       } else {
+                                           selectedIds = [];
+                                       }
+                                   "
+                                   class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        </th>
+                    {% endif %}
+                    <th class="px-4 py-3">Processo SEI</th>
+                    <th class="px-4 py-3">Instituição / CNPJ</th>
+                    <th class="px-4 py-3">Município / UF</th>
+                    <th class="px-4 py-3">Recebimento</th>
+                    <th class="px-4 py-3">Grupo</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3">Analista</th>
+                    <th class="px-4 py-3">Alertas</th>
+                    <th class="px-4 py-3 text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 bg-white text-slate-700">
+                {% for sub in page_obj.object_list %}
+                    <tr class="hover:bg-slate-50 transition">
+                        {% if can_distribute %}
+                            <td class="px-4 py-3">
+                                <input type="checkbox" value="{{ sub.id }}"
+                                       :checked="selectedIds.includes('{{ sub.id }}')"
+                                       @change="
+                                           if ($event.target.checked) {
+                                               if (!selectedIds.includes('{{ sub.id }}')) selectedIds.push('{{ sub.id }}');
+                                           } else {
+                                               selectedIds = selectedIds.filter(id => id !== '{{ sub.id }}');
+                                           }
+                                       "
+                                       class="submission-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            </td>
+                        {% endif %}
+                        <td class="px-4 py-3 font-semibold text-govblue-600">
+                            <a href="{% url 'submission-detail' submission_id=sub.id %}" class="hover:underline">
+                                {{ sub.processo_sei }}
+                            </a>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-slate-900">{{ sub.institution.name }}</div>
+                            <div class="text-[11px] text-slate-500 font-mono">{{ sub.institution.formatted_cnpj }}</div>
+                        </td>
+                        <td class="px-4 py-3">
+                            {{ sub.municipality.name }}/{{ sub.municipality.state }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            {{ sub.received_at|date:"d/m/Y H:i" }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold
+                                {% if sub.target_group == 'G1' %}bg-purple-100 text-purple-800
+                                {% elif sub.target_group == 'G2' %}bg-emerald-100 text-emerald-800
+                                {% elif sub.target_group == 'G3' %}bg-blue-100 text-blue-800
+                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {{ sub.target_group }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="badge-status
+                                {% if sub.workflow_status == 'UNDER_ANALYSIS' %}badge-emanalise
+                                {% elif sub.workflow_status == 'ELIGIBLE_FOR_RANKING' %}badge-apta
+                                {% elif sub.workflow_status == 'INELIGIBLE' %}badge-inapta
+                                {% elif sub.workflow_status == 'PENDING_REVIEW' %}badge-naoenviado
+                                {% else %}badge-naoaplicavel{% endif %}">
+                                {{ sub.get_workflow_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if sub.assigned_analyst %}
+                                <span class="font-medium text-slate-800">{{ sub.assigned_analyst.get_full_name|default:sub.assigned_analyst.username }}</span>
+                            {% else %}
+                                <span class="text-slate-400 italic">Não distribuído</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            {% if sub.alerts %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800" title="{{ sub.alerts|length }} alerta(s)">
+                                    &#9888; {{ sub.alerts|length }}
+                                </span>
+                            {% else %}
+                                <span class="text-emerald-600 font-bold" title="Nenhuma inconsistência detectada">&check;</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap">
+                            <a href="{% url 'submission-detail' submission_id=sub.id %}" class="text-govblue-600 hover:text-govblue-800 font-semibold">
+                                Ver &rarr;
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="10" class="px-4 py-8 text-center text-slate-400">
+                            Nenhum processo encontrado com os critérios informados.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+        <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+            <div>
+                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} (total de {{ page_obj.paginator.count }} registros)
+            </div>
+            <div class="flex space-x-1">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
+                       hx-get="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
+                       hx-target="#submissions-table-container"
+                       class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100">
+                        Anterior
+                    </a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
+                       hx-get="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
+                       hx-target="#submissions-table-container"
+                       class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100">
+                        Próxima
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>

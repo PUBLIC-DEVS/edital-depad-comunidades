@@ -1,0 +1,19 @@
+{% if suggestions %}
+    <p class="text-xs text-slate-500 mb-2">
+        Abaixo está a proposta de distribuição balanceada computada pelo sistema com base na menor carga de processos ativos de cada analista:
+    </p>
+    <div class="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded">
+        {% for s in suggestions %}
+            <div class="p-2 flex justify-between items-center text-xs">
+                <span class="font-medium text-slate-800">{{ s.processo_sei }}</span>
+                <span class="text-slate-500">&rarr;</span>
+                <span class="font-semibold text-blue-700">{{ s.suggested_analyst_name }}</span>
+            </div>
+        {% endfor %}
+    </div>
+    <p class="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 mt-2">
+        Nota: Esta é uma simulação orientativa. Para efetivar, selecione o analista desejado na barra de ações em lote e clique em "Atribuir em Lote".
+    </p>
+{% else %}
+    <p class="text-xs text-slate-500">Nenhum analista ativo cadastrado no sistema para balanceamento.</p>
+{% endif %}
