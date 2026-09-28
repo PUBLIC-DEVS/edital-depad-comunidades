@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Painel Operacional — Sistema de Gestão de Editais{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="border-b border-slate-200 pb-4 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Painel Operacional</h1>
+            <p class="text-sm text-slate-500">Visão consolidada da gestão do edital e fluxo de trabalho</p>
+        </div>
+        <div class="flex space-x-2">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                Sistema Operacional
+            </span>
+        </div>
+    </div>
+
+    <!-- Quick Stats Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div class="text-xs font-semibold uppercase text-slate-500 tracking-wider">Total de Inscrições</div>
+            <div class="text-2xl font-bold text-slate-900 mt-1">{{ total_submissions|default:"0" }}</div>
+            <div class="text-xs text-slate-500 mt-1">Processos recebidos no edital</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div class="text-xs font-semibold uppercase text-blue-600 tracking-wider">Em Análise</div>
+            <div class="text-2xl font-bold text-blue-700 mt-1">{{ under_analysis|default:"0" }}</div>
+            <div class="text-xs text-slate-500 mt-1">Análises documentais em curso</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div class="text-xs font-semibold uppercase text-amber-600 tracking-wider">Em Revisão / Diligência</div>
+            <div class="text-2xl font-bold text-amber-700 mt-1">{{ pending_review|default:"0" }}</div>
+            <div class="text-xs text-slate-500 mt-1">Pendências e contraditório</div>
+        </div>
+        <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div class="text-xs font-semibold uppercase text-emerald-600 tracking-wider">Aptas / Classificadas</div>
+            <div class="text-2xl font-bold text-emerald-700 mt-1">{{ eligible_count|default:"0" }}</div>
+            <div class="text-xs text-slate-500 mt-1">Elegíveis para ranking</div>
+        </div>
+    </div>
+
+    <!-- Operational Navigation Shortcuts -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+            <h2 class="text-base font-bold text-slate-900 mb-2">Processos & Distribuição</h2>
+            <p class="text-sm text-slate-600 mb-4">Acompanhe a fila completa de processos recebidos, efetue atribuição para analistas e verifique duplicidades.</p>
+            <a href="/processos/" class="inline-flex items-center text-sm font-semibold text-govblue-600 hover:text-govblue-700">
+                Acessar fila de processos &rarr;
+            </a>
+        </div>
+        <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+            <h2 class="text-base font-bold text-slate-900 mb-2">Área de Análise Documental</h2>
+            <p class="text-sm text-slate-600 mb-4">Espaço de trabalho do analista com checagem estruturada de requisitos (4.2-I a 4.2-XVI), salvamento de rascunhos e conclusão auditada.</p>
+            <a href="/minhas-analises/" class="inline-flex items-center text-sm font-semibold text-govblue-600 hover:text-govblue-700">
+                Ir para Minhas Análises &rarr;
+            </a>
+        </div>
+        <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
+            <h2 class="text-base font-bold text-slate-900 mb-2">Classificação & Ranking</h2>
+            <p class="text-sm text-slate-600 mb-4">Gere snapshots imutáveis de classificação por grupos (G1, G2 PRONASCI, G3), ordenação temporal e aplicação de regras de desempate.</p>
+            <a href="/classificacao/" class="inline-flex items-center text-sm font-semibold text-govblue-600 hover:text-govblue-700">
+                Ver classificação oficial &rarr;
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

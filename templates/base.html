@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Gestão de Editais - DEPED/MDS{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        govblue: {
+                            50: '#f0f6ff',
+                            100: '#e0ecff',
+                            600: '#0c326f',
+                            700: '#002256',
+                            800: '#001a42',
+                        },
+                        status: {
+                            atende: '#16a34a',
+                            naoatende: '#dc2626',
+                            naoenviado: '#d97706',
+                            naoaplicavel: '#64748b',
+                            emanalise: '#2563eb',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <!-- Alpine.js for lightweight declarative UI only -->
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <header class="bg-govblue-700 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="font-bold text-lg tracking-tight">DEPED / MDS</div>
+                    <span class="text-blue-300">|</span>
+                    <a href="{% url 'dashboard' %}" class="text-sm sm:text-base font-semibold text-white hover:text-blue-100 transition">
+                        Sistema de Gestão e Análise de Edital
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    {% if user.is_authenticated %}
+                        <div class="text-xs sm:text-sm text-blue-100">
+                            <span class="font-medium text-white">{{ user.get_full_name|default:user.username }}</span>
+                            <span class="inline-block ml-1 px-2 py-0.5 text-xs font-semibold bg-blue-900 text-blue-200 rounded">
+                                {{ user.get_role_display }}
+                            </span>
+                        </div>
+                        <form method="post" action="{% url 'logout' %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-xs bg-govblue-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded transition">
+                                Sair
+                            </button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="text-xs bg-white text-govblue-700 font-semibold px-3 py-1.5 rounded hover:bg-blue-50 transition">
+                            Entrar
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if user.is_authenticated %}
+            <nav class="bg-govblue-800 border-t border-govblue-600">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex space-x-4 text-xs font-medium py-2 overflow-x-auto">
+                        <a href="{% url 'dashboard' %}" class="text-white hover:text-blue-200 px-2 py-1 rounded">Painel Geral</a>
+                        <a href="/processos/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Processos</a>
+                        {% if user.is_analyst %}
+                            <a href="/minhas-analises/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Minhas Análises</a>
+                        {% endif %}
+                        {% if user.is_reviewer or user.is_coordinator %}
+                            <a href="/revisoes/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Fila de Revisão</a>
+                            <a href="/diligencias/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Diligências</a>
+                        {% endif %}
+                        <a href="/classificacao/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Classificação & Ranking</a>
+                        <a href="/metricas/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Métricas</a>
+                        {% if user.is_admin_role or user.is_staff %}
+                            <a href="/admin/" class="text-amber-300 hover:text-amber-100 px-2 py-1 rounded ml-auto">Administração</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </nav>
+        {% endif %}
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% if messages %}
+            <div class="mb-4 space-y-2">
+                {% for message in messages %}
+                    <div class="p-3 text-sm rounded shadow-sm {% if message.tags == 'error' %}bg-red-50 text-red-800 border-l-4 border-red-500{% elif message.tags == 'success' %}bg-green-50 text-green-800 border-l-4 border-green-500{% else %}bg-blue-50 text-blue-800 border-l-4 border-blue-500{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        Ministério do Desenvolvimento e Assistência Social, Família e Combate à Fome — DEPED &copy; 2026
+    </footer>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

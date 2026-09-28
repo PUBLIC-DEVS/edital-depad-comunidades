@@ -1,0 +1,27 @@
+/* Custom supplementary styles */
+.badge-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-atende { background-color: #dcfce7; color: #166534; }
+.badge-naoatende { background-color: #fee2e2; color: #991b1b; }
+.badge-naoenviado { background-color: #fef3c7; color: #92400e; }
+.badge-naoaplicavel { background-color: #f1f5f9; color: #475569; }
+.badge-emanalise { background-color: #dbeafe; color: #1e40af; }
+.badge-apta { background-color: #dcfce7; color: #166534; }
+.badge-inapta { background-color: #fee2e2; color: #991b1b; }
+
+/* HTMX transition indicators */
+.htmx-indicator {
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}
