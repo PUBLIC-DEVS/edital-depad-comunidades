@@ -27,7 +27,9 @@ class DashboardMetricsService:
 
         # Status do workflow
         status_counts = dict(
-            subs.values("workflow_status").annotate(count=Count("id")).values_list("workflow_status", "count")
+            subs.values("workflow_status")
+            .annotate(count=Count("id"))
+            .values_list("workflow_status", "count")
         )
 
         under_analysis = status_counts.get(Submission.WorkflowStatus.UNDER_ANALYSIS, 0)
@@ -43,11 +45,7 @@ class DashboardMetricsService:
 
         # Distribuídos vs. não distribuídos
         # Um processo é distribuído se tem atribuição ativa
-        distributed_count = (
-            subs.filter(assignments__status="ACTIVE")
-            .distinct()
-            .count()
-        )
+        distributed_count = subs.filter(assignments__status="ACTIVE").distinct().count()
         unassigned_count = total_received - distributed_count
 
         # Aptos vs. Inaptos
@@ -55,7 +53,12 @@ class DashboardMetricsService:
         apt_count = (
             subs.filter(
                 Q(evaluation__result=Evaluation.Result.APTA)
-                | Q(workflow_status__in=[Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING, Submission.WorkflowStatus.RANKED])
+                | Q(
+                    workflow_status__in=[
+                        Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
+                        Submission.WorkflowStatus.RANKED,
+                    ]
+                )
             )
             .distinct()
             .count()
@@ -71,7 +74,9 @@ class DashboardMetricsService:
 
         # Distribuição por grupo (G1, G2, G3, sem grupo)
         group_counts = dict(
-            subs.values("target_group").annotate(count=Count("id")).values_list("target_group", "count")
+            subs.values("target_group")
+            .annotate(count=Count("id"))
+            .values_list("target_group", "count")
         )
         by_group = {
             "G1": group_counts.get(Submission.TargetGroup.G1, 0),
@@ -81,12 +86,16 @@ class DashboardMetricsService:
         }
 
         # Distribuição por analista
-        analysts = User.objects.filter(role=User.Role.ANALISTA, is_active=True).order_by("first_name", "username")
+        analysts = User.objects.filter(role=User.Role.ANALISTA, is_active=True).order_by(
+            "first_name", "username"
+        )
         by_analyst = []
         for analyst in analysts:
             analyst_subs = subs.filter(assignments__analyst=analyst, assignments__status="ACTIVE")
             assigned_c = analyst_subs.count()
-            analyzing_c = analyst_subs.filter(workflow_status=Submission.WorkflowStatus.UNDER_ANALYSIS).count()
+            analyzing_c = analyst_subs.filter(
+                workflow_status=Submission.WorkflowStatus.UNDER_ANALYSIS
+            ).count()
             concluded_c = analyst_subs.filter(
                 workflow_status__in=[
                     Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
@@ -96,12 +105,14 @@ class DashboardMetricsService:
                     Submission.WorkflowStatus.PENDING_REVIEW,
                 ]
             ).count()
-            by_analyst.append({
-                "analyst": analyst,
-                "total_assigned": assigned_c,
-                "under_analysis": analyzing_c,
-                "concluded": concluded_c,
-            })
+            by_analyst.append(
+                {
+                    "analyst": analyst,
+                    "total_assigned": assigned_c,
+                    "under_analysis": analyzing_c,
+                    "concluded": concluded_c,
+                }
+            )
 
         # Distribuição por UF
         by_uf_qs = (
@@ -110,7 +121,9 @@ class DashboardMetricsService:
             .annotate(count=Count("id"))
             .order_by("-count")
         )
-        by_uf = [{"state": item["municipality__state"], "count": item["count"]} for item in by_uf_qs]
+        by_uf = [
+            {"state": item["municipality__state"], "count": item["count"]} for item in by_uf_qs
+        ]
 
         return {
             "total_received": total_received,
@@ -128,7 +141,9 @@ class DashboardMetricsService:
         }
 
     @classmethod
-    def get_top_failed_requirements(cls, edital: Edital | None = None, limit: int = 10) -> list[dict[str, Any]]:
+    def get_top_failed_requirements(
+        cls, edital: Edital | None = None, limit: int = 10
+    ) -> list[dict[str, Any]]:
         """Calcula o ranking dos requisitos que mais reprovaram propostas."""
         qs = CheckResult.objects.filter(
             status__in=[CheckResult.Status.NAO_ATENDE, CheckResult.Status.NAO_ENVIADO]
@@ -211,13 +226,15 @@ class DashboardMetricsService:
                     f"Soma das vagas por público ({soma}) difere do total solicitado ({sub.vagas_solicitadas})."
                 )
             if has_error:
-                capacity_inconsistencies.append({
-                    "submission": sub,
-                    "reasons": reasons,
-                    "vagas_solicitadas": sub.vagas_solicitadas,
-                    "capacidade_total": sub.capacidade_total,
-                    "soma_vagas": soma,
-                })
+                capacity_inconsistencies.append(
+                    {
+                        "submission": sub,
+                        "reasons": reasons,
+                        "vagas_solicitadas": sub.vagas_solicitadas,
+                        "capacidade_total": sub.capacidade_total,
+                        "soma_vagas": soma,
+                    }
+                )
 
         # 2. Divergências de CNPJ
         cnpj_issues = []
@@ -235,14 +252,18 @@ class DashboardMetricsService:
             )
             for c_cnpj in check_cnpjs:
                 if normalize_cnpj(c_cnpj) != normalize_cnpj(raw_cnpj):
-                    reasons.append(f"Documento anexado tem CNPJ '{c_cnpj}' diferente do cadastrado ({raw_cnpj}).")
+                    reasons.append(
+                        f"Documento anexado tem CNPJ '{c_cnpj}' diferente do cadastrado ({raw_cnpj})."
+                    )
 
             if reasons:
-                cnpj_issues.append({
-                    "submission": sub,
-                    "reasons": reasons,
-                    "institution_cnpj": raw_cnpj,
-                })
+                cnpj_issues.append(
+                    {
+                        "submission": sub,
+                        "reasons": reasons,
+                        "institution_cnpj": raw_cnpj,
+                    }
+                )
 
         # 3. Divergências entre analista e revisor
         reviewer_divergences_qs = (
@@ -275,7 +296,12 @@ class DashboardMetricsService:
         positive_with_failed_items = []
         apta_subs = subs.filter(
             Q(evaluation__result=Evaluation.Result.APTA)
-            | Q(workflow_status__in=[Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING, Submission.WorkflowStatus.RANKED])
+            | Q(
+                workflow_status__in=[
+                    Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
+                    Submission.WorkflowStatus.RANKED,
+                ]
+            )
         ).distinct()
 
         for sub in apta_subs:
@@ -285,10 +311,14 @@ class DashboardMetricsService:
                 status__in=[CheckResult.Status.NAO_ATENDE, CheckResult.Status.NAO_ENVIADO],
             ).select_related("requirement_check__requirement")
             if failed_mandatory.exists():
-                positive_with_failed_items.append({
-                    "submission": sub,
-                    "failed_requirements": [cr.requirement_check.requirement.code for cr in failed_mandatory],
-                })
+                positive_with_failed_items.append(
+                    {
+                        "submission": sub,
+                        "failed_requirements": [
+                            cr.requirement_check.requirement.code for cr in failed_mandatory
+                        ],
+                    }
+                )
 
         # 5. Processos sem município/UF
         missing_municipality = list(

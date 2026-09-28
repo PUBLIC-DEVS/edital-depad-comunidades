@@ -49,7 +49,9 @@ class TestReportingDashboardAndValidation:
         )
 
         muni_sp = Municipality.objects.create(ibge_code="3550308", name="São Paulo", state="SP")
-        muni_rj = Municipality.objects.create(ibge_code="3304557", name="Rio de Janeiro", state="RJ")
+        muni_rj = Municipality.objects.create(
+            ibge_code="3304557", name="Rio de Janeiro", state="RJ"
+        )
 
         inst1 = Institution.objects.create(name="Inst 1", cnpj="00000000000191")
         inst2 = Institution.objects.create(name="Inst 2", cnpj="00000000000272")
@@ -66,9 +68,7 @@ class TestReportingDashboardAndValidation:
         req2 = Requirement.objects.create(
             edital=edital, code="4.2-V", name="Estatuto Social", mandatory=True, order=2
         )
-        RequirementCheck.objects.create(
-            requirement=req2, name="Finalidade institucional", order=1
-        )
+        RequirementCheck.objects.create(requirement=req2, name="Finalidade institucional", order=1)
 
         # Submissão 1 - G1, distribuída, sob análise
         sub1 = Submission.objects.create(
@@ -85,11 +85,16 @@ class TestReportingDashboardAndValidation:
             capacidade_total=30,
             workflow_status=Submission.WorkflowStatus.UNDER_ANALYSIS,
         )
-        Assignment.objects.create(submission=sub1, analyst=analyst, assigned_by=coord, status=Assignment.Status.ACTIVE)
+        Assignment.objects.create(
+            submission=sub1, analyst=analyst, assigned_by=coord, status=Assignment.Status.ACTIVE
+        )
 
         # Avaliação com reprovação no 4.2-XVI
         eval1 = Evaluation.objects.create(
-            submission=sub1, analyst=analyst, status=Evaluation.Status.COMPLETED, result=Evaluation.Result.INAPTA
+            submission=sub1,
+            analyst=analyst,
+            status=Evaluation.Status.COMPLETED,
+            result=Evaluation.Result.INAPTA,
         )
         cr1 = CheckResult.objects.create(
             evaluation=eval1,
@@ -110,12 +115,17 @@ class TestReportingDashboardAndValidation:
             vagas_masculinas=5,
             vagas_maes_nutrizes=0,
             vagas_solicitadas=20,  # Inconsistência: 5+5 != 20!
-            capacidade_total=10,   # Inconsistência: 20 > 10!
+            capacidade_total=10,  # Inconsistência: 20 > 10!
             workflow_status=Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
         )
-        Assignment.objects.create(submission=sub2, analyst=analyst, assigned_by=coord, status=Assignment.Status.ACTIVE)
+        Assignment.objects.create(
+            submission=sub2, analyst=analyst, assigned_by=coord, status=Assignment.Status.ACTIVE
+        )
         eval2 = Evaluation.objects.create(
-            submission=sub2, analyst=analyst, status=Evaluation.Status.COMPLETED, result=Evaluation.Result.APTA
+            submission=sub2,
+            analyst=analyst,
+            status=Evaluation.Status.COMPLETED,
+            result=Evaluation.Result.APTA,
         )
         CheckResult.objects.create(
             evaluation=eval2,
@@ -192,7 +202,9 @@ class TestReportingDashboardAndValidation:
         assert top_failed[0]["failure_count"] == 2  # Sub1 e Sub2
 
         # Submissões reprovadas pelo código
-        failing_subs = DashboardMetricsService.get_submissions_failing_requirement("4.2-XVI", data["edital"])
+        failing_subs = DashboardMetricsService.get_submissions_failing_requirement(
+            "4.2-XVI", data["edital"]
+        )
         failing_seis = [s.processo_sei for s in failing_subs]
         assert "SEI-001" in failing_seis
         assert "SEI-002" in failing_seis
@@ -208,12 +220,16 @@ class TestReportingDashboardAndValidation:
         assert insights["positive_with_failed_items"][0]["submission"].processo_sei == "SEI-002"
 
         # Inconsistência de capacidade / vagas
-        cap_subs = [item["submission"].processo_sei for item in insights["capacity_inconsistencies"]]
+        cap_subs = [
+            item["submission"].processo_sei for item in insights["capacity_inconsistencies"]
+        ]
         assert "SEI-002" in cap_subs
 
         # Divergência de revisor
         assert len(insights["reviewer_divergences"]) == 1
-        assert insights["reviewer_divergences"][0]["analyst_decision"] == CheckResult.Status.NAO_ATENDE
+        assert (
+            insights["reviewer_divergences"][0]["analyst_decision"] == CheckResult.Status.NAO_ATENDE
+        )
         assert insights["reviewer_divergences"][0]["reviewer_decision"] == CheckResult.Status.ATENDE
 
         # Processo sem município

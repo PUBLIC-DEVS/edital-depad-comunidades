@@ -110,12 +110,14 @@ def metrics_export_csv_view(request):
     writer.writerow([])
     writer.writerow(["Analista", "Total Atribuídos", "Em Análise", "Concluídos"])
     for a in summary["by_analyst"]:
-        writer.writerow([
-            a["analyst"].get_full_name() or a["analyst"].username,
-            a["total_assigned"],
-            a["under_analysis"],
-            a["concluded"],
-        ])
+        writer.writerow(
+            [
+                a["analyst"].get_full_name() or a["analyst"].username,
+                a["total_assigned"],
+                a["under_analysis"],
+                a["concluded"],
+            ]
+        )
 
     writer.writerow([])
     writer.writerow(["UF", "Total de Processos"])
