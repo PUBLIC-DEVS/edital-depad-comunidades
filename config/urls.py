@@ -3,7 +3,8 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
 from apps.evaluations.views import my_evaluations_view
-from config.views import dashboard_view, health_check
+from apps.reporting.views import dashboard_metrics_view
+from config.views import health_check
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,5 +17,6 @@ urlpatterns = [
     path("revisoes/", include("apps.reviews.urls")),
     path("diligencias/", include("apps.reviews.diligence_urls")),
     path("classificacao/", include("apps.ranking.urls")),
-    path("", dashboard_view, name="dashboard"),
+    path("metricas/", include("apps.reporting.urls")),
+    path("", dashboard_metrics_view, name="dashboard"),
 ]

@@ -177,6 +177,8 @@ class ScopedQuerySetSelector:
 
 def require_role(*roles: str):
     """Decorator para views exigindo determinados papéis de usuário."""
+    if len(roles) == 1 and isinstance(roles[0], (list, tuple, set)):
+        roles = tuple(roles[0])
 
     def decorator(view_func):
         @wraps(view_func)
