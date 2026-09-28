@@ -44,6 +44,7 @@ select = [
 ignore = [
     "B904",  # allow raise without from inside custom exceptions where clean
     "B008",  # do not perform function calls in argument defaults
+    "E501",  # line length handled by ruff format
 ]
 
 [tool.ruff.lint.isort]
