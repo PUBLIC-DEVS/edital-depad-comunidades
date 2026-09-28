@@ -13,5 +13,7 @@ urlpatterns = [
     path("processos/", include("apps.submissions.urls")),
     path("avaliacoes/", include("apps.evaluations.urls")),
     path("minhas-analises/", my_evaluations_view, name="my-evaluations"),
+    path("revisoes/", include("apps.reviews.urls")),
+    path("diligencias/", include("apps.reviews.diligence_urls")),
     path("", dashboard_view, name="dashboard"),
 ]

@@ -56,7 +56,10 @@ def evaluation_workspace_view(request: HttpRequest, submission_id: int) -> HttpR
     evaluation = EvaluationService.initialize_evaluation(submission, analyst=request.user)
 
     # Se a submissão estava em ASSIGNED, transiciona para UNDER_ANALYSIS
-    if submission.workflow_status == Submission.WorkflowStatus.ASSIGNED and request.user.role == User.Role.ANALISTA:
+    if (
+        submission.workflow_status == Submission.WorkflowStatus.ASSIGNED
+        and request.user.role == User.Role.ANALISTA
+    ):
         from apps.submissions.services.workflow import WorkflowService
 
         WorkflowService.transition(

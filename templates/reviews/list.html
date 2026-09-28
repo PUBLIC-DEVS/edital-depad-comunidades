@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Fila de Revisão — DEPED/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center pb-3 border-b border-slate-200">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Fila de Revisão</h1>
+            <p class="text-sm text-slate-500">Conformidade e controle de qualidade das análises documentais concluídas</p>
+        </div>
+        <div class="text-xs bg-purple-50 text-purple-900 border border-purple-200 px-3 py-1.5 rounded font-semibold">
+            {{ total_count }} processo(s) na fila de revisão
+        </div>
+    </div>
+
+    <!-- Review list table -->
+    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3">Processo SEI</th>
+                        <th class="px-4 py-3">Instituição / CNPJ</th>
+                        <th class="px-4 py-3">Analista Original</th>
+                        <th class="px-4 py-3">Data da Análise</th>
+                        <th class="px-4 py-3">Parecer Original</th>
+                        <th class="px-4 py-3">Status da Revisão</th>
+                        <th class="px-4 py-3">Revisor</th>
+                        <th class="px-4 py-3 text-right">Ação</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white text-slate-700">
+                    {% for rev in reviews %}
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="px-4 py-3 font-semibold text-govblue-600">
+                                {{ rev.submission.processo_sei }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="font-medium text-slate-900">{{ rev.submission.institution.name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ rev.submission.institution.formatted_cnpj }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                {{ rev.evaluation.analyst.get_full_name|default:rev.evaluation.analyst.username }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {{ rev.evaluation.completed_at|date:"d/m/Y H:i"|default:rev.created_at|date:"d/m/Y H:i" }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="badge-status
+                                    {% if rev.evaluation.result == 'APTA' %}badge-apta
+                                    {% elif rev.evaluation.result == 'INAPTA' %}badge-inapta
+                                    {% else %}badge-emanalise{% endif %}">
+                                    {{ rev.evaluation.get_result_display }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-0.5 rounded text-[11px] font-semibold
+                                    {% if rev.status == 'PENDING' %}bg-amber-100 text-amber-800
+                                    {% else %}bg-green-100 text-green-800{% endif %}">
+                                    {{ rev.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                {{ rev.reviewer.get_full_name|default:rev.reviewer.username }}
+                            </td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <a href="{% url 'review-detail' review_id=rev.id %}" class="inline-flex items-center px-3 py-1 bg-govblue-600 hover:bg-govblue-700 text-white rounded text-xs font-semibold shadow-sm transition">
+                                    Revisar &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="px-4 py-8 text-center text-slate-400">
+                                Nenhum processo aguardando revisão no momento.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
