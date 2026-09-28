@@ -15,5 +15,6 @@ urlpatterns = [
     path("minhas-analises/", my_evaluations_view, name="my-evaluations"),
     path("revisoes/", include("apps.reviews.urls")),
     path("diligencias/", include("apps.reviews.diligence_urls")),
+    path("classificacao/", include("apps.ranking.urls")),
     path("", dashboard_view, name="dashboard"),
 ]

@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Classificação e Ranking — DEPED/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-slate-200 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Classificação e Ranking</h1>
+            <p class="text-sm text-slate-500">Ordenação determinística por grupos, precedência temporal e snapshots oficiais imutáveis</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <a href="{% url 'ranking-history' %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-xs transition border border-slate-300">
+                Histórico de Snapshots
+            </a>
+            {% if latest_snapshot %}
+                <a href="{% url 'ranking-export-csv' snapshot_id=latest_snapshot.id %}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded text-xs shadow-sm transition">
+                    &darr; Exportar CSV Oficial
+                </a>
+            {% endif %}
+            {% if can_generate %}
+                <button type="button" @click="$refs.generateModal.showModal()" class="px-3 py-1.5 bg-govblue-600 hover:bg-govblue-700 text-white font-semibold rounded text-xs shadow-sm transition">
+                    + Gerar Novo Snapshot
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Active Snapshot Info Banner -->
+    {% if latest_snapshot %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+            <div>
+                <span class="font-bold text-govblue-800 uppercase tracking-wider text-[11px] block">Snapshot Ativo:</span>
+                <span class="text-sm font-bold text-slate-900">{{ latest_snapshot.get_snapshot_type_display }}</span>
+                <span class="text-slate-600 ml-2">({{ latest_snapshot.created_at|date:"d/m/Y H:i:s" }}) — Regras v{{ latest_snapshot.rules_version }} — Política: {{ latest_snapshot.duplicate_policy }}</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
+                    &check; Imutável e Auditado
+                </span>
+            </div>
+        </div>
+    {% else %}
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-xs text-amber-900 flex justify-between items-center">
+            <span>Nenhum snapshot de ranking foi gerado ainda para este edital. Coordenadores podem gerar o snapshot oficial acima.</span>
+        </div>
+    {% endif %}
+
+    <!-- Filter toolbar: Group buttons -->
+    <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm text-xs">
+        <div class="flex items-center space-x-2">
+            <span class="font-semibold text-slate-600">Filtrar por Grupo:</span>
+            <a href="?group=" class="px-3 py-1 rounded font-medium {% if not group_filter %}bg-govblue-600 text-white{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+                Todos os Grupos
+            </a>
+            <a href="?group=G1" class="px-3 py-1 rounded font-medium {% if group_filter == 'G1' %}bg-purple-600 text-white{% else %}bg-purple-50 text-purple-800 hover:bg-purple-100{% endif %}">
+                G1 (Mulheres/Nutrizes)
+            </a>
+            <a href="?group=G2" class="px-3 py-1 rounded font-medium {% if group_filter == 'G2' %}bg-emerald-600 text-white{% else %}bg-emerald-50 text-emerald-800 hover:bg-emerald-100{% endif %}">
+                G2 (PRONASCI)
+            </a>
+            <a href="?group=G3" class="px-3 py-1 rounded font-medium {% if group_filter == 'G3' %}bg-blue-600 text-white{% else %}bg-blue-50 text-blue-800 hover:bg-blue-100{% endif %}">
+                G3 (Demais Municípios)
+            </a>
+        </div>
+        <div class="text-slate-500 font-medium">
+            {{ entries|length }} registro(s) classificado(s)
+        </div>
+    </div>
+
+    <!-- Ranking Table -->
+    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
+                <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3 text-center w-12">Posição</th>
+                        <th class="px-4 py-3">Grupo</th>
+                        <th class="px-4 py-3">Processo SEI</th>
+                        <th class="px-4 py-3">Instituição / CNPJ</th>
+                        <th class="px-4 py-3">Município / UF</th>
+                        <th class="px-4 py-3">Protocolo</th>
+                        <th class="px-4 py-3 text-center">Vagas</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Observações / Desempate</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white text-slate-700">
+                    {% for entry in entries %}
+                        <tr class="hover:bg-slate-50 transition {% if entry.is_duplicate_suppressed %}opacity-50 bg-slate-50{% endif %}">
+                            <td class="px-4 py-3 text-center font-bold text-slate-900 text-sm">
+                                {% if entry.is_duplicate_suppressed %}
+                                    <span class="text-slate-400 text-xs italic">-</span>
+                                {% else %}
+                                    #{{ entry.position }}
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-0.5 rounded text-[11px] font-bold
+                                    {% if entry.target_group == 'G1' %}bg-purple-100 text-purple-800
+                                    {% elif entry.target_group == 'G2' %}bg-emerald-100 text-emerald-800
+                                    {% elif entry.target_group == 'G3' %}bg-blue-100 text-blue-800
+                                    {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                    {{ entry.target_group }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 font-semibold text-govblue-600">
+                                <a href="{% url 'submission-detail' submission_id=entry.submission.id %}" class="hover:underline">
+                                    {{ entry.submission.processo_sei }}
+                                </a>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="font-medium text-slate-900">{{ entry.submission.institution.name }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ entry.submission.institution.formatted_cnpj }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                {{ entry.submission.municipality.name }}/{{ entry.submission.municipality.state }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap font-mono text-[11px]">
+                                {{ entry.received_at|date:"d/m/Y H:i:s" }}
+                            </td>
+                            <td class="px-4 py-3 text-center font-bold text-slate-800">
+                                {{ entry.total_vacancies }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="badge-status
+                                    {% if entry.qualification_status == 'Apta' or entry.qualification_status == 'Elegível para Ranking' or entry.qualification_status == 'Classificada no Ranking' %}badge-apta
+                                    {% elif entry.qualification_status == 'Inapta' or entry.qualification_status == 'Inabilitada / Inelegível' %}badge-inapta
+                                    {% else %}badge-emanalise{% endif %}">
+                                    {{ entry.qualification_status }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-[11px] text-slate-500">
+                                {{ entry.tie_breaker_notes }}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9" class="px-4 py-8 text-center text-slate-400">
+                                Nenhuma inscrição classificada encontrada para este filtro.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal for Generating New Snapshot (Coordinators/Admins) -->
+    {% if can_generate %}
+        <dialog x-ref="generateModal" class="p-6 rounded-lg shadow-xl border border-slate-200 max-w-md w-full backdrop:bg-slate-900/50">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+                <h3 class="font-bold text-sm text-slate-800">Gerar Novo Snapshot de Ranking</h3>
+                <button type="button" @click="$refs.generateModal.close()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+            <form method="post" action="{% url 'ranking-generate-snapshot' %}" class="space-y-4 text-xs">
+                {% csrf_token %}
+                <input type="hidden" name="edital_id" value="{{ edital.id }}">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Tipo de Snapshot:</label>
+                    <select name="snapshot_type" class="w-full px-2 py-1.5 border border-slate-300 rounded bg-white text-xs">
+                        {% for code, label in snapshot_types %}
+                            <option value="{{ code }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Descrição / Justificativa da Emissão:</label>
+                    <input type="text" name="description" placeholder="Ex: Publicação do resultado preliminar oficial no DOU"
+                           class="w-full px-2 py-1.5 border border-slate-300 rounded text-xs bg-white">
+                </div>
+                <div class="bg-amber-50 p-2.5 rounded border border-amber-200 text-amber-800 text-[11px]">
+                    <strong>Atenção:</strong> A geração calculará o enquadramento em grupos, resolverá duplicidades pela política do edital e criará um registro histórico imutável.
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end space-x-2">
+                    <button type="button" @click="$refs.generateModal.close()" class="px-3 py-1.5 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-1.5 bg-govblue-600 hover:bg-govblue-700 text-white font-bold rounded shadow transition">
+                        Confirmar Geração
+                    </button>
+                </div>
+            </form>
+        </dialog>
+    {% endif %}
+</div>
+{% endblock %}
