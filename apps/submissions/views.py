@@ -204,7 +204,13 @@ def submission_detail_view(request: HttpRequest, submission_id: int) -> HttpResp
                 User.Role.COORDENADOR,
             }
         )
-        and not hasattr(submission, "evaluation"),
+        and (
+            not hasattr(submission, "evaluation")
+            or (
+                submission.evaluation.status == "DRAFT"
+                and submission.workflow_status == "UNDER_ANALYSIS"
+            )
+        ),
     }
     return render(request, "submissions/detail.html", context)
 
@@ -231,7 +237,7 @@ def submission_cnpj_correction_view(request, submission_id):
         else:
             messages.success(request, "CNPJ corrigido com justificativa e trilha de auditoria.")
     else:
-        errors = [*form.errors.get("cnpj", []), *form.errors.get("reason", [])]
+        errors = [message for values in form.errors.values() for message in values]
         messages.error(request, "; ".join(errors))
     return redirect("submission-detail", submission_id=submission_id)
 

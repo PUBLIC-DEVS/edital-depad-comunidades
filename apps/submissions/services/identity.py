@@ -6,9 +6,11 @@ from django.db import transaction
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.evaluations.models import Evaluation
+from apps.evaluations.validation_rules import ValidationRuleEvaluator
 from apps.institutions.cnpj import cnpj_validator, normalize_cnpj
 from apps.institutions.models import Institution
 from apps.submissions.models import Submission
+from apps.submissions.services.eligibility import ParticipationEligibilityService
 
 
 class SubmissionIdentityService:
@@ -29,8 +31,30 @@ class SubmissionIdentityService:
             .select_related("institution", "edital")
             .get(pk=submission.pk)
         )
-        if Evaluation.objects.filter(submission=locked).exists():
-            raise ValidationError("CNPJ não pode ser corrigido após o início da análise.")
+        evaluation = Evaluation.objects.select_for_update().filter(submission=locked).first()
+        if evaluation and (
+            evaluation.status != Evaluation.Status.DRAFT
+            or locked.workflow_status != Submission.WorkflowStatus.UNDER_ANALYSIS
+        ):
+            raise ValidationError(
+                "Correção durante análise exige avaliação em rascunho no estágio de análise. "
+                "Decisões concluídas não são alteradas por esta operação."
+            )
+        if locked.workflow_status in {
+            Submission.WorkflowStatus.RANKED,
+            Submission.WorkflowStatus.CLOSED,
+        }:
+            raise ValidationError("Processo classificado ou encerrado não permite esta correção.")
+        if (
+            evaluation
+            and ParticipationEligibilityService.active_restrictions(
+                locked.edital, normalized
+            ).exists()
+        ):
+            raise ValidationError(
+                "Novo CNPJ possui restrição ativa. Correção não aplicada: "
+                "a fonte de restrição deve ser tratada formalmente antes da recuperação."
+            )
         old_institution = locked.institution
         if old_institution.cnpj == normalized:
             raise ValidationError("O CNPJ informado já é o CNPJ canônico desta candidatura.")
@@ -51,6 +75,11 @@ class SubmissionIdentityService:
             institution.save()
         locked.institution = institution
         locked.save(update_fields=["institution", "updated_at"])
+        duplicates = list(
+            Submission.objects.filter(edital=locked.edital, institution=institution)
+            .exclude(pk=locked.pk)
+            .values_list("pk", flat=True)
+        )
         AuditEvent.objects.create(
             actor=actor,
             entity_type="Submission",
@@ -63,9 +92,43 @@ class SubmissionIdentityService:
                 "reason": reason.strip(),
                 "old_institution_id": old_institution.pk,
                 "new_institution_id": institution.pk,
+                "duplicate_submission_ids": duplicates,
             },
         )
-        from apps.submissions.services.eligibility import ParticipationEligibilityService
-
-        ParticipationEligibilityService.apply_preanalysis_block(locked, actor)
+        if evaluation:
+            # Confirmation referred to the old canonical identity. Keep every document value.
+            for result in evaluation.check_results.filter(canonical_cnpj_confirmed=True):
+                result.canonical_cnpj_confirmed = False
+                result.save(update_fields=["canonical_cnpj_confirmed", "updated_at"])
+                AuditEvent.objects.create(
+                    actor=actor,
+                    entity_type="CheckResult",
+                    entity_id=str(result.pk),
+                    action="FIELD_CHANGE",
+                    field="canonical_cnpj_confirmed",
+                    old_value="True",
+                    new_value="False",
+                    metadata={
+                        "evaluation_id": evaluation.pk,
+                        "reason": "Canonical identity correction",
+                    },
+                )
+            evaluation.submission = locked
+            outcomes = ValidationRuleEvaluator.evaluate_evaluation(evaluation)
+            AuditEvent.objects.create(
+                actor=actor,
+                entity_type="Evaluation",
+                entity_id=str(evaluation.pk),
+                action="IDENTITY_VALIDATIONS_REEVALUATED",
+                metadata={
+                    "submission_id": locked.pk,
+                    "outcomes": [
+                        {"rule_id": item.rule.pk, "status": item.status}
+                        for item in outcomes
+                        if item.rule.rule_type == "CNPJ_MATCH_CANONICAL"
+                    ],
+                },
+            )
+        else:
+            ParticipationEligibilityService.apply_preanalysis_block(locked, actor)
         return locked

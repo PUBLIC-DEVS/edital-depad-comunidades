@@ -279,6 +279,7 @@ class ParticipationRestrictionForm(forms.ModelForm):
 
 
 class SubmissionCnpjCorrectionForm(forms.Form):
+    confirm = forms.BooleanField(label="Confirmo a correção formal desta candidatura.")
     cnpj = forms.CharField(
         max_length=20,
         label="CNPJ correto declarado no Anexo I",
