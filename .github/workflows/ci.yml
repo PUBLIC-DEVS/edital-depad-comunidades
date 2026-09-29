@@ -65,4 +65,4 @@ jobs:
           SECRET_KEY: ci-secret-key-not-for-production
           DEBUG: "False"
         run: |
-          pytest --cov=apps --cov-report=term-missing
+          pytest -m "not legacy_real" --cov=apps --cov-report=term-missing

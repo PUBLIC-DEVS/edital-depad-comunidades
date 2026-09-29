@@ -26,12 +26,11 @@ class ProgramMunicipalityAdmin(admin.ModelAdmin):
 class FundingRuleAdmin(admin.ModelAdmin):
     list_display = (
         "edital",
-        "target_group",
-        "monthly_value_per_vacancy",
+        "vacancy_type",
+        "monthly_value",
         "duration_months",
-        "minimum_equity_percentage",
     )
-    list_filter = ("edital", "target_group")
+    list_filter = ("edital", "vacancy_type")
 
 
 @admin.register(Requirement)

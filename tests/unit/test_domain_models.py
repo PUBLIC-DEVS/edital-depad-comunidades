@@ -84,12 +84,11 @@ class TestDomainModels:
     def test_funding_rule(self, edital):
         rule = FundingRule.objects.create(
             edital=edital,
-            target_group="G1",
-            monthly_value_per_vacancy=Decimal("2000.00"),
+            vacancy_type="FEMALE",
+            monthly_value=Decimal("2000.00"),
             duration_months=12,
-            minimum_equity_percentage=Decimal("10.00"),
         )
-        assert rule.monthly_value_per_vacancy == Decimal("2000.00")
+        assert rule.monthly_value == Decimal("2000.00")
 
     def test_program_municipality(self, edital, municipality):
         prog = ProgramMunicipality.objects.create(

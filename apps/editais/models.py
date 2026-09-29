@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -46,6 +49,12 @@ class Edital(models.Model):
             ("ELIGIBLE", "Primeira inscrição elegível"),
         ],
         default="ABSOLUTE",
+    )
+    minimum_equity_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("10.00"),
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
     tie_breaker_policy = models.CharField(
         max_length=30,
@@ -117,13 +126,13 @@ class ProgramMunicipality(models.Model):
         return f"{mun} - {self.program_name} ({self.edital.number}/{self.edital.year})"
 
 
-class FundingRule(models.Model):
+class LegacyGroupFundingRule(models.Model):
     """Regras financeiras parametrizadas por edital e grupo de atendimento."""
 
     edital = models.ForeignKey(
         Edital,
         on_delete=models.CASCADE,
-        related_name="funding_rules",
+        related_name="legacy_group_funding_rules",
         verbose_name="Edital",
     )
     target_group = models.CharField(
@@ -163,6 +172,30 @@ class FundingRule(models.Model):
     def __str__(self):
         ed = f"{self.edital.number}/{self.edital.year}"
         return f"{ed} - {self.target_group}: R$ {self.monthly_value_per_vacancy}/mês"
+
+
+class FundingRule(models.Model):
+    """Financial rule by vacancy type. Old group rules remain in an archive table."""
+
+    class VacancyType(models.TextChoices):
+        FEMALE = "FEMALE", "Feminina"
+        MALE = "MALE", "Masculina"
+        NURSING_MOTHER = "NURSING_MOTHER", "Mãe nutriz"
+
+    edital = models.ForeignKey(Edital, on_delete=models.CASCADE, related_name="funding_rules")
+    vacancy_type = models.CharField(max_length=20, choices=VacancyType.choices)
+    monthly_value = models.DecimalField(
+        max_digits=12, decimal_places=2, validators=[MinValueValidator(0)]
+    )
+    duration_months = models.PositiveIntegerField(default=12, validators=[MinValueValidator(1)])
+
+    class Meta:
+        db_table = "editais_vacancy_funding_rule"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["edital", "vacancy_type"], name="unique_funding_vacancy_type"
+            )
+        ]
 
 
 class Requirement(models.Model):

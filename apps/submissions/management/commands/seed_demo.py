@@ -17,7 +17,7 @@ from apps.editais.models import (
 )
 from apps.evaluations.models import CheckResult, Evaluation
 from apps.institutions.models import Institution, Municipality
-from apps.ranking.models import RankingEntry, RankingSnapshot
+from apps.ranking.models import RankingSnapshot
 from apps.ranking.services.classification import ClassificationService
 from apps.reviews.models import Diligence, Review, ReviewItemDecision
 from apps.submissions.models import Assignment, Submission
@@ -144,34 +144,17 @@ class Command(BaseCommand):
                 },
             )
 
-            # Regras Financeiras
-            FundingRule.objects.get_or_create(
-                edital=edital,
-                target_group="G1",
-                defaults={
-                    "monthly_value_per_vacancy": Decimal("1500.00"),
-                    "duration_months": 12,
-                    "minimum_equity_percentage": Decimal("10.00"),
-                },
-            )
-            FundingRule.objects.get_or_create(
-                edital=edital,
-                target_group="G2",
-                defaults={
-                    "monthly_value_per_vacancy": Decimal("1300.00"),
-                    "duration_months": 12,
-                    "minimum_equity_percentage": Decimal("10.00"),
-                },
-            )
-            FundingRule.objects.get_or_create(
-                edital=edital,
-                target_group="G3",
-                defaults={
-                    "monthly_value_per_vacancy": Decimal("1100.00"),
-                    "duration_months": 12,
-                    "minimum_equity_percentage": Decimal("10.00"),
-                },
-            )
+            # Regras por tipo de vaga; nunca derivadas dos grupos G1/G2/G3.
+            for vacancy_type, amount in [
+                ("FEMALE", "1172.23"),
+                ("MALE", "1172.23"),
+                ("NURSING_MOTHER", "1527.37"),
+            ]:
+                FundingRule.objects.get_or_create(
+                    edital=edital,
+                    vacancy_type=vacancy_type,
+                    defaults={"monthly_value": Decimal(amount), "duration_months": 12},
+                )
 
             # Requisitos Documentais e Subcritérios
             req_data = [
@@ -557,30 +540,11 @@ class Command(BaseCommand):
             for s in [sub1, sub2, sub3, sub4, sub5, sub6, sub7]:
                 ClassificationService.classify_and_update(s)
 
-            # 6. Snapshot de Ranking Publicado de Demonstração
-            snapshot, _ = RankingSnapshot.objects.get_or_create(
-                edital=edital,
-                snapshot_type=RankingSnapshot.SnapshotType.PRELIMINAR,
-                rules_version="1.0",
-                defaults={
-                    "generated_by": coord_user,
-                    "duplicate_policy": "KEEP_EARLIEST_SUBMISSION",
-                    "description": "Resultado Preliminar de Classificação — Demonstração",
-                    "is_immutable": True,
-                },
-            )
-            RankingEntry.objects.get_or_create(
-                snapshot=snapshot,
-                submission=sub1,
-                defaults={
-                    "target_group": "G1",
-                    "position": 1,
-                    "received_at": sub1.received_at,
-                    "total_vacancies": 20,
-                    "qualification_status": "APTA",
-                    "tie_breaker_notes": "1º lugar por antiguidade temporal de protocolo.",
-                },
-            )
+            # Official snapshot goes through the same service as production.
+            from apps.ranking.services import RankingService
+
+            if not RankingSnapshot.objects.filter(edital=edital).exists():
+                RankingService.generate_snapshot(edital, coord_user, description="Demonstração")
 
             # 7. Eventos de Auditoria
             AuditEvent.objects.create(

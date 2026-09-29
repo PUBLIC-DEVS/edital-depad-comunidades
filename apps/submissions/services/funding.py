@@ -1,72 +1,59 @@
-"""Serviço de cálculo e validação das regras financeiras do edital."""
+"""Decimal financial calculations by vacancy type, with explicit cent rounding."""
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
-from apps.editais.models import Edital, FundingRule
+from django.core.exceptions import ValidationError
+
+from apps.editais.models import FundingRule
 
 
 class FundingRuleNotFoundError(Exception):
-    """Lançada quando não há regra financeira configurada para o grupo/edital."""
+    pass
 
 
 class FundingService:
-    """Calcula valores mensais, valores globais e patrimônio líquido mínimo exigido."""
-
     @staticmethod
-    def get_funding_rule(edital: Edital, target_group: str) -> FundingRule:
-        """Obtém a regra financeira específica do grupo ou a regra geral do edital."""
-        rule = FundingRule.objects.filter(edital=edital, target_group=target_group).first()
-        if not rule:
-            # Fallback para regra geral do edital se cadastrada
-            rule = FundingRule.objects.filter(edital=edital, target_group="GERAL").first()
-
-        if not rule:
-            msg = f"Nenhuma regra financeira encontrada para o edital {edital} e grupo {target_group}."
-            raise FundingRuleNotFoundError(msg)
+    def get_funding_rule(edital, vacancy_type):
+        rule = FundingRule.objects.filter(edital=edital, vacancy_type=vacancy_type).first()
+        if rule is None:
+            raise FundingRuleNotFoundError(f"Missing rule for {vacancy_type}")
         return rule
 
     @classmethod
-    def calculate_monthly_value(cls, edital: Edital, target_group: str, vacancies: int) -> Decimal:
-        """Calcula o valor financeiro mensal: (valor por vaga) * (número de vagas)."""
-        rule = cls.get_funding_rule(edital, target_group)
-        return rule.monthly_value_per_vacancy * Decimal(vacancies)
+    def calculate_monthly_value(cls, edital, vacancy_type, vacancies):
+        if vacancies < 0 or int(vacancies) != vacancies:
+            raise ValidationError("Vagas devem ser inteiras e não negativas.")
+        return cls.get_funding_rule(edital, vacancy_type).monthly_value * Decimal(vacancies)
 
     @classmethod
-    def calculate_global_value(
-        cls,
-        edital: Edital,
-        target_group: str,
-        vacancies: int,
-        duration_months: int | None = None,
-    ) -> Decimal:
-        """Calcula o valor global proposto: (mensal) * (duração em meses)."""
-        rule = cls.get_funding_rule(edital, target_group)
-        months = duration_months if duration_months is not None else rule.duration_months
-        monthly_total = cls.calculate_monthly_value(edital, target_group, vacancies)
-        return monthly_total * Decimal(months)
+    def calculate_global_value(cls, edital, vacancy_type, vacancies, duration_months=None):
+        rule = cls.get_funding_rule(edital, vacancy_type)
+        months = rule.duration_months if duration_months is None else duration_months
+        if months <= 0:
+            raise ValidationError("Duração deve ser positiva.")
+        return (
+            cls.calculate_monthly_value(edital, vacancy_type, vacancies) * Decimal(months)
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @staticmethod
+    def calculate_minimum_equity(edital, valor_global):
+        return (valor_global * edital.minimum_equity_percentage / Decimal(100)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
     @classmethod
-    def calculate_minimum_equity(
-        cls,
-        edital: Edital,
-        target_group: str,
-        valor_global: Decimal,
-    ) -> Decimal:
-        """Calcula o patrimônio líquido mínimo exigido com base no percentual configurado."""
-        rule = cls.get_funding_rule(edital, target_group)
-        percentage = rule.minimum_equity_percentage
-        if percentage <= Decimal("0.00"):
-            return Decimal("0.00")
-        return (valor_global * percentage) / Decimal("100.00")
+    def calculate_submission_values(cls, submission):
+        amounts = [
+            (FundingRule.VacancyType.FEMALE, submission.vagas_femininas),
+            (FundingRule.VacancyType.MALE, submission.vagas_masculinas),
+            (FundingRule.VacancyType.NURSING_MOTHER, submission.vagas_maes_nutrizes),
+        ]
+        total = sum(
+            (cls.calculate_global_value(submission.edital, t, n) for t, n in amounts if n),
+            Decimal(0),
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return total, cls.calculate_minimum_equity(submission.edital, total)
 
     @classmethod
-    def validate_equity_adequacy(
-        cls,
-        edital: Edital,
-        target_group: str,
-        valor_global: Decimal,
-        patrimonio_declarado: Decimal,
-    ) -> bool:
-        """Verifica se o patrimônio líquido da entidade é suficiente frente ao valor global."""
-        minimo = cls.calculate_minimum_equity(edital, target_group, valor_global)
-        return patrimonio_declarado >= minimo
+    def validate_equity_adequacy(cls, edital, valor_global, patrimonio_declarado):
+        return patrimonio_declarado >= cls.calculate_minimum_equity(edital, valor_global)

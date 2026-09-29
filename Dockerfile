@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
+COPY README.md .
+# Django 5.2 LTS version range is defined in pyproject.toml.
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .[dev]
 
