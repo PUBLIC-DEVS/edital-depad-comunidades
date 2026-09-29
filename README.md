@@ -1,8 +1,8 @@
 # edital-depad-comunidades
 
-Sistema Django para inscrições, distribuição, análise documental, revisão, diligência e classificação do edital DEPED/MDS. Preserva o monólito modular, services de domínio, Django Templates, HTMX, RBAC e AuditEvent.
+Plataforma Django para criar e executar **novos editais configuráveis**: cadastro de grupos, requisitos, subcritérios, evidências, finanças, programas/municípios, publicação versionada, processos, distribuição, análise, revisão, diligência, ranking e métricas. Toda essa operação funciona sem Excel. Veja [o relatório da Fase 16](docs/CRUD_PRODUCTIZATION_REPORT.md) e [a fronteira do legado](docs/legacy-boundary.md).
 
-A fase 15 corrige regras identificadas pela auditoria. A paridade com a planilha histórica real está **FAIL**, com diferenças registradas por processo. Testes verdes do harness não equivalem a paridade aprovada. Consulte [o relatório de hardening](docs/POST_AUDIT_HARDENING_REPORT.md), [a comparação real](docs/REAL_LEGACY_PARITY.md) e [o resumo sanitizado](artifacts/legacy-real-summary.json).
+A planilha histórica continua disponível apenas para migração e regressão. O golden master real permanece `FAIL` nas diferenças já documentadas; testes verdes do comparador não transformam isso em paridade aprovada. Consulte [o relatório de hardening](docs/POST_AUDIT_HARDENING_REPORT.md), [a comparação real](docs/REAL_LEGACY_PARITY.md) e [o resumo sanitizado](artifacts/legacy-real-summary.json).
 
 ## Ambiente local
 
@@ -18,7 +18,7 @@ python manage.py seed_demo
 python manage.py runserver
 ```
 
-O cenário de demonstração usa dados sintéticos e credenciais de desenvolvimento. Nunca estabelece paridade histórica. O comando informa os logins; não execute o seed em produção.
+`seed_demo` constrói um edital com quatro grupos, regras financeiras e processos fictícios, sem `import_legacy_edital`. O comando informa os logins; a senha de demonstração local pode ser definida por `DEMO_PASSWORD`. Não execute o seed em produção. Para testar o produto sem carregar o app legado, use `ENABLE_LEGACY_IMPORT=false` antes de `migrate`, `seed_demo` e `runserver`. Uma instalação apenas do núcleo pode usar `pip install -e .`; o extra `.[legacy]` instala `openpyxl` quando a migração histórica for necessária.
 
 Com Docker:
 
@@ -30,28 +30,17 @@ docker compose exec web python manage.py seed_demo
 
 Aplicação: `http://localhost:8000/`; health check: `/health/`.
 
-## Fluxo e permissões
+## Criar um edital sem Excel
 
-O analista atribuído inicia a avaliação por POST. Abrir o workspace por GET apenas consulta dados. APTA segue para ELIGIBLE_FOR_RANKING, sem revisão automática; INAPTA cria revisão pendente sem responsável. O revisor assume a revisão antes de editar. Uma avaliação iniciada bloqueia redistribuição até existir uma operação formal de transferência.
+Entre como `ADMINISTRADOR` e abra `/administracao/` → **Editais** → **Novo edital**. Preencha número, ano, abertura/encerramento e versão. Na visão geral, cadastre grupos/públicos, requisitos, subcritérios e evidências, política de classificação, regras financeiras e vínculos de programas/municípios; crie analista e revisor em **Usuários e perfis**. O checklist exibe o que falta antes de **Publicar edital**. A publicação grava um snapshot imutável das regras. Para outra edição, use **Duplicar edital**; apenas a configuração é copiada.
 
-Diligência saneada retorna ao estágio de origem. Consequência de diligência não saneada exige configuração expressa do coordenador/admin; sem política, a conclusão é bloqueada. Registros históricos incompletos não recebem prazo, data ou solicitante inventados.
+O distribuidor usa `/processos/novo/` ou `/processos/importar-csv/` e atribui processos individuais/em lote. O analista atribuído inicia por POST, salva a análise dinâmica e conclui. `APTA` segue para ranking sem revisão automática; `INAPTA` vai a revisão não atribuída. O revisor assume a revisão, registra decisões de todos os itens impeditivos e conclui um parecer coerente. Uma diligência saneada retorna ao estágio de origem. Coordenador/Admin geram ranking; métricas exibem separadamente análise inicial e resultado consolidado. Consulte [o roteiro e as permissões](docs/CRUD_PRODUCTIZATION_REPORT.md).
 
-Ranking oficial admite somente estágios ELIGIBLE_FOR_RANKING/RANKED, elimina duplicatas das posições e registra exclusões separadas. O padrão histórico mantém a primeira inscrição absoluta por CNPJ. Empates absolutos permanecem bloqueados enquanto a política estiver UNRESOLVED. Snapshots, entradas e exclusões são protegidos por model, queryset, service e admin; acesso SQL privilegiado está fora dessa proteção.
+O ranking oficial admite somente elegíveis, exclui duplicatas das posições e preserva exclusões auditáveis. Empates absolutos permanecem bloqueados enquanto a política estiver `UNRESOLVED`. Snapshots, entradas e exclusões são protegidos nas rotas/ORM comuns. Uma avaliação iniciada bloqueia redistribuição até haver operação formal de transferência.
 
-| Papel | Escopo |
-| --- | --- |
-| ANALISTA | Processos atribuídos e próprias avaliações |
-| REVISOR | Fila não atribuída e revisões assumidas; sem edição de revisão de outro responsável |
-| DISTRIBUIDOR | Intake e distribuição |
-| COORDENADOR | Visão global, métricas, ranking e operações autorizadas |
-| ADMINISTRADOR | Visão global e configuração |
-| CONSULTA | Leitura global autorizada; sem mutações |
+## Importação histórica e golden master
 
-Métricas, ranking, histórico e exports exigem ADMINISTRADOR/COORDENADOR/CONSULTA nas views. Admin de entidades operacionais é somente leitura; alterações passam pelos serviços auditados.
-
-## Importação e golden master
-
-O XLSX histórico fica fora do Git e é sempre somente leitura. Coordenadas e normalizações estão em `apps/legacy_import`; consulte [o schema](docs/LEGACY_IMPORT_SCHEMA.md). A instituição é resolvida por CNPJ, o processo por edital + SEI e os eventos repetidos de diligência por hash + aba + linha.
+Para usar os comandos históricos, instale `pip install -e ".[legacy]"` e mantenha `ENABLE_LEGACY_IMPORT=true`. O XLSX histórico fica fora do Git e é sempre somente leitura. Coordenadas e normalizações estão em `apps/legacy_import`; consulte [o schema](docs/LEGACY_IMPORT_SCHEMA.md). A instituição é resolvida por CNPJ, o processo por edital + SEI e os eventos repetidos de diligência por hash + aba + linha.
 
 ```bash
 python manage.py import_legacy_edital "$LEGACY_XLSX_PATH" --strict
