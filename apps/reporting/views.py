@@ -1,12 +1,11 @@
 """Views para o painel de métricas operacionais e conferência de validações."""
 
-import csv
-
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from apps.accounts.permissions import require_role
+from apps.csv_utils import SafeCsvWriter
 from apps.editais.models import Edital, Requirement
 from apps.reporting.services.metrics import DashboardMetricsService
 
@@ -105,7 +104,7 @@ def metrics_export_csv_view(request):
     filename = f"metricas_edital_{selected_edital.number if selected_edital else 'geral'}.csv"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
-    writer = csv.writer(response, delimiter=";")
+    writer = SafeCsvWriter(response, delimiter=";")
     writer.writerow(["Métrica / Categoria", "Valor"])
     writer.writerow(["Total Recebidos", summary["total_received"]])
     writer.writerow(["Distribuídos", summary["distributed_count"]])

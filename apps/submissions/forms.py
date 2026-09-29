@@ -7,6 +7,7 @@ from apps.accounts.models import User
 from apps.editais.models import Edital, TargetGroup
 from apps.institutions.cnpj import cnpj_validator, normalize_cnpj
 from apps.institutions.models import Institution
+from apps.institutions.postal import normalize_postal_code
 from apps.submissions.models import ParticipationRestriction, Submission
 from apps.submissions.services.funding import FundingRuleNotFoundError, FundingService
 
@@ -122,6 +123,9 @@ class SubmissionIntakeForm(forms.ModelForm):
     def clean_institution_cnpj(self):
         return normalize_cnpj(self.cleaned_data["institution_cnpj"])
 
+    def clean_institution_postal_code(self):
+        return normalize_postal_code(self.cleaned_data.get("institution_postal_code", ""))
+
     def clean(self):
         cleaned_data = super().clean()
         fem = cleaned_data.get("vagas_femininas") or 0
@@ -174,7 +178,7 @@ class SubmissionIntakeForm(forms.ModelForm):
                 "institution_email": existing.contact_email,
                 "institution_phone": existing.contact_phone,
                 "institution_address": existing.address,
-                "institution_postal_code": existing.postal_code,
+                "institution_postal_code": normalize_postal_code(existing.postal_code),
             }
             if any(
                 cleaned_data.get(field) and cleaned_data[field] != value

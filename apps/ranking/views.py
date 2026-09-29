@@ -1,7 +1,5 @@
 """Views para visualização, filtros e geração de snapshots de classificação e ranking."""
 
-import csv
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -11,6 +9,7 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
 from apps.accounts.permissions import RolePermissionPolicy, require_role
+from apps.csv_utils import SafeCsvWriter
 from apps.editais.models import Edital
 from apps.ranking.models import RankingSnapshot
 from apps.ranking.services import RankingService
@@ -150,7 +149,7 @@ def ranking_export_csv_view(request: HttpRequest, snapshot_id: int) -> HttpRespo
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
-    writer = csv.writer(response, delimiter=";")
+    writer = SafeCsvWriter(response, delimiter=";")
     writer.writerow(
         [
             "Posição",

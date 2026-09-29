@@ -6,6 +6,7 @@ from apps.editais.forms import StyledModelForm
 from apps.editais.models import Program
 from apps.institutions.cnpj import normalize_cnpj
 from apps.institutions.models import Institution, Municipality
+from apps.institutions.postal import normalize_postal_code
 
 
 class InstitutionForm(StyledModelForm):
@@ -24,8 +25,12 @@ class InstitutionForm(StyledModelForm):
             "contact_email",
             "contact_phone",
             "address",
+            "postal_code",
             "municipality",
         ]
+
+    def clean_postal_code(self):
+        return normalize_postal_code(self.cleaned_data["postal_code"])
 
     def clean_cnpj(self):
         cnpj = normalize_cnpj(self.cleaned_data["cnpj"])

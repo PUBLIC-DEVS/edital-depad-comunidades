@@ -111,6 +111,7 @@ def catalog_form(request, catalog, object_id=None):
                     "contact_email",
                     "contact_phone",
                     "address",
+                    "postal_code",
                     "municipality_id",
                 )
             }
