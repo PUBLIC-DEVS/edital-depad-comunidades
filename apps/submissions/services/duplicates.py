@@ -4,6 +4,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from django.core.exceptions import ValidationError
+
 from apps.editais.models import Edital
 from apps.institutions.cnpj import normalize_cnpj
 from apps.submissions.models import Submission
@@ -35,6 +37,7 @@ class DuplicateService:
         cls,
         submissions: Iterable[Submission],
         policy: str = Edital.DuplicatePolicy.KEEP_EARLIEST_SUBMISSION,
+        include_closed: bool = False,
     ) -> DuplicateResolution:
         """Resolve duplicidades para a lista de submissões segundo a política informada.
 
@@ -45,6 +48,8 @@ class DuplicateService:
 
         Submissões canceladas ou fechadas (CLOSED) não bloqueiam outras inscrições da mesma entidade.
         """
+        if policy not in Edital.DuplicatePolicy.values:
+            raise ValidationError("Política de duplicidade desconhecida.")
         groups = cls.group_by_institution_cnpj(submissions)
 
         retained: list[Submission] = []
@@ -54,7 +59,9 @@ class DuplicateService:
         for _cnpj, group in groups.items():
             # Filtra submissões ativas (ignora canceladas/fechadas na disputa de duplicidade)
             active_subs = [
-                s for s in group if s.workflow_status != Submission.WorkflowStatus.CLOSED
+                s
+                for s in group
+                if include_closed or s.workflow_status != Submission.WorkflowStatus.CLOSED
             ]
 
             if len(active_subs) <= 1:
@@ -94,7 +101,10 @@ class DuplicateService:
 
             # Submissões fechadas mantêm seu estado original
             for closed_sub in group:
-                if closed_sub.workflow_status == Submission.WorkflowStatus.CLOSED:
+                if (
+                    not include_closed
+                    and closed_sub.workflow_status == Submission.WorkflowStatus.CLOSED
+                ):
                     retained.append(closed_sub)
 
         return DuplicateResolution(

@@ -1,167 +1,148 @@
-"""Serviço determinístico de ordenação, desempate e geração de snapshots de ranking."""
+"""Official eligible ranking with separate immutable exclusions."""
 
 from collections import defaultdict
 
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.utils import timezone
 
-from apps.accounts.models import User
+from apps.accounts.permissions import RolePermissionPolicy
 from apps.audit.models import AuditEvent
-from apps.editais.models import Edital
-from apps.ranking.models import RankingEntry, RankingSnapshot
+from apps.ranking.models import RankingEntry, RankingExclusion, RankingSnapshot, _build_snapshot
 from apps.ranking.services.classification import ClassificationService
 from apps.submissions.models import Submission
 from apps.submissions.services.duplicates import DuplicateService
+from apps.submissions.services.workflow import WorkflowService
 
 
 class RankingError(Exception):
-    """Exceção base para erros na geração de ranking."""
+    pass
 
 
 class RankingService:
-    """Orquestrador determinístico da classificação e geração de snapshots de ranking."""
-
     @classmethod
     @transaction.atomic
     def generate_snapshot(
         cls,
-        edital: Edital,
-        actor: User,
-        snapshot_type: str = RankingSnapshot.SnapshotType.PRELIMINAR,
-        description: str = "",
-        eligible_statuses: list[str] | None = None,
-    ) -> RankingSnapshot:
-        """Gera um snapshot de ranking imutável para o edital informado.
-
-        Critérios de elegibilidade:
-        - Por padrão, inclui submissões com status ELIGIBLE_FOR_RANKING ou RANKED.
-        - Também inclui submissões com avaliação concluída como APTA caso ainda não estejam formalmente fechadas/inabilitadas.
-        - Suprime duplicidades conforme a política configurada no Edital.
-        - Enquadra deterministamente em G1, G2 (PRONASCI por IBGE) e G3.
-        - Ordena por data e hora de protocolo (received_at), desempatando por processo_sei e ID.
-        - Atribui posições ordinais consecutivas a partir de 1 por grupo.
-        """
-        if eligible_statuses is None:
-            eligible_statuses = [
-                Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
-                Submission.WorkflowStatus.RANKED,
-            ]
-
-        # Busca todas as submissões ativas do edital
-        submissions_qs = (
-            Submission.objects.filter(edital=edital)
-            .exclude(workflow_status=Submission.WorkflowStatus.CLOSED)
+        edital,
+        actor,
+        snapshot_type=RankingSnapshot.SnapshotType.PRELIMINAR,
+        description="",
+        eligible_statuses=None,
+    ):
+        if not RolePermissionPolicy.can_generate_ranking(actor):
+            raise PermissionDenied("Sem permissão para gerar ranking.")
+        if snapshot_type not in RankingSnapshot.SnapshotType.values:
+            raise ValidationError("Tipo de snapshot inválido.")
+        allowed = {"ELIGIBLE_FOR_RANKING", "RANKED"}
+        eligible = set(eligible_statuses) if eligible_statuses is not None else allowed
+        if not eligible or not eligible.issubset(allowed):
+            raise ValidationError("Ranking oficial exige estágios elegíveis.")
+        universe = list(
+            Submission.objects.select_for_update()
+            .filter(edital=edital)
             .select_related("institution", "municipality", "edital")
         )
-
-        all_submissions = list(submissions_qs)
-
-        # 1. Atualiza e garante grupos corretos
-        ClassificationService.bulk_classify(all_submissions)
-        for s in all_submissions:
-            s.target_group = ClassificationService.classify_submission(s)
-
-        # 2. Resolução de duplicidades
-        dup_resolution = DuplicateService.resolve_duplicates(
-            submissions=all_submissions,
-            policy=edital.duplicate_policy,
+        for sub in universe:
+            ClassificationService.classify_and_update(sub, actor)
+        duplicate_universe = (
+            universe
+            if edital.duplicate_scope == "ABSOLUTE"
+            else [s for s in universe if s.workflow_status in eligible]
         )
-        suppressed_ids = {s.id for s in dup_resolution.suppressed}
-
-        # 3. Criação do snapshot imutável
+        resolution = DuplicateService.resolve_duplicates(
+            duplicate_universe,
+            edital.duplicate_policy,
+            include_closed=edital.duplicate_scope == "ABSOLUTE",
+        )
+        suppressed = {s.pk for s in resolution.suppressed}
+        winners = {s.institution.cnpj: s for s in resolution.retained}
+        grouped = defaultdict(list)
+        exclusions = []
+        for sub in universe:
+            reason, winner = None, None
+            if sub.pk in suppressed:
+                reason, winner = "DUPLICATE_SUPPRESSED", winners[sub.institution.cnpj]
+            elif sub.workflow_status == "CLOSED":
+                reason = "CLOSED"
+            elif sub.workflow_status not in eligible:
+                reason = "NOT_ELIGIBLE"
+            elif sub.target_group == "SEM_GRUPO":
+                reason = "NO_TARGET_GROUP"
+            if reason:
+                exclusions.append((sub, reason, winner))
+            else:
+                grouped[sub.target_group].append(sub)
+        if edital.tie_breaker_policy == "UNRESOLVED":
+            for group in grouped.values():
+                if len({s.received_at for s in group}) != len(group):
+                    raise ValidationError(
+                        "OPEN BUSINESS QUESTION: configure a política de empate absoluto."
+                    )
         snapshot = RankingSnapshot.objects.create(
             edital=edital,
             generated_by=actor,
             snapshot_type=snapshot_type,
             rules_version=edital.rules_version,
             duplicate_policy=edital.duplicate_policy,
-            is_immutable=True,
-            description=description or f"Snapshot gerado em {timezone.now():%d/%m/%Y %H:%M}",
+            description=description,
+            policy_metadata={
+                "duplicate_scope": edital.duplicate_scope,
+                "tie_breaker_policy": edital.tie_breaker_policy,
+                "eligible_statuses": sorted(eligible),
+            },
         )
-
-        # 4. Agrupa por target_group
-        by_group: dict[str, list[Submission]] = defaultdict(list)
-        for s in all_submissions:
-            # Apenas grupos G1, G2 e G3 concorrem ao ranking
-            if s.target_group in (
-                Submission.TargetGroup.G1,
-                Submission.TargetGroup.G2,
-                Submission.TargetGroup.G3,
-            ):
-                by_group[s.target_group].append(s)
-
-        entries_to_create: list[RankingEntry] = []
-
-        for group_name, group_submissions in by_group.items():
-            # Ordenação determinística:
-            # 1º: Não suprimida por duplicidade (ativas primeiro)
-            # 2º: Elegíveis para ranking primeiro
-            # 3º: Timestamp de recebimento (received_at)
-            # 4º: Processo SEI (desempate lexicográfico)
-            # 5º: ID interno
-            def sort_key(s: Submission):
-                is_suppressed = s.id in suppressed_ids
-                is_eligible = s.workflow_status in eligible_statuses
-                return (
-                    is_suppressed,  # False (0) antes de True (1)
-                    not is_eligible,  # True elegível (False=0) antes de não elegível (True=1)
-                    s.received_at,
-                    s.processo_sei,
-                    s.id,
-                )
-
-            sorted_group = sorted(group_submissions, key=sort_key)
-
-            position = 1
-            for sub in sorted_group:
-                is_sup = sub.id in suppressed_ids
-                reason = dup_resolution.suppression_reasons.get(sub.id, "")
-
-                tie_note = (
-                    f"Protocolo: {sub.received_at:%d/%m/%Y %H:%M:%S}. SEI: {sub.processo_sei}."
-                )
-                if is_sup:
-                    tie_note += f" [Duplicidade suprimida: {reason}]"
-
-                entry = RankingEntry(
+        with _build_snapshot(snapshot):
+            for sub, reason, winner in exclusions:
+                RankingExclusion.objects.create(
                     snapshot=snapshot,
                     submission=sub,
-                    target_group=group_name,
-                    position=position,
-                    received_at=sub.received_at,
-                    total_vacancies=sub.vagas_solicitadas or sub.computed_total_vagas,
-                    is_duplicate_suppressed=is_sup,
-                    qualification_status=sub.get_workflow_status_display(),
-                    tie_breaker_notes=tie_note,
+                    reason_code=reason,
+                    reason_text=resolution.suppression_reasons.get(sub.pk, reason),
+                    duplicate_of=winner,
+                    metadata={
+                        "received_at": sub.received_at.isoformat(),
+                        "target_group": sub.target_group,
+                        "workflow_status": sub.workflow_status,
+                    },
                 )
-                entries_to_create.append(entry)
-                position += 1
-
-        RankingEntry.objects.bulk_create(entries_to_create)
-
-        # Transiciona submissões elegíveis para RANKED se estiverem em ELIGIBLE_FOR_RANKING
-        eligible_ranked_ids = [
-            e.submission_id
-            for e in entries_to_create
-            if not e.is_duplicate_suppressed
-            and e.submission.workflow_status == Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING
-        ]
-        if eligible_ranked_ids:
-            Submission.objects.filter(id__in=eligible_ranked_ids).update(
-                workflow_status=Submission.WorkflowStatus.RANKED,
-            )
-
+            for group, submissions in grouped.items():
+                for position, sub in enumerate(
+                    sorted(submissions, key=lambda s: (s.received_at, s.processo_sei)), 1
+                ):
+                    RankingEntry.objects.create(
+                        snapshot=snapshot,
+                        submission=sub,
+                        target_group=group,
+                        position=position,
+                        received_at=sub.received_at,
+                        total_vacancies=sub.vagas_solicitadas,
+                        qualification_status=sub.workflow_status,
+                        snapshot_data={
+                            "processo_sei": sub.processo_sei,
+                            "institution": sub.institution.name,
+                            "cnpj": sub.institution.cnpj,
+                            "municipality": sub.municipality.name if sub.municipality else None,
+                            "state": sub.municipality.state if sub.municipality else None,
+                        },
+                        tie_breaker_notes=f"Policy: {edital.tie_breaker_policy}",
+                    )
+                    if sub.workflow_status == "ELIGIBLE_FOR_RANKING":
+                        WorkflowService.transition(
+                            sub,
+                            "RANKED",
+                            actor,
+                            reason="Entrada em snapshot oficial.",
+                            metadata={"snapshot_id": snapshot.pk},
+                        )
         AuditEvent.objects.create(
             actor=actor,
             entity_type="RankingSnapshot",
-            entity_id=str(snapshot.id),
+            entity_id=str(snapshot.pk),
             action="GENERATE_SNAPSHOT",
-            new_value=snapshot.snapshot_type,
             metadata={
-                "total_entries": len(entries_to_create),
-                "edital": edital.number,
-                "rules_version": edital.rules_version,
+                "total_entries": snapshot.entries.count(),
+                "total_exclusions": snapshot.exclusions.count(),
+                **snapshot.policy_metadata,
             },
         )
-
         return snapshot

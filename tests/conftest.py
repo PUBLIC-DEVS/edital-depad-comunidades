@@ -10,7 +10,7 @@ from apps.submissions.models import Assignment, Submission
 @pytest.fixture
 def domain(db):
     users = {
-        name: User.objects.create_user(username=name, role=role)
+        name: User.objects.create_user(username=name, email=f"{name}@example.test", role=role)
         for name, role in {
             "analyst": "ANALISTA",
             "other_analyst": "ANALISTA",

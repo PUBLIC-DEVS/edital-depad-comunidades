@@ -15,7 +15,7 @@ from apps.editais.models import (
 )
 from apps.evaluations.models import CheckResult, Evaluation
 from apps.institutions.models import Institution, Municipality
-from apps.ranking.models import RankingEntry, RankingSnapshot
+from apps.ranking.models import RankingEntry, RankingSnapshot, _build_snapshot
 from apps.reviews.models import Diligence, Review
 from apps.submissions.models import Assignment, Submission
 
@@ -198,15 +198,16 @@ class TestDomainModels:
             rules_version="1.0",
             duplicate_policy="KEEP_EARLIEST_SUBMISSION",
         )
-        entry = RankingEntry.objects.create(
-            snapshot=snapshot,
-            submission=sub,
-            target_group="G1",
-            position=1,
-            received_at=sub.received_at,
-            total_vacancies=15,
-            qualification_status="APTA",
-        )
+        with _build_snapshot(snapshot):
+            entry = RankingEntry.objects.create(
+                snapshot=snapshot,
+                submission=sub,
+                target_group="G1",
+                position=1,
+                received_at=sub.received_at,
+                total_vacancies=15,
+                qualification_status="APTA",
+            )
         assert entry.position == 1
 
     def test_audit_event_append_only_enforcement(self, user):

@@ -28,6 +28,7 @@ class TestRankingFlowIntegration:
             opens_at=now,
             closes_at=now + timezone.timedelta(days=30),
             rules_version="1.0",
+            tie_breaker_policy="SEI_LEXICOGRAPHIC",
             duplicate_policy=Edital.DuplicatePolicy.KEEP_EARLIEST_SUBMISSION,
         )
         mun_pronasci = Municipality.objects.create(
@@ -149,11 +150,10 @@ class TestRankingFlowIntegration:
         entries_g3 = list(snapshot.entries.filter(target_group="G3").order_by("position"))
 
         # G1 deve ter sub_g1 na posição 1 (não suprimida) e sub_dup como duplicidade suprimida
-        assert len(entries_g1) == 2
+        assert len(entries_g1) == 1
         assert entries_g1[0].submission == sub_g1
         assert entries_g1[0].is_duplicate_suppressed is False
-        assert entries_g1[1].submission == sub_dup
-        assert entries_g1[1].is_duplicate_suppressed is True
+        assert snapshot.exclusions.get(submission=sub_dup).reason_code == "DUPLICATE_SUPPRESSED"
 
         # G2 deve ter sub_g2
         assert len(entries_g2) == 1

@@ -39,6 +39,22 @@ class Edital(models.Model):
         verbose_name="Versão das Regras",
         help_text="Identificador versionado para preservar integridade de editais anteriores.",
     )
+    duplicate_scope = models.CharField(
+        max_length=20,
+        choices=[
+            ("ABSOLUTE", "Primeira inscrição absoluta"),
+            ("ELIGIBLE", "Primeira inscrição elegível"),
+        ],
+        default="ABSOLUTE",
+    )
+    tie_breaker_policy = models.CharField(
+        max_length=30,
+        choices=[
+            ("UNRESOLVED", "Política de empate não definida"),
+            ("SEI_LEXICOGRAPHIC", "Processo SEI em ordem lexicográfica"),
+        ],
+        default="UNRESOLVED",
+    )
     duplicate_policy = models.CharField(
         max_length=40,
         choices=DuplicatePolicy.choices,

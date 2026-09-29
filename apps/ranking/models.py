@@ -1,8 +1,60 @@
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 from django.conf import settings
+from django.core.exceptions import PermissionDenied
 from django.db import models
 
+_building = ContextVar("ranking_snapshot_building", default=None)
 
-class RankingSnapshot(models.Model):
+
+@contextmanager
+def _build_snapshot(snapshot):
+    token = _building.set(snapshot.pk)
+    try:
+        yield
+    finally:
+        _building.reset(token)
+
+
+class ImmutableQuerySet(models.QuerySet):
+    def bulk_create(self, objs, *args, **kwargs):
+        objs = list(objs)
+        for obj in objs:
+            if hasattr(obj, "snapshot_id") and obj.snapshot_id != _building.get():
+                raise PermissionDenied("Entradas só podem ser criadas durante geração do snapshot.")
+        return super().bulk_create(objs, *args, **kwargs)
+
+    def update(self, **kwargs):
+        raise PermissionDenied("Snapshot e registros de ranking são imutáveis.")
+
+    def delete(self):
+        raise PermissionDenied("Snapshot e registros de ranking não podem ser excluídos.")
+
+    def bulk_update(self, *args, **kwargs):
+        raise PermissionDenied("Ranking não permite bulk_update.")
+
+
+class ImmutableRankingModel(models.Model):
+    objects = ImmutableQuerySet.as_manager()
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding or (
+            self.pk is not None and type(self).objects.filter(pk=self.pk).exists()
+        ):
+            raise PermissionDenied("Registros persistidos de ranking são imutáveis.")
+        if hasattr(self, "snapshot_id") and self.snapshot_id != _building.get():
+            raise PermissionDenied("Snapshot fechado para inclusão de entradas/exclusões.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Registros de ranking não podem ser excluídos.")
+
+
+class RankingSnapshot(ImmutableRankingModel):
     """Snapshot imutável de classificação e ranking em determinado momento ou publicação."""
 
     class SnapshotType(models.TextChoices):
@@ -36,6 +88,7 @@ class RankingSnapshot(models.Model):
         max_length=50,
         verbose_name="Política de Duplicidade Utilizada",
     )
+    policy_metadata = models.JSONField(default=dict)
     is_immutable = models.BooleanField(
         default=True,
         verbose_name="Imutável",
@@ -59,7 +112,7 @@ class RankingSnapshot(models.Model):
         return f"Ranking {self.get_snapshot_type_display()} - {ed} ({date_str})"
 
 
-class RankingEntry(models.Model):
+class RankingEntry(ImmutableRankingModel):
     """Posição individual de uma submissão dentro de um snapshot de ranking."""
 
     snapshot = models.ForeignKey(
@@ -103,12 +156,16 @@ class RankingEntry(models.Model):
         blank=True,
         verbose_name="Critérios de Desempate Aplicados",
     )
+    snapshot_data = models.JSONField(default=dict)
 
     class Meta:
         verbose_name = "Entrada no Ranking"
         verbose_name_plural = "Entradas no Ranking"
         ordering = ["target_group", "position"]
         constraints = [
+            models.UniqueConstraint(
+                fields=["snapshot", "submission"], name="unique_ranked_submission_snapshot"
+            ),
             models.UniqueConstraint(
                 fields=["snapshot", "target_group", "position"],
                 name="unique_snapshot_group_position",
@@ -117,3 +174,28 @@ class RankingEntry(models.Model):
 
     def __str__(self):
         return f"{self.target_group} - #{self.position}: {self.submission.processo_sei}"
+
+
+class RankingExclusion(ImmutableRankingModel):
+    snapshot = models.ForeignKey(
+        RankingSnapshot, on_delete=models.PROTECT, related_name="exclusions"
+    )
+    submission = models.ForeignKey(
+        "submissions.Submission", on_delete=models.PROTECT, related_name="ranking_exclusions"
+    )
+    reason_code = models.CharField(max_length=40)
+    reason_text = models.TextField(blank=True)
+    duplicate_of = models.ForeignKey(
+        "submissions.Submission",
+        on_delete=models.PROTECT,
+        null=True,
+        related_name="duplicate_exclusions",
+    )
+    metadata = models.JSONField(default=dict)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["snapshot", "submission"], name="unique_ranking_exclusion_submission"
+            )
+        ]

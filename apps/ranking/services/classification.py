@@ -2,6 +2,9 @@
 
 from collections.abc import Iterable
 
+from django.db import transaction
+
+from apps.audit.models import AuditEvent
 from apps.editais.models import ProgramMunicipality
 from apps.submissions.models import Submission
 
@@ -46,12 +49,23 @@ class ClassificationService:
         return Submission.TargetGroup.SEM_GRUPO
 
     @classmethod
-    def classify_and_update(cls, submission: Submission) -> str:
+    @transaction.atomic
+    def classify_and_update(cls, submission: Submission, actor=None) -> str:
         """Determina o grupo, atualiza o modelo e persiste se houver alteração."""
         group = cls.classify_submission(submission)
         if submission.target_group != group:
+            old = submission.target_group
             submission.target_group = group
             submission.save(update_fields=["target_group", "updated_at"])
+            AuditEvent.objects.create(
+                actor=actor,
+                entity_type="Submission",
+                entity_id=str(submission.pk),
+                action="CLASSIFICATION_CHANGE",
+                field="target_group",
+                old_value=old,
+                new_value=group,
+            )
         return group
 
     @classmethod

@@ -1,44 +1,32 @@
 from django.contrib import admin
 
-from .models import RankingEntry, RankingSnapshot
+from .models import RankingEntry, RankingExclusion, RankingSnapshot
 
 
-class RankingEntryInline(admin.TabularInline):
-    model = RankingEntry
-    extra = 0
-    readonly_fields = (
-        "submission",
-        "target_group",
-        "position",
-        "received_at",
-        "total_vacancies",
-        "is_duplicate_suppressed",
-    )
+class ReadOnlyRankingAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(f.name for f in self.model._meta.fields)
 
 
 @admin.register(RankingSnapshot)
-class RankingSnapshotAdmin(admin.ModelAdmin):
-    list_display = (
-        "edital",
-        "snapshot_type",
-        "rules_version",
-        "duplicate_policy",
-        "generated_by",
-        "created_at",
-    )
-    list_filter = ("edital", "snapshot_type")
-    inlines = [RankingEntryInline]
+class RankingSnapshotAdmin(ReadOnlyRankingAdmin):
+    list_display = ("edital", "snapshot_type", "generated_by", "created_at")
 
 
 @admin.register(RankingEntry)
-class RankingEntryAdmin(admin.ModelAdmin):
-    list_display = (
-        "snapshot",
-        "target_group",
-        "position",
-        "submission",
-        "received_at",
-        "is_duplicate_suppressed",
-    )
-    list_filter = ("target_group", "is_duplicate_suppressed", "snapshot__snapshot_type")
-    search_fields = ("submission__processo_sei",)
+class RankingEntryAdmin(ReadOnlyRankingAdmin):
+    list_display = ("snapshot", "target_group", "position", "submission")
+
+
+@admin.register(RankingExclusion)
+class RankingExclusionAdmin(ReadOnlyRankingAdmin):
+    list_display = ("snapshot", "submission", "reason_code", "duplicate_of")
