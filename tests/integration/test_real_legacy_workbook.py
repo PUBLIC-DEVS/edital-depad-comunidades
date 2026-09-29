@@ -115,3 +115,7 @@ def test_external_import_idempotency_in_separate_processes(real_path, tmp_path):
     assert a["counts_after_import"] == b["counts_before_import"] == b["counts_after_import"]
     for field in ("initial_results_calculated", "mismatches_by_code", "source_issue_codes"):
         assert a[field] == b[field]
+    # Verify each process/result/evidence comparison, not only stable aggregate counts.
+    for area in ("submissions", "evaluations", "reviews", "diligences", "ranking"):
+        filename = f"legacy-real-{area}-diff.csv"
+        assert (first / filename).read_text() == (second / filename).read_text()
