@@ -1,4 +1,4 @@
-"""Full operational 2026 lifecycle, built through Django screens without Excel."""
+"""HTTP integration lifecycle for 2026, built through Django views without Excel."""
 
 import pytest
 from django.urls import reverse

@@ -145,3 +145,38 @@ def test_identity_correction_protects_completed_decisions(identity_case):
         SubmissionIdentityService.correct_cnpj(
             domain["sub"], "11222333000181", "Conferido no Anexo I.", domain["admin"]
         )
+
+
+@pytest.mark.django_db
+def test_identity_reuses_existing_institution_and_records_duplicate(identity_case):
+    from apps.institutions.models import Institution
+
+    domain, _, _ = identity_case
+    target = Institution.objects.create(cnpj="11222333000181", name="Instituição correta")
+    duplicate = Submission.objects.create(
+        edital=domain["edital"],
+        institution=target,
+        processo_sei="SAME-NEW-CNPJ",
+        received_at=domain["sub"].received_at,
+    )
+    corrected = SubmissionIdentityService.correct_cnpj(
+        domain["sub"], target.cnpj, "Conferido no Anexo I.", domain["coord"]
+    )
+    assert corrected.institution_id == target.pk
+    event = AuditEvent.objects.get(action="CANONICAL_CNPJ_CORRECTION")
+    assert event.metadata["duplicate_submission_ids"] == [duplicate.pk]
+    assert corrected.workflow_status == "UNDER_ANALYSIS"
+
+
+@pytest.mark.django_db
+def test_identity_recovery_action_visible_after_start_and_detail_get_is_safe(client, identity_case):
+    domain, evaluation, result = identity_case
+    client.force_login(domain["coord"])
+    before = AuditEvent.objects.count()
+    response = client.get(reverse("submission-detail", args=[domain["sub"].pk]))
+    assert response.status_code == 200
+    assert "Corrigir CNPJ da candidatura" in response.content.decode()
+    assert AuditEvent.objects.count() == before
+    assert Evaluation.objects.count() == 1
+    result.refresh_from_db()
+    assert result.canonical_cnpj_confirmed

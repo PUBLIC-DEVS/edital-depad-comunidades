@@ -166,3 +166,25 @@ def test_restriction_release_does_not_reopen_other_ineligibility(domain):
         Eligibility.release_preanalysis_block(
             domain["sub"], domain["admin"], "Não é bloqueio cadastral"
         )
+
+
+@pytest.mark.django_db
+def test_restriction_release_requires_all_sources_inactive(domain):
+    first = block(domain)
+    second = ParticipationRestriction.objects.create(
+        edital=domain["edital"],
+        cnpj=first.cnpj,
+        reason="Outra fonte",
+        source="Fonte 2",
+        created_by=domain["admin"],
+    )
+    first.active = False
+    Eligibility.update_restriction(first, domain["admin"])
+    with pytest.raises(ValidationError, match="restrição ativa"):
+        Eligibility.release_preanalysis_block(domain["sub"], domain["coord"], "Conferência formal")
+    second.active = False
+    Eligibility.update_restriction(second, domain["admin"])
+    released = Eligibility.release_preanalysis_block(
+        domain["sub"], domain["coord"], "Todas as fontes desativadas"
+    )
+    assert released.workflow_status == "RECEIVED"
