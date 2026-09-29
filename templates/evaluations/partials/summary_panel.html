@@ -9,6 +9,20 @@
         </span>
     </div>
 
+    <section class="border rounded-lg p-3 space-y-2" aria-label="Validações automáticas">
+        <div class="flex justify-between text-xs">
+            <strong>Validações automáticas</strong>
+            <span>{{ validation_critical_count }} crítica(s) · {{ validation_warning_count }} aviso(s)</span>
+        </div>
+        {% for outcome in validation_outcomes %}
+            <p class="text-xs {% if outcome.status == 'FAIL' %}text-red-800{% elif outcome.status == 'PASS' %}text-emerald-800{% else %}text-amber-800{% endif %}">
+                {{ outcome.rule.requirement_check.name }} — {{ outcome.message }}
+            </p>
+        {% empty %}
+            <p class="text-xs text-slate-500">Este edital não configurou validações automáticas.</p>
+        {% endfor %}
+    </section>
+
     <!-- Calculated Result Badge -->
     <div class="p-4 rounded-lg text-center
         {% if assessment.result == 'APTA' %}bg-emerald-50 border border-emerald-200 text-emerald-800
@@ -71,9 +85,9 @@
             <form method="post" action="{% url 'evaluation-conclude' evaluation_id=evaluation.id %}">
                 {% csrf_token %}
                 <button type="submit"
-                        {% if not assessment.is_complete %}disabled title="Avalie todos os itens antes de concluir a análise"{% endif %}
+                        {% if not can_conclude %}disabled title="Resolva pendências e validações críticas antes de concluir"{% endif %}
                         class="w-full text-xs font-bold py-2.5 rounded transition shadow-sm
-                        {% if assessment.is_complete %}bg-govblue-600 hover:bg-govblue-700 text-white cursor-pointer
+                        {% if can_conclude %}bg-govblue-600 hover:bg-govblue-700 text-white cursor-pointer
                         {% else %}bg-slate-200 text-slate-400 cursor-not-allowed{% endif %}">
                     Concluir Análise Técnica
                 </button>
@@ -84,4 +98,5 @@
             Esta análise está em modo somente leitura (já concluída ou atribuída a outro usuário).
         </div>
     {% endif %}
+    {% if can_request_diligence %}<a href="{% url 'diligence-create' submission.id %}" class="block w-full rounded border border-amber-400 bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-900">Solicitar diligência</a>{% endif %}
 </div>

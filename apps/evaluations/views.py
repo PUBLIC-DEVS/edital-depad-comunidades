@@ -17,6 +17,7 @@ from apps.evaluations.assessment import definition_rows
 from apps.evaluations.forms import CheckResultForm
 from apps.evaluations.models import Evaluation
 from apps.evaluations.services import EvaluationService, InconsistentEvaluationError
+from apps.evaluations.validation_rules import ValidationRuleEvaluator
 from apps.submissions.models import Submission
 
 
@@ -128,13 +129,12 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
             for error in values
         )
     if request.headers.get("HX-Request"):
+        context = workspace_context(request, evaluation)
         return render(
             request,
             "evaluations/partials/summary_panel.html",
             {
-                "evaluation": evaluation,
-                "assessment": EvaluationService.calculate_assessment(evaluation),
-                "can_edit": True,
+                **context,
                 "draft_saved": valid,
                 "validation_errors": errors,
             },
@@ -172,18 +172,73 @@ def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpRe
 
 def workspace_context(request, evaluation, bound_forms=None):
     can_edit = RolePermissionPolicy.can_edit_evaluation(request.user, evaluation)
-    sections = {}
+    macros = {}
     for requirement, definition, result in definition_rows(evaluation):
-        section = sections.setdefault(requirement.pk, {"requirement": requirement, "checks": []})
+        section_name = requirement.presentation_section.strip() or "Documentos e requisitos"
+        macro = macros.setdefault(section_name, {"title": section_name, "requirements": {}})
+        section = macro["requirements"].setdefault(
+            requirement.pk,
+            {"requirement": requirement, "checks": []},
+        )
         if result:
             form = (bound_forms or {}).get(result.pk) or CheckResultForm(
                 result=result, can_edit=can_edit
             )
-            section["checks"].append({"check": definition, "result": result, "form": form})
+            outcomes = ValidationRuleEvaluator.evaluate_result(result)
+            section["checks"].append(
+                {
+                    "check": definition,
+                    "result": result,
+                    "form": form,
+                    "validations": outcomes,
+                }
+            )
+    outcome_list = [
+        outcome
+        for result in evaluation.check_results.select_related(
+            "evaluation__submission__edital", "evaluation__submission__institution"
+        )
+        for outcome in ValidationRuleEvaluator.evaluate_result(result)
+    ]
+    blockers = [
+        outcome
+        for outcome in outcome_list
+        if outcome.rule.blocks_completion
+        and outcome.rule.severity == "CRITICAL"
+        and outcome.status != "PASS"
+    ]
     return {
         "submission": evaluation.submission,
         "evaluation": evaluation,
-        "req_sections": list(sections.values()),
+        "macro_sections": [
+            {
+                "title": macro["title"],
+                "requirements": list(macro["requirements"].values()),
+            }
+            for macro in macros.values()
+        ],
         "assessment": EvaluationService.calculate_assessment(evaluation),
         "can_edit": can_edit,
+        "can_request_diligence": request.user.is_superuser
+        or request.user.role in {User.Role.COORDENADOR, User.Role.ADMINISTRADOR}
+        or (
+            request.user.role == User.Role.REVISOR
+            and hasattr(evaluation, "review")
+            and evaluation.review.reviewer_id == request.user.pk
+            and evaluation.review.status == "PENDING"
+        ),
+        "validation_outcomes": outcome_list,
+        "validation_blockers": blockers,
+        "validation_critical_count": sum(
+            1
+            for outcome in outcome_list
+            if outcome.rule.severity == "CRITICAL" and outcome.status != "PASS"
+        ),
+        "validation_warning_count": sum(
+            1
+            for outcome in outcome_list
+            if outcome.rule.severity == "WARNING" and outcome.status != "PASS"
+        ),
+        "can_conclude": EvaluationService.calculate_assessment(evaluation).is_complete
+        and not blockers,
     }

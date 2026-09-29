@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Programas municipais{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <a href="{% url 'edital-list' %}" class="text-sm text-govblue-700 underline">← Editais</a>
+    <div class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-2xl font-bold">Programas</h1><p class="text-sm text-slate-600">Cadastre a identidade dos programas e, dentro de cada edital, associe municípios elegíveis.</p></div><a href="{% url 'program-create' %}" class="rounded bg-govblue-700 px-4 py-2 text-white">Novo programa</a></div>
+    <div class="space-y-3">{% for program in programs %}<article class="flex flex-wrap justify-between gap-3 rounded-lg border bg-white p-5"><div><h2 class="font-semibold">{{ program.code }} · {{ program.name }}</h2>{% if program.description %}<p class="text-sm text-slate-600">{{ program.description }}</p>{% endif %}<p class="text-xs">{% if program.active %}Ativo{% else %}Desativado{% endif %} · {{ program.municipality_links.count }} associação(ões) de município</p></div><a class="text-govblue-700 underline" href="{% url 'program-edit' program.pk %}">Editar</a></article>{% empty %}<p class="rounded border bg-white p-5">Nenhum programa cadastrado.</p>{% endfor %}</div>
+</div>
+{% endblock %}

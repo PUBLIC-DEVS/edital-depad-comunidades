@@ -3,7 +3,17 @@ from django.core.exceptions import ValidationError
 from apps.audit.models import AuditEvent
 from apps.institutions.cnpj import cnpj_validator, normalize_cnpj
 
-EVIDENCE_FIELDS = ("sei_number", "pages", "document_cnpj", "valid_until", "numeric_value", "notes")
+EVIDENCE_FIELDS = (
+    "sei_number",
+    "pages",
+    "document_cnpj",
+    "valid_until",
+    "opened_on",
+    "cnae",
+    "canonical_cnpj_confirmed",
+    "numeric_value",
+    "notes",
+)
 
 
 def audit_value(value):

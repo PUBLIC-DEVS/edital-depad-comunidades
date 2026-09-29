@@ -8,6 +8,7 @@ from .models import (
     ProgramMunicipality,
     Requirement,
     RequirementCheck,
+    RequirementValidationRule,
     TargetGroup,
     allowed_check_statuses,
 )
@@ -32,6 +33,19 @@ class EditalForm(StyledModelForm):
     def clean_status(self):
         return self.cleaned_data["status"] or self.instance.status or Edital.Status.DRAFT
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.initial.setdefault("duplicate_policy", Edital.DuplicatePolicy.WARN_ONLY)
+        self.fields["duplicate_policy"].help_text = (
+            "Duplicidade gera alerta. A opção inicial mantém todas as candidaturas para análise; "
+            "se a coordenação definir prevalência, selecione uma política explícita."
+        )
+        self.fields["validation_reference_date"].help_text = (
+            "Data oficial usada para validar vigência documental e idade mínima do CNPJ. "
+            "A publicação será bloqueada se uma regra ativa exigir esta data e ela estiver vazia."
+        )
+
     class Meta:
         model = Edital
         fields = [
@@ -44,6 +58,8 @@ class EditalForm(StyledModelForm):
             "closes_at",
             "rules_version",
             "minimum_equity_percentage",
+            "validation_reference_date",
+            "requires_financial_rules",
             "duplicate_policy",
             "duplicate_scope",
             "tie_breaker_policy",
@@ -52,6 +68,7 @@ class EditalForm(StyledModelForm):
             f: forms.DateTimeInput(format="%Y-%m-%dT%H:%M", attrs={"type": "datetime-local"})
             for f in ("opens_at", "closes_at")
         }
+        widgets["validation_reference_date"] = forms.DateInput(attrs={"type": "date"})
 
     def clean(self):
         data = super().clean()
@@ -87,6 +104,9 @@ CONFIG_FIELDS = [
     "collect_pages",
     "collect_document_cnpj",
     "collect_valid_until",
+    "collect_opened_on",
+    "collect_cnae",
+    "collect_canonical_cnpj_confirmed",
     "collect_numeric_value",
     "collect_notes",
 ]
@@ -128,6 +148,9 @@ class EvidenceForm(StyledModelForm):
                         "pages": "páginas",
                         "document_cnpj": "CNPJ do documento",
                         "valid_until": "validade",
+                        "opened_on": "data de abertura",
+                        "cnae": "CNAE",
+                        "canonical_cnpj_confirmed": "confirmação do CNPJ da candidatura",
                         "numeric_value": "valor numérico",
                         "notes": "observações",
                     }[name.removeprefix("collect_")]
@@ -141,8 +164,10 @@ class RequirementForm(EvidenceForm):
             "code",
             "name",
             "description",
+            "presentation_section",
             "order",
             "mandatory",
+            "requires_checks",
             "failure_behavior",
             "active",
             *CONFIG_FIELDS,
@@ -208,8 +233,120 @@ class ProgramMunicipalityForm(StyledModelForm):
         return super().save(commit=commit)
 
 
+class ProgramForm(StyledModelForm):
+    class Meta:
+        model = Program
+        fields = ["code", "name", "description", "active"]
+
+
 class ClassificationPolicyForm(StyledModelForm):
     class Meta:
         model = ClassificationPolicy
-        fields = ["policy_type"]
-        labels = {"policy_type": "Política de classificação"}
+        fields = ["policy_type", "mixed_group_code"]
+        labels = {
+            "policy_type": "Política de classificação",
+            "mixed_group_code": "Grupo das entidades com vagas femininas e masculinas",
+        }
+
+    def __init__(self, *args, edital, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["mixed_group_code"] = forms.ChoiceField(
+            choices=[("", "Selecione")]
+            + list(
+                edital.target_groups.filter(active=True)
+                .order_by("order", "code")
+                .values_list("code", "name")
+            ),
+            required=False,
+            label=self.fields["mixed_group_code"].label,
+        )
+
+
+class RequirementValidationRuleForm(StyledModelForm):
+    years = forms.IntegerField(required=False, min_value=1, label="Idade mínima em anos")
+    expected_cnae = forms.CharField(required=False, max_length=30, label="CNAE esperado")
+    match_mode = forms.ChoiceField(
+        required=False,
+        choices=[
+            ("UNRESOLVED", "Aguardando decisão da coordenação"),
+            ("EXACT", "Correspondência exata"),
+            ("CONTAINS", "Presente entre os CNAEs informados"),
+        ],
+        label="Como comparar o CNAE",
+    )
+
+    class Meta:
+        model = RequirementValidationRule
+        fields = ["requirement_check", "rule_type", "severity", "blocks_completion", "active"]
+
+    def __init__(self, *args, edital, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["requirement_check"].queryset = RequirementCheck.objects.filter(
+            requirement__edital=edital, active=True
+        ).select_related("requirement")
+        self.fields["requirement_check"].label_from_instance = lambda check: (
+            f"{check.requirement.code} — {check.name}"
+        )
+        config = (
+            self.instance.config
+            if self.instance.pk and isinstance(self.instance.config, dict)
+            else {}
+        )
+        for key in ("years", "expected_cnae", "match_mode"):
+            self.initial[key] = config.get(key)
+        self.fields["years"].widget.attrs["data-rule-config"] = "CNPJ_MINIMUM_AGE"
+        for key in ("expected_cnae", "match_mode"):
+            self.fields[key].widget.attrs["data-rule-config"] = "CNAE_REQUIRED"
+
+    def clean(self):
+        data = super().clean()
+        if data.get("rule_type") == RequirementValidationRule.RuleType.CNPJ_MINIMUM_AGE:
+            if not data.get("years"):
+                self.add_error("years", "Informe a idade mínima.")
+        if data.get("rule_type") == RequirementValidationRule.RuleType.CNAE_REQUIRED:
+            if not data.get("expected_cnae"):
+                self.add_error("expected_cnae", "Informe o CNAE esperado.")
+            if not data.get("match_mode"):
+                self.add_error("match_mode", "Escolha como comparar o CNAE.")
+        return data
+
+    def _post_clean(self):
+        # Model.clean validates the typed JSON configuration; prepare a safe,
+        # temporary shape so ordinary field errors remain attached to this form.
+        rule_type = self.cleaned_data.get("rule_type")
+        if rule_type == RequirementValidationRule.RuleType.CNPJ_MINIMUM_AGE:
+            self.instance.config = {
+                "years": self.cleaned_data.get("years") or 1,
+                "reference_date": "EDITAL_REFERENCE_DATE",
+            }
+        elif rule_type == RequirementValidationRule.RuleType.CNAE_REQUIRED:
+            self.instance.config = {
+                "expected_cnae": self.cleaned_data.get("expected_cnae") or "PENDING",
+                "match_mode": self.cleaned_data.get("match_mode") or "UNRESOLVED",
+            }
+        elif rule_type == RequirementValidationRule.RuleType.DATE_NOT_EXPIRED:
+            self.instance.config = {"reference_date": "EDITAL_REFERENCE_DATE"}
+        else:
+            self.instance.config = {}
+        super()._post_clean()
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        rule_type = self.cleaned_data["rule_type"]
+        if rule_type == RequirementValidationRule.RuleType.CNPJ_MINIMUM_AGE:
+            instance.config = {
+                "years": self.cleaned_data["years"],
+                "reference_date": "EDITAL_REFERENCE_DATE",
+            }
+        elif rule_type == RequirementValidationRule.RuleType.CNAE_REQUIRED:
+            instance.config = {
+                "expected_cnae": self.cleaned_data["expected_cnae"],
+                "match_mode": self.cleaned_data["match_mode"],
+            }
+        elif rule_type == RequirementValidationRule.RuleType.DATE_NOT_EXPIRED:
+            instance.config = {"reference_date": "EDITAL_REFERENCE_DATE"}
+        else:
+            instance.config = {}
+        if commit:
+            instance.save()
+        return instance

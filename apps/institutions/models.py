@@ -54,6 +54,7 @@ class Institution(models.Model):
     contact_email = models.EmailField(blank=True, verbose_name="E-mail de Contato")
     contact_phone = models.CharField(max_length=50, blank=True, verbose_name="Telefone de Contato")
     address = models.CharField(max_length=255, blank=True, verbose_name="Endereço")
+    postal_code = models.CharField(max_length=9, blank=True, verbose_name="CEP")
     municipality = models.ForeignKey(
         Municipality,
         on_delete=models.SET_NULL,

@@ -3,6 +3,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("programas/", views.program_list, name="program-list"),
+    path("programas/novo/", views.program_form, name="program-create"),
+    path("programas/<int:program_id>/editar/", views.program_form, name="program-edit"),
     path("", views.edital_list, name="edital-list"),
     path("novo/", views.edital_form, name="edital-create"),
     path("<int:edital_id>/", views.edital_detail, name="edital-detail"),
@@ -10,6 +13,11 @@ urlpatterns = [
     path("<int:edital_id>/publicar/", views.edital_publish, name="edital-publish"),
     path("<int:edital_id>/duplicar/", views.edital_clone, name="edital-clone"),
     path("<int:edital_id>/status/", views.edital_status, name="edital-status"),
+    path(
+        "<int:edital_id>/pre-visualizar/",
+        views.edital_analyst_preview,
+        name="edital-analyst-preview",
+    ),
     path("<int:edital_id>/<str:section>/", views.section_list, name="edital-section"),
     path("<int:edital_id>/<str:section>/novo/", views.section_form, name="edital-section-create"),
     path(

@@ -35,6 +35,16 @@ class CheckResultForm(forms.Form):
                 required=False,
                 widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             ),
+            "opened_on": lambda: forms.DateField(
+                label="Data de abertura do CNPJ",
+                required=False,
+                widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            ),
+            "cnae": lambda: forms.CharField(label="CNAE informado", max_length=30, required=False),
+            "canonical_cnpj_confirmed": lambda: forms.BooleanField(
+                label="Confirmo o CNPJ da candidatura declarado no Anexo I",
+                required=False,
+            ),
             "numeric_value": lambda: forms.DecimalField(
                 label="Valor numérico", max_digits=14, decimal_places=2, required=False
             ),

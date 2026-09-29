@@ -124,11 +124,18 @@ class CheckResult(models.Model):
         blank=True,
         verbose_name="CNPJ Constante no Documento",
     )
+    canonical_cnpj_confirmed = models.BooleanField(
+        null=True,
+        blank=True,
+        verbose_name="CNPJ da candidatura confirmado no Anexo I",
+    )
     valid_until = models.DateField(
         null=True,
         blank=True,
         verbose_name="Data de Validade da Certidão / Documento",
     )
+    opened_on = models.DateField(null=True, blank=True, verbose_name="Data de abertura do CNPJ")
+    cnae = models.CharField(max_length=30, blank=True, verbose_name="CNAE informado")
     numeric_value = models.DecimalField(
         max_digits=14,
         decimal_places=2,

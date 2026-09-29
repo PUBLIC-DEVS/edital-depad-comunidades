@@ -22,6 +22,9 @@ class EvidenceConfiguration(models.Model):
     collect_pages = models.BooleanField(default=True)
     collect_document_cnpj = models.BooleanField(default=False)
     collect_valid_until = models.BooleanField(default=False)
+    collect_opened_on = models.BooleanField(default=False)
+    collect_cnae = models.BooleanField(default=False)
+    collect_canonical_cnpj_confirmed = models.BooleanField(default=False)
     collect_numeric_value = models.BooleanField(default=False)
     collect_notes = models.BooleanField(default=True)
 
@@ -55,6 +58,9 @@ class EvidenceConfiguration(models.Model):
                 "pages",
                 "document_cnpj",
                 "valid_until",
+                "opened_on",
+                "cnae",
+                "canonical_cnpj_confirmed",
                 "numeric_value",
                 "notes",
             )
@@ -74,6 +80,7 @@ class Edital(models.Model):
         ARCHIVED = "ARCHIVED", "Arquivado"
 
     class DuplicatePolicy(models.TextChoices):
+        WARN_ONLY = ("WARN_ONLY", "Alertar e manter candidaturas para análise")
         KEEP_EARLIEST_SUBMISSION = (
             "KEEP_EARLIEST_SUBMISSION",
             "Manter a inscrição mais antiga (Histórico)",
@@ -126,6 +133,16 @@ class Edital(models.Model):
         default=Decimal("10.00"),
         validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
+    validation_reference_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de referência das validações",
+        help_text="Data oficial usada para validade documental e idade mínima do CNPJ.",
+    )
+    requires_financial_rules = models.BooleanField(
+        default=True,
+        verbose_name="Este edital exige cálculo financeiro por vaga",
+    )
     tie_breaker_policy = models.CharField(
         max_length=30,
         choices=[
@@ -175,6 +192,8 @@ class Edital(models.Model):
                 "duplicate_policy",
                 "tie_breaker_policy",
                 "minimum_equity_percentage",
+                "validation_reference_date",
+                "requires_financial_rules",
             )
             if not old.configuration_editable and any(
                 getattr(old, f) != getattr(self, f) for f in protected
@@ -342,6 +361,14 @@ class Requirement(ConfigurationModel, EvidenceConfiguration):
     )
     name = models.CharField(max_length=255, verbose_name="Título do Requisito")
     description = models.TextField(blank=True, verbose_name="Descrição Detalhada")
+    presentation_section = models.CharField(
+        max_length=100, blank=True, verbose_name="Seção visual no espaço do analista"
+    )
+    requires_checks = models.BooleanField(
+        default=False,
+        verbose_name="Exige subcritérios configurados",
+        help_text="Use quando este requisito precisa de um ou mais checks para publicação.",
+    )
     order = models.PositiveIntegerField(default=0, verbose_name="Ordem de Exibição")
     mandatory = models.BooleanField(
         default=True,
@@ -419,6 +446,59 @@ class RequirementCheck(ConfigurationModel, EvidenceConfiguration):
         return self.requirement.edital
 
 
+class RequirementValidationRule(ConfigurationModel):
+    """Small, typed automatic validation attached to a configured check."""
+
+    class RuleType(models.TextChoices):
+        CNPJ_MATCH_CANONICAL = "CNPJ_MATCH_CANONICAL", "CNPJ igual ao da candidatura"
+        DATE_NOT_EXPIRED = "DATE_NOT_EXPIRED", "Documento vigente na data de referência"
+        CNPJ_MINIMUM_AGE = "CNPJ_MINIMUM_AGE", "Idade mínima de atividade do CNPJ"
+        CNAE_REQUIRED = "CNAE_REQUIRED", "CNAE exigido"
+
+    class Severity(models.TextChoices):
+        CRITICAL = "CRITICAL", "Crítica"
+        WARNING = "WARNING", "Aviso"
+
+    requirement_check = models.ForeignKey(
+        RequirementCheck, on_delete=models.CASCADE, related_name="validation_rules"
+    )
+    rule_type = models.CharField(max_length=40, choices=RuleType.choices)
+    severity = models.CharField(max_length=12, choices=Severity.choices, default=Severity.CRITICAL)
+    blocks_completion = models.BooleanField(default=True)
+    config = models.JSONField(default=dict, blank=True)
+    active = models.BooleanField(default=True)
+
+    configuration_edital_path = "requirement_check__requirement__edital__"
+
+    @property
+    def configuration_edital(self):
+        return self.requirement_check.requirement.edital
+
+    def clean(self):
+        super().clean()
+        config = self.config if isinstance(self.config, dict) else {}
+        if self.rule_type == self.RuleType.CNPJ_MINIMUM_AGE:
+            years = config.get("years")
+            if not isinstance(years, int) or isinstance(years, bool) or years < 1:
+                raise ValidationError({"config": "Informe years como inteiro maior que zero."})
+        if self.rule_type == self.RuleType.CNAE_REQUIRED:
+            if not config.get("expected_cnae"):
+                raise ValidationError({"config": "Informe o CNAE esperado."})
+            if config.get("match_mode") not in {"EXACT", "CONTAINS", "UNRESOLVED"}:
+                raise ValidationError({"config": "Informe EXACT, CONTAINS ou UNRESOLVED."})
+        if self.rule_type in {self.RuleType.DATE_NOT_EXPIRED, self.RuleType.CNPJ_MINIMUM_AGE}:
+            if config.get("reference_date") != "EDITAL_REFERENCE_DATE":
+                raise ValidationError({"config": "A referência deve ser EDITAL_REFERENCE_DATE."})
+
+    class Meta:
+        ordering = ["requirement_check__order", "rule_type"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["requirement_check", "rule_type"], name="unique_check_validation_rule"
+            )
+        ]
+
+
 class Program(models.Model):
     code = models.CharField(max_length=50, unique=True, verbose_name="Código")
     name = models.CharField(max_length=150, verbose_name="Nome")
@@ -467,9 +547,31 @@ class ClassificationPolicy(ConfigurationModel):
         default="VACANCY_TARGET_POLICY_V1",
         choices=[
             ("VACANCY_TARGET_POLICY_V1", "Vagas e programa municipal (v1)"),
+            (
+                "VACANCY_TARGET_POLICY_V2_MIXED_FIRST",
+                "Vagas com prioridade para entidades mistas (v2)",
+            ),
             ("MANUAL_TARGET_POLICY_V1", "Grupo informado no cadastro (v1)"),
         ],
     )
+    mixed_group_code = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Grupo para entidades com vagas femininas e masculinas",
+    )
+
+    def clean(self):
+        super().clean()
+        if self.policy_type == "VACANCY_TARGET_POLICY_V2_MIXED_FIRST":
+            if (
+                not self.mixed_group_code
+                or not self.edital.target_groups.filter(
+                    code=self.mixed_group_code, active=True
+                ).exists()
+            ):
+                raise ValidationError(
+                    {"mixed_group_code": "Selecione um grupo ativo deste edital."}
+                )
 
 
 class EditalConfigurationSnapshot(models.Model):

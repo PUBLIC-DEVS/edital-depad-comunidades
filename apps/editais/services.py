@@ -13,7 +13,9 @@ from .models import (
     Edital,
     EditalConfigurationSnapshot,
     FundingRule,
+    Program,
     Requirement,
+    RequirementValidationRule,
 )
 
 
@@ -38,7 +40,16 @@ def configuration_data(edital):
         "classification_policy": fields(edital.classification_policy),
         "groups": [fields(g) for g in edital.target_groups.all()],
         "requirements": [
-            {**fields(r), "checks": [fields(c) for c in r.checks.all()]}
+            {
+                **fields(r),
+                "checks": [
+                    {
+                        **fields(c),
+                        "validations": [fields(rule) for rule in c.validation_rules.all()],
+                    }
+                    for c in r.checks.all()
+                ],
+            }
             for r in edital.requirements.all()
         ],
         "funding": [fields(f) for f in edital.funding_rules.all().order_by("vacancy_type")],
@@ -58,6 +69,31 @@ def configuration_data(edital):
 
 
 class EditalConfigurationService:
+    @staticmethod
+    @transaction.atomic
+    def save_program(instance, actor):
+        require_configuration_actor(actor)
+        created = instance.pk is None
+        previous = None
+        if instance.pk:
+            previous = Program.objects.select_for_update().get(pk=instance.pk)
+        instance.full_clean()
+        instance.save()
+        for field in ("code", "name", "description", "active"):
+            old = getattr(previous, field) if previous else ""
+            new = getattr(instance, field)
+            if created or old != new:
+                AuditEvent.objects.create(
+                    actor=actor,
+                    entity_type="Program",
+                    entity_id=str(instance.pk),
+                    action="CONFIG_CREATE" if created else "CONFIG_UPDATE",
+                    field=field,
+                    old_value=str(old),
+                    new_value=str(new),
+                )
+        return instance
+
     @staticmethod
     def validate(edital):
         errors, warnings, checklist = [], [], []
@@ -83,11 +119,17 @@ class EditalConfigurationService:
         section("Grupos / públicos", group_errors)
         policy = ClassificationPolicy.objects.filter(edital=edital).first()
         policy_errors = [] if policy else ["Configure a política de classificação."]
-        if policy and policy.policy_type == "VACANCY_TARGET_POLICY_V1":
+        if policy and policy.policy_type in {
+            "VACANCY_TARGET_POLICY_V1",
+            "VACANCY_TARGET_POLICY_V2_MIXED_FIRST",
+        }:
             if any(not g.vacancy_types for g in groups):
                 policy_errors.append("Informe os tipos de vaga que enquadram cada grupo.")
             if len({g.order for g in groups}) != len(groups):
                 policy_errors.append("Defina prioridades distintas para os grupos.")
+        if policy and policy.policy_type == "VACANCY_TARGET_POLICY_V2_MIXED_FIRST":
+            if not any(g.code == policy.mixed_group_code for g in groups):
+                policy_errors.append("Selecione o grupo para entidades mistas.")
         section(
             "Classificação e duplicidades",
             policy_errors,
@@ -98,25 +140,72 @@ class EditalConfigurationService:
         requirements = list(edital.requirements.filter(active=True).prefetch_related("checks"))
         req_errors = [] if requirements else ["Cadastre ao menos um requisito ativo."]
         for req in requirements:
+            if req.requires_checks and not req.checks.filter(active=True).exists():
+                req_errors.append(f"{req.code}: configure ao menos um subcritério ativo.")
             for definition in [req, *req.checks.filter(active=True)]:
                 try:
                     definition.full_clean()
                 except ValidationError as exc:
                     req_errors.append(f"{definition.code}: {'; '.join(exc.messages)}")
         section("Requisitos e subcritérios", req_errors)
+        validation_errors, validation_warnings = [], []
+        for rule in RequirementValidationRule.objects.filter(
+            requirement_check__requirement__edital=edital, active=True
+        ).select_related("requirement_check__requirement"):
+            try:
+                rule.full_clean()
+            except ValidationError as exc:
+                validation_errors.extend(
+                    f"{rule.requirement_check.code}: {message}" for message in exc.messages
+                )
+            if (
+                rule.rule_type
+                in {
+                    RequirementValidationRule.RuleType.DATE_NOT_EXPIRED,
+                    RequirementValidationRule.RuleType.CNPJ_MINIMUM_AGE,
+                }
+                and not edital.validation_reference_date
+            ):
+                validation_errors.append(
+                    f"{rule.requirement_check.code}: configure a data oficial de referência."
+                )
+            if (
+                rule.rule_type == RequirementValidationRule.RuleType.CNAE_REQUIRED
+                and isinstance(rule.config, dict)
+                and rule.config.get("match_mode") == "UNRESOLVED"
+            ):
+                validation_warnings.append(
+                    "O modo de comparação do CNAE aguarda decisão da coordenação."
+                )
+                if (
+                    rule.severity == RequirementValidationRule.Severity.CRITICAL
+                    and rule.blocks_completion
+                ):
+                    validation_errors.append(
+                        f"{rule.requirement_check.code}: resolva o modo do CNAE antes de publicar uma regra crítica."
+                    )
+        section("Validações automáticas", validation_errors, validation_warnings)
         funding_types = set(edital.funding_rules.values_list("vacancy_type", flat=True))
         needed_types = set().union(*(set(g.vacancy_types) for g in groups)) if groups else set()
         if policy and policy.policy_type == "MANUAL_TARGET_POLICY_V1":
             needed_types = set(FundingRule.VacancyType.values)
-        funding_errors = [
-            f"Configure o financiamento para {t}." for t in sorted(needed_types - funding_types)
-        ]
+        funding_errors = (
+            [f"Configure o financiamento para {t}." for t in sorted(needed_types - funding_types)]
+            if edital.requires_financial_rules
+            else []
+        )
         for rule in edital.funding_rules.all():
             try:
                 rule.full_clean()
             except ValidationError as exc:
                 funding_errors.extend(exc.messages)
-        section("Financeiro", funding_errors)
+        section(
+            "Financeiro",
+            funding_errors,
+            []
+            if edital.requires_financial_rules
+            else ["Este edital não definiu cálculo financeiro."],
+        )
         program_errors = []
         for group in groups:
             if group.program_id and (
@@ -223,6 +312,7 @@ class EditalConfigurationService:
                 "duplicate_scope",
                 "tie_breaker_policy",
                 "minimum_equity_percentage",
+                "requires_financial_rules",
             )
         }
         defaults.update(new_data)
@@ -245,7 +335,9 @@ class EditalConfigurationService:
         for req in source.requirements.all():
             new_req = copy(req, edital=clone)
             for check in req.checks.all():
-                copy(check, requirement=new_req)
+                new_check = copy(check, requirement=new_req)
+                for rule in check.validation_rules.all():
+                    copy(rule, requirement_check=new_check)
         for obj in source.funding_rules.all():
             copy(obj, edital=clone)
         for obj in source.program_municipalities.all():

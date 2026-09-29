@@ -53,6 +53,9 @@ class EvaluationService:
     @transaction.atomic
     def initialize_evaluation(cls, submission: Submission, analyst: User) -> Evaluation:
         """Inicializa ou obtém a avaliação de uma submissão, gerando registros de checagem em branco."""
+        from apps.submissions.services.eligibility import ParticipationEligibilityService
+
+        ParticipationEligibilityService.require_assignable(submission)
         evaluation, created = Evaluation.objects.get_or_create(
             submission=submission,
             defaults={
@@ -119,6 +122,9 @@ class EvaluationService:
             raise PermissionDenied("Somente o analista atribuído pode iniciar análise.")
         if submission.workflow_status != Submission.WorkflowStatus.ASSIGNED:
             raise ValidationError("Processo não está no estágio de início da análise.")
+        from apps.submissions.services.eligibility import ParticipationEligibilityService
+
+        ParticipationEligibilityService.require_assignable(submission)
         evaluation = cls.initialize_evaluation(submission, analyst)
         from apps.submissions.services.workflow import WorkflowService
 
@@ -212,6 +218,16 @@ class EvaluationService:
                 "checagens pendentes. Avalie todos os itens ou salve como rascunho."
             )
             raise InconsistentEvaluationError(msg)
+        from apps.evaluations.validation_rules import ValidationRuleEvaluator
+
+        blockers = ValidationRuleEvaluator.blockers(evaluation)
+        if blockers:
+            labels = "; ".join(
+                f"{outcome.rule.requirement_check.name}: {outcome.message}" for outcome in blockers
+            )
+            raise InconsistentEvaluationError(
+                f"Validações críticas impedem concluir a análise: {labels}"
+            )
 
         evaluation.status = Evaluation.Status.COMPLETED
         evaluation.result = assessment.result

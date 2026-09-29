@@ -13,18 +13,22 @@ from .forms import (
     CloneEditalForm,
     EditalForm,
     FundingRuleForm,
+    ProgramForm,
     ProgramMunicipalityForm,
     RequirementCheckForm,
     RequirementForm,
+    RequirementValidationRuleForm,
     TargetGroupForm,
 )
 from .models import (
     ClassificationPolicy,
     Edital,
     FundingRule,
+    Program,
     ProgramMunicipality,
     Requirement,
     RequirementCheck,
+    RequirementValidationRule,
     TargetGroup,
 )
 from .services import EditalConfigurationService
@@ -33,10 +37,44 @@ SECTIONS = {
     "grupos": (TargetGroup, TargetGroupForm, "Grupos / públicos"),
     "requisitos": (Requirement, RequirementForm, "Requisitos"),
     "subcriterios": (RequirementCheck, RequirementCheckForm, "Subcritérios"),
+    "validacoes": (
+        RequirementValidationRule,
+        RequirementValidationRuleForm,
+        "Validações automáticas",
+    ),
     "financeiro": (FundingRule, FundingRuleForm, "Regras financeiras"),
     "programas": (ProgramMunicipality, ProgramMunicipalityForm, "Municípios / programas"),
     "classificacao": (ClassificationPolicy, ClassificationPolicyForm, "Política de classificação"),
 }
+
+
+@login_required
+@require_role(User.Role.ADMINISTRADOR, User.Role.COORDENADOR)
+def program_list(request):
+    return render(request, "editais/programs.html", {"programs": Program.objects.order_by("name")})
+
+
+@login_required
+@require_role(User.Role.ADMINISTRADOR)
+def program_form(request, program_id=None):
+    program = get_object_or_404(Program, pk=program_id) if program_id else Program()
+    form = ProgramForm(request.POST or None, instance=program)
+    if request.method == "POST" and form.is_valid():
+        try:
+            EditalConfigurationService.save_program(form.save(commit=False), request.user)
+        except ValidationError as exc:
+            form.add_error(None, "; ".join(exc.messages))
+        else:
+            return redirect("program-list")
+    return render(
+        request,
+        "administration/form.html",
+        {
+            "form": form,
+            "title": "Editar programa" if program_id else "Novo programa",
+            "back_url": "/admin-editais/programas/",
+        },
+    )
 
 
 def section_objects(edital, section):
@@ -45,9 +83,11 @@ def section_objects(edital, section):
 
         raise Http404
     model = SECTIONS[section][0]
-    return model.objects.filter(
-        **({"requirement__edital": edital} if model is RequirementCheck else {"edital": edital})
-    )
+    scope = {
+        RequirementCheck: {"requirement__edital": edital},
+        RequirementValidationRule: {"requirement_check__requirement__edital": edital},
+    }.get(model, {"edital": edital})
+    return model.objects.filter(**scope)
 
 
 @login_required
@@ -104,6 +144,9 @@ def edital_detail(request, edital_id):
             "events": AuditEvent.objects.filter(entity_type="Edital", entity_id=str(edital.pk))[
                 :20
             ],
+            "requirements": edital.requirements.filter(active=True)
+            .prefetch_related("checks__validation_rules")
+            .order_by("order", "code"),
         },
     )
 
@@ -136,12 +179,18 @@ def section_form(request, edital_id, section, object_id=None):
     if not edital.configuration_editable:
         raise PermissionDenied("Configuração publicada protegida.")
     instance = get_object_or_404(qs, pk=object_id) if object_id else model()
-    if model is not RequirementCheck:
+    if model is not RequirementValidationRule:
         instance.edital = edital
-    kwargs = {"edital": edital} if model is RequirementCheck else {}
+    kwargs = (
+        {"edital": edital}
+        if model in {RequirementCheck, ClassificationPolicy, RequirementValidationRule}
+        else {}
+    )
     form = form_class(request.POST or None, instance=instance, **kwargs)
     if model is RequirementCheck and not object_id:
         form.initial["requirement"] = request.GET.get("requirement")
+    if model is RequirementValidationRule and not object_id:
+        form.initial["requirement_check"] = request.GET.get("check")
     if request.method == "POST" and form.is_valid():
         try:
             EditalConfigurationService.save(form.save(commit=False), request.user)
@@ -249,3 +298,27 @@ def edital_status(request, edital_id):
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages))
     return redirect("edital-detail", edital_id=edital.pk)
+
+
+@login_required
+@require_role(User.Role.ADMINISTRADOR, User.Role.COORDENADOR)
+def edital_analyst_preview(request, edital_id):
+    """Read-only preview of the configured analyst form; it never creates an evaluation."""
+    edital = get_object_or_404(Edital, pk=edital_id)
+    requirements = (
+        edital.requirements.filter(active=True)
+        .prefetch_related("checks__validation_rules")
+        .order_by("order", "code")
+    )
+    sections = {}
+    for requirement in requirements:
+        key = requirement.presentation_section.strip() or "Documentos e requisitos"
+        sections.setdefault(key, []).append(requirement)
+    return render(
+        request,
+        "editais/analyst_preview.html",
+        {
+            "edital": edital,
+            "sections": [{"title": key, "requirements": value} for key, value in sections.items()],
+        },
+    )
