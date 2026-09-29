@@ -3,6 +3,7 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.editais.models import FundingRule
 
@@ -13,10 +14,17 @@ class FundingRuleNotFoundError(Exception):
 
 class FundingService:
     @staticmethod
-    def get_funding_rule(edital, vacancy_type):
+    def get_funding_rule(edital, vacancy_type, as_of=None):
         rule = FundingRule.objects.filter(edital=edital, vacancy_type=vacancy_type).first()
         if rule is None:
             raise FundingRuleNotFoundError(f"Missing rule for {vacancy_type}")
+        if as_of and (
+            (rule.valid_from and as_of < rule.valid_from)
+            or (rule.valid_until and as_of > rule.valid_until)
+        ):
+            raise ValidationError(
+                f"Regra financeira para {vacancy_type} fora da vigência na data de recebimento."
+            )
         return rule
 
     @classmethod
@@ -26,8 +34,10 @@ class FundingService:
         return cls.get_funding_rule(edital, vacancy_type).monthly_value * Decimal(vacancies)
 
     @classmethod
-    def calculate_global_value(cls, edital, vacancy_type, vacancies, duration_months=None):
-        rule = cls.get_funding_rule(edital, vacancy_type)
+    def calculate_global_value(
+        cls, edital, vacancy_type, vacancies, duration_months=None, as_of=None
+    ):
+        rule = cls.get_funding_rule(edital, vacancy_type, as_of)
         months = rule.duration_months if duration_months is None else duration_months
         if months <= 0:
             raise ValidationError("Duração deve ser positiva.")
@@ -49,7 +59,18 @@ class FundingService:
             (FundingRule.VacancyType.NURSING_MOTHER, submission.vagas_maes_nutrizes),
         ]
         total = sum(
-            (cls.calculate_global_value(submission.edital, t, n) for t, n in amounts if n),
+            (
+                cls.calculate_global_value(
+                    submission.edital,
+                    t,
+                    n,
+                    as_of=timezone.localdate(submission.received_at)
+                    if submission.received_at
+                    else None,
+                )
+                for t, n in amounts
+                if n
+            ),
             Decimal(0),
         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         return total, cls.calculate_minimum_equity(submission.edital, total)

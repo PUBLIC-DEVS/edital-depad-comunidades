@@ -6,8 +6,8 @@ from django.core.exceptions import ValidationError
 
 from apps.legacy_import.importer import LegacyImporter
 from apps.legacy_import.models import LegacyImportIssue, LegacyImportRun
+from apps.legacy_import.synthetic import generate_synthetic_legacy_workbook
 from apps.submissions.models import Submission
-from apps.submissions.services.legacy_generator import generate_synthetic_legacy_workbook
 
 pytestmark = [pytest.mark.legacy, pytest.mark.django_db]
 

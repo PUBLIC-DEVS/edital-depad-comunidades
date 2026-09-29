@@ -68,3 +68,13 @@ jobs:
           SECURE_SSL_REDIRECT: "False"
         run: |
           pytest -m "not legacy_real" --cov=apps --cov-report=term-missing
+
+      - name: Verify New Edital Lifecycle Without Legacy App
+        env:
+          DATABASE_URL: postgres://edital_user:edital_password@localhost:5432/edital_depad_test
+          SECRET_KEY: ci-secret-key-not-for-production
+          DEBUG: "False"
+          SECURE_SSL_REDIRECT: "False"
+          ENABLE_LEGACY_IMPORT: "false"
+        run: |
+          pytest tests/integration/test_new_edital_full_lifecycle.py

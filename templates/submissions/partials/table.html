@@ -61,10 +61,7 @@
                         </td>
                         <td class="px-4 py-3">
                             <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold
-                                {% if sub.target_group == 'G1' %}bg-purple-100 text-purple-800
-                                {% elif sub.target_group == 'G2' %}bg-emerald-100 text-emerald-800
-                                {% elif sub.target_group == 'G3' %}bg-blue-100 text-blue-800
-                                {% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {% if sub.target_group_definition %}bg-blue-100 text-govblue-800{% else %}bg-slate-100 text-slate-700{% endif %}">
                                 {{ sub.target_group }}
                             </span>
                         </td>

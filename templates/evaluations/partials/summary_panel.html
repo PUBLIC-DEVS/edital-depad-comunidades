@@ -1,4 +1,5 @@
 <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4 sticky top-6">
+    {% if validation_errors %}<div role="alert" class="text-sm text-red-800 bg-red-50 p-3 rounded">{% for error in validation_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
     <div class="border-b border-slate-100 pb-3 flex justify-between items-center">
         <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">
             Painel de Resumo
@@ -13,14 +14,14 @@
         {% if assessment.result == 'APTA' %}bg-emerald-50 border border-emerald-200 text-emerald-800
         {% elif assessment.result == 'INAPTA' %}bg-red-50 border border-red-200 text-red-800
         {% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Resultado Oficial Calculado</div>
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Resultado da análise inicial</div>
         <div class="text-xl font-bold mt-1">
             {% if assessment.result == 'APTA' %}APTA
             {% elif assessment.result == 'INAPTA' %}INAPTA
             {% else %}EM ANÁLISE{% endif %}
         </div>
         <div class="text-[11px] mt-1 text-slate-600">
-            Calculado pelo motor de regras (EvaluationService)
+            Calculado conforme a configuração do edital
         </div>
     </div>
 

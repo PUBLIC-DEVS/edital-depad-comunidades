@@ -10,7 +10,15 @@ from django.utils.text import slugify
 
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
-from apps.editais.models import Edital, ProgramMunicipality, Requirement, RequirementCheck
+from apps.editais.models import (
+    ClassificationPolicy,
+    Edital,
+    Program,
+    ProgramMunicipality,
+    Requirement,
+    RequirementCheck,
+    TargetGroup,
+)
 from apps.evaluations.models import CheckResult, Evaluation
 from apps.evaluations.services.evaluation import EvaluationService
 from apps.institutions.cnpj import normalize_cnpj, validate_cnpj
@@ -136,17 +144,42 @@ class LegacyImporter:
                         "No historical dates available",
                     )
                     raise ValidationError("No historical dates available")
-                edital, _ = Edital.objects.get_or_create(
+                edital, edital_created = Edital.objects.get_or_create(
                     number=self.number,
                     year=self.year,
                     defaults={
                         "name": f"Edital {self.number}/{self.year}",
                         "opens_at": min(timestamps),
                         "closes_at": max(timestamps),
-                        "status": Edital.Status.ARCHIVED,
+                        "status": Edital.Status.DRAFT,
                     },
                 )
                 self.edital = edital
+                if not edital_created and edital.status != Edital.Status.ARCHIVED:
+                    raise ValidationError("Legacy imports must target their own archived edital.")
+                program, _ = Program.objects.get_or_create(
+                    code="PRONASCI", defaults={"name": "PRONASCI"}
+                )
+                self.program = program
+                for order, (code, name, types, priority_program) in enumerate(
+                    [
+                        ("G1", "Mulheres e mães nutrizes", ["FEMALE", "NURSING_MOTHER"], None),
+                        ("G2", "Masculino PRONASCI", ["MALE"], program),
+                        ("G3", "Masculino", ["MALE"], None),
+                    ],
+                    1,
+                ):
+                    TargetGroup.objects.get_or_create(
+                        edital=edital,
+                        code=code,
+                        defaults={
+                            "name": name,
+                            "vacancy_types": types,
+                            "order": order,
+                            "program": priority_program,
+                        },
+                    )
+                ClassificationPolicy.objects.get_or_create(edital=edital)
                 try:
                     configure_source_finance(data, edital)
                 except ValidationError as exc:
@@ -191,6 +224,9 @@ class LegacyImporter:
                     setattr(self.report, attr, counts[group])
                 if self.strict and any(i["severity"] == "ERROR" for i in self.issues):
                     raise ValidationError("Strict import rejected source issues")
+                if edital_created:
+                    edital.status = Edital.Status.ARCHIVED
+                    edital.save(update_fields=["status", "updated_at"])
                 if self.dry_run:
                     transaction.set_rollback(True)
         except ValidationError:
@@ -283,7 +319,10 @@ class LegacyImporter:
                     edital=self.edital,
                     municipality=municipality,
                     program_name="PRONASCI",
-                    defaults={"legacy_original_name": pronasci_names[normalized_text(muni_name)]},
+                    defaults={
+                        "legacy_original_name": pronasci_names[normalized_text(muni_name)],
+                        "program": self.program,
+                    },
                 )
         else:
             self.issue(
@@ -420,6 +459,11 @@ class LegacyImporter:
                         code=f"{code}-{col}",
                         defaults={
                             "name": col,
+                            **{
+                                f"collect_{attr}": True
+                                for attr in evidence
+                                if attr != "minimum_equity"
+                            },
                             "order": index,
                             "accepted_statuses": ["ATENDE", "NAO_APLICAVEL"]
                             if col == "BV"

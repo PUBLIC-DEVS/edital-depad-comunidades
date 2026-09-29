@@ -111,7 +111,7 @@ class ReviewItemDecision(models.Model):
 
     def __str__(self):
         status_txt = "Concorda" if self.agrees_with_analyst else f"Diverge ({self.reviewer_status})"
-        return f"{self.check_result.requirement_check.code} - {status_txt}"
+        return f"{self.check_result.definition.code} - {status_txt}"
 
     def clean(self):
         if (

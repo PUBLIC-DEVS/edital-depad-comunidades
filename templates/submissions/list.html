@@ -3,6 +3,7 @@
 {% block title %}Processos e Distribuição — DEPED/MDS{% endblock %}
 
 {% block content %}
+<form method="get" class="mb-4"><label for="edital-filter">Edital</label><select id="edital-filter" name="edital" class="form-select"><option value="">Todos autorizados</option>{% for e in editais %}<option value="{{ e.pk }}" {% if edital_filter == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.number }}/{{ e.year }}</option>{% endfor %}</select><button class="btn-secondary">Filtrar</button></form>
 <div class="space-y-6">
     <!-- Header with actions -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
@@ -15,12 +16,15 @@
                 Fila de Exceções & Alertas
             </a>
             {% if can_distribute %}
-                <a href="{% url 'submission-create' %}" class="inline-flex items-center px-3 py-1.5 bg-govblue-600 hover:bg-govblue-700 text-white text-xs font-semibold rounded transition shadow-sm">
+                <a href="{% url 'submission-import-csv' %}{% if edital_filter %}?edital={{ edital_filter }}{% endif %}" class="btn-secondary">Importar CSV</a>
+                <a href="{% url 'submission-create' %}{% if edital_filter %}?edital={{ edital_filter }}{% endif %}" class="inline-flex items-center px-3 py-1.5 bg-govblue-600 hover:bg-govblue-700 text-white text-xs font-semibold rounded transition shadow-sm">
                     + Cadastrar Processo
                 </a>
             {% endif %}
         </div>
     </div>
+
+    {% if can_distribute %}<section class="card p-4"><h2 class="font-semibold mb-3">Carga dos analistas</h2><div class="grid md:grid-cols-3 gap-3">{% for item in workloads %}<div class="border rounded p-3"><strong>{{ item.full_name }}</strong><p class="text-xs text-slate-600">{{ item.active_count }} em distribuição/análise · {{ item.pending_count }} pendentes · {{ item.completed_count }} concluídos</p></div>{% empty %}<p>Cadastre analistas para distribuir processos.</p>{% endfor %}</div></section>{% endif %}
 
     <!-- Filters and Search Bar -->
     <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">

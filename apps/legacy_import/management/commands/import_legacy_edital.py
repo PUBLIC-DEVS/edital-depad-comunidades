@@ -5,7 +5,7 @@ import os
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.submissions.services.legacy_importer import LegacyImporter
+from apps.legacy_import.importer import LegacyImporter
 
 
 class Command(BaseCommand):

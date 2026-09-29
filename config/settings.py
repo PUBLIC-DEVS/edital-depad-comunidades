@@ -39,8 +39,12 @@ INSTALLED_APPS = [
     "apps.ranking.apps.RankingConfig",
     "apps.reporting.apps.ReportingConfig",
     "apps.audit.apps.AuditConfig",
-    "apps.legacy_import",
 ]
+
+# Optional migration/regression boundary. New edital runtime is independent.
+ENABLE_LEGACY_IMPORT = os.getenv("ENABLE_LEGACY_IMPORT", "true").lower() == "true"
+if ENABLE_LEGACY_IMPORT:
+    INSTALLED_APPS.append("apps.legacy_import")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

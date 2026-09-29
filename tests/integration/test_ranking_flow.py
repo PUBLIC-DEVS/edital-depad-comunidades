@@ -3,10 +3,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.editais.models import Edital, ProgramMunicipality
+from apps.editais.models import Edital, FundingRule, ProgramMunicipality, Requirement
+from apps.editais.services import EditalConfigurationService
 from apps.institutions.models import Institution, Municipality
 from apps.ranking.models import RankingSnapshot
 from apps.submissions.models import Submission
+from tests.group_configuration import configure_example_groups
 
 
 @pytest.mark.django_db
@@ -19,6 +21,7 @@ class TestRankingFlowIntegration:
         analyst = User.objects.create_user(
             username="analyst_rk_flow", email="a_rk@mds.gov.br", role=User.Role.ANALISTA
         )
+        admin = User.objects.create_user(username="admin_rk_flow", role=User.Role.ADMINISTRADOR)
 
         now = timezone.now()
         edital = Edital.objects.create(
@@ -31,6 +34,7 @@ class TestRankingFlowIntegration:
             tie_breaker_policy="SEI_LEXICOGRAPHIC",
             duplicate_policy=Edital.DuplicatePolicy.KEEP_EARLIEST_SUBMISSION,
         )
+        program = configure_example_groups(edital)
         mun_pronasci = Municipality.objects.create(
             ibge_code="3304557", name="Rio de Janeiro", state="RJ"
         )
@@ -42,8 +46,25 @@ class TestRankingFlowIntegration:
             edital=edital,
             municipality=mun_pronasci,
             program_name="PRONASCI",
+            program=program,
             active=True,
         )
+        Requirement.objects.create(
+            edital=edital,
+            code="DOCUMENTO",
+            name="Documento de habilitação",
+            failure_behavior="NONE",
+            accepted_statuses=["ATENDE"],
+            failure_statuses=["NAO_ATENDE"],
+        )
+        for vacancy_type in FundingRule.VacancyType.values:
+            FundingRule.objects.create(
+                edital=edital,
+                vacancy_type=vacancy_type,
+                monthly_value="1000.00",
+            )
+        EditalConfigurationService.publish(edital, admin)
+        edital.refresh_from_db()
 
         return {
             "coord": coord,

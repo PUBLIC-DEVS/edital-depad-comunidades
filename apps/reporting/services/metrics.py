@@ -7,6 +7,7 @@ from django.db.models import Count, Q, QuerySet
 
 from apps.accounts.models import User
 from apps.editais.models import Edital
+from apps.evaluations.assessment import blocking_results
 from apps.evaluations.models import CheckResult, Evaluation
 from apps.institutions.cnpj import normalize_cnpj, validate_cnpj
 from apps.reviews.models import ReviewItemDecision
@@ -48,42 +49,40 @@ class DashboardMetricsService:
         distributed_count = subs.filter(assignments__status="ACTIVE").distinct().count()
         unassigned_count = total_received - distributed_count
 
-        # Aptos vs. Inaptos
-        # Baseado em avaliações finalizadas ou status de classificação
-        apt_count = (
-            subs.filter(
-                Q(evaluation__result=Evaluation.Result.APTA)
-                | Q(
-                    workflow_status__in=[
-                        Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
-                        Submission.WorkflowStatus.RANKED,
-                    ]
-                )
-            )
-            .distinct()
-            .count()
-        )
-        inapt_count = (
-            subs.filter(
-                Q(evaluation__result=Evaluation.Result.INAPTA)
-                | Q(workflow_status=Submission.WorkflowStatus.INELIGIBLE)
-            )
-            .distinct()
-            .count()
-        )
-
-        # Distribuição por grupo (G1, G2, G3, sem grupo)
-        group_counts = dict(
-            subs.values("target_group")
-            .annotate(count=Count("id"))
-            .values_list("target_group", "count")
-        )
-        by_group = {
-            "G1": group_counts.get(Submission.TargetGroup.G1, 0),
-            "G2": group_counts.get(Submission.TargetGroup.G2, 0),
-            "G3": group_counts.get(Submission.TargetGroup.G3, 0),
-            "SEM_GRUPO": group_counts.get(Submission.TargetGroup.SEM_GRUPO, 0),
+        # Two mutually exclusive dimensions, never an OR across lifecycle phases.
+        initial_results = {"APTA": 0, "INAPTA": 0, "EM_ANALISE": 0}
+        for result in subs.values_list("evaluation__result", flat=True):
+            initial_results[result or "EM_ANALISE"] += 1
+        outcome_by_workflow = {
+            "RECEIVED": ("RECEBIDO", "Recebido"),
+            "ASSIGNED": ("DISTRIBUIDO", "Distribuído"),
+            "UNDER_ANALYSIS": ("EM_ANALISE", "Em análise"),
+            "PENDING_REVIEW": ("EM_REVISAO", "Em revisão"),
+            "PENDING_DILIGENCE": ("EM_DILIGENCIA", "Em diligência"),
+            "ELIGIBLE_FOR_RANKING": ("HABILITADO", "Habilitado"),
+            "INELIGIBLE": ("INABILITADO", "Inabilitado"),
+            "RANKED": ("CLASSIFICADO", "Classificado"),
+            "CLOSED": ("ENCERRADO", "Encerrado"),
         }
+        consolidated_results = {
+            outcome: status_counts.get(status, 0)
+            for status, (outcome, _) in outcome_by_workflow.items()
+        }
+        consolidated_labels = dict(outcome_by_workflow.values())
+        group_counts = subs.values("edital__number", "edital__year", "target_group").annotate(
+            count=Count("id")
+        )
+        by_group = {}
+        if edital:
+            by_group.update({g.code: 0 for g in edital.target_groups.all()})
+            by_group["SEM_GRUPO"] = 0
+        for item in group_counts:
+            key = (
+                item["target_group"]
+                if edital
+                else f"{item['edital__number']}/{item['edital__year']} · {item['target_group']}"
+            )
+            by_group[key] = by_group.get(key, 0) + item["count"]
 
         # Distribuição por analista
         analysts = User.objects.filter(role=User.Role.ANALISTA, is_active=True).order_by(
@@ -133,8 +132,15 @@ class DashboardMetricsService:
             "pending_review": pending_review,
             "pending_diligence": pending_diligence,
             "concluded": concluded,
-            "apt_count": apt_count,
-            "inapt_count": inapt_count,
+            "apt_count": initial_results["APTA"],
+            "inapt_count": initial_results["INAPTA"],
+            "initial_results": initial_results,
+            "consolidated_results": consolidated_results,
+            "consolidated_labels": consolidated_labels,
+            "consolidated_cards": [
+                {"label": label, "count": consolidated_results[outcome]}
+                for outcome, label in consolidated_labels.items()
+            ],
             "by_group": by_group,
             "by_analyst": by_analyst,
             "by_uf": by_uf,
@@ -145,53 +151,45 @@ class DashboardMetricsService:
         cls, edital: Edital | None = None, limit: int = 10
     ) -> list[dict[str, Any]]:
         """Calcula o ranking dos requisitos que mais reprovaram propostas."""
-        qs = CheckResult.objects.filter(
-            status__in=[CheckResult.Status.NAO_ATENDE, CheckResult.Status.NAO_ENVIADO]
-        )
+        evaluations = Evaluation.objects.select_related("submission__edital")
         if edital:
-            qs = qs.filter(evaluation__submission__edital=edital)
-
-        top_qs = (
-            qs.values(
-                "requirement_check__requirement__code",
-                "requirement_check__requirement__name",
-                "requirement_check__requirement__description",
-            )
-            .annotate(failure_count=Count("evaluation__submission", distinct=True))
-            .order_by("-failure_count")[:limit]
-        )
-
+            evaluations = evaluations.filter(submission__edital=edital)
+        counts = defaultdict(set)
+        definitions = {}
+        for evaluation in evaluations:
+            for result in blocking_results(evaluation):
+                req = result.requirement
+                counts[req.pk].add(evaluation.submission_id)
+                definitions[req.pk] = req
         return [
             {
-                "code": item["requirement_check__requirement__code"],
-                "name": item["requirement_check__requirement__name"],
-                "description": item["requirement_check__requirement__description"] or "",
-                "failure_count": item["failure_count"],
+                "code": definitions[pk].code,
+                "name": definitions[pk].name,
+                "description": definitions[pk].description,
+                "edital_id": definitions[pk].edital_id,
+                "failure_count": len(ids),
             }
-            for item in top_qs
+            for pk, ids in sorted(counts.items(), key=lambda item: (-len(item[1]), item[0]))[:limit]
         ]
 
     @classmethod
     def get_submissions_failing_requirement(
         cls, requirement_code: str, edital: Edital | None = None
     ) -> QuerySet[Submission]:
-        """Retorna as submissões que foram reprovadas em um determinado requisito."""
-        qs = (
-            Submission.objects.filter(
-                evaluation__check_results__requirement_check__requirement__code=requirement_code,
-                evaluation__check_results__status__in=[
-                    CheckResult.Status.NAO_ATENDE,
-                    CheckResult.Status.NAO_ENVIADO,
-                ],
-            )
+        evaluations = Evaluation.objects.all()
+        if edital:
+            evaluations = evaluations.filter(submission__edital=edital)
+        ids = [
+            evaluation.submission_id
+            for evaluation in evaluations
+            if any(r.requirement.code == requirement_code for r in blocking_results(evaluation))
+        ]
+        return (
+            Submission.objects.filter(pk__in=ids)
             .select_related("institution", "municipality", "edital", "evaluation")
             .prefetch_related("assignments__analyst")
-            .distinct()
             .order_by("processo_sei")
         )
-        if edital:
-            qs = qs.filter(edital=edital)
-        return qs
 
     @classmethod
     def get_validation_insights(cls, edital: Edital | None = None) -> dict[str, Any]:
@@ -284,7 +282,7 @@ class DashboardMetricsService:
             {
                 "submission": item.review.submission,
                 "reviewer": item.review.reviewer,
-                "item_name": item.check_result.requirement_check.name,
+                "item_name": item.check_result.definition.name,
                 "analyst_decision": item.check_result.status,
                 "reviewer_decision": item.reviewer_status,
                 "justification": item.justification,
@@ -294,29 +292,17 @@ class DashboardMetricsService:
 
         # 4. Parecer positivo com item obrigatório reprovado (Grave contradição)
         positive_with_failed_items = []
-        apta_subs = subs.filter(
-            Q(evaluation__result=Evaluation.Result.APTA)
-            | Q(
-                workflow_status__in=[
-                    Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
-                    Submission.WorkflowStatus.RANKED,
-                ]
-            )
-        ).distinct()
-
-        for sub in apta_subs:
-            failed_mandatory = CheckResult.objects.filter(
-                evaluation__submission=sub,
-                requirement_check__requirement__mandatory=True,
-                status__in=[CheckResult.Status.NAO_ATENDE, CheckResult.Status.NAO_ENVIADO],
-            ).select_related("requirement_check__requirement")
-            if failed_mandatory.exists():
+        for sub in subs.filter(evaluation__result=Evaluation.Result.APTA).select_related(
+            "evaluation"
+        ):
+            failed_mandatory = blocking_results(sub.evaluation)
+            if failed_mandatory:
                 positive_with_failed_items.append(
                     {
                         "submission": sub,
-                        "failed_requirements": [
-                            cr.requirement_check.requirement.code for cr in failed_mandatory
-                        ],
+                        "failed_requirements": sorted(
+                            {r.requirement.code for r in failed_mandatory}
+                        ),
                     }
                 )
 
@@ -326,6 +312,7 @@ class DashboardMetricsService:
                 Q(municipality__isnull=True)
                 | Q(municipality__state="")
                 | Q(municipality__ibge_code="")
+                | Q(municipality__ibge_code__isnull=True)
             )
         )
 

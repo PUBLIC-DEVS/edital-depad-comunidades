@@ -130,9 +130,9 @@ class RankingEntry(ImmutableRankingModel):
         verbose_name="Inscrição Classificada",
     )
     target_group = models.CharField(
-        max_length=20,
+        max_length=50,
         verbose_name="Grupo Concorrido",
-        help_text="G1, G2, G3 ou SEM_GRUPO",
+        help_text="Código do grupo configurado para o edital.",
     )
     position = models.PositiveIntegerField(
         verbose_name="Posição na Fila",

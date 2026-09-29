@@ -16,6 +16,8 @@ class AnalystWorkload:
     username: str
     full_name: str
     active_count: int
+    pending_count: int = 0
+    completed_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -44,7 +46,33 @@ class DistributionService:
                             Submission.WorkflowStatus.UNDER_ANALYSIS,
                         ],
                     ),
-                )
+                ),
+                pending_count=Count(
+                    "assigned_submissions",
+                    filter=Q(
+                        assigned_submissions__status=Assignment.Status.ACTIVE,
+                        assigned_submissions__submission__workflow_status__in=[
+                            "ASSIGNED",
+                            "UNDER_ANALYSIS",
+                            "PENDING_REVIEW",
+                            "PENDING_DILIGENCE",
+                        ],
+                    ),
+                    distinct=True,
+                ),
+                completed_count=Count(
+                    "assigned_submissions",
+                    filter=Q(
+                        assigned_submissions__status=Assignment.Status.ACTIVE,
+                        assigned_submissions__submission__workflow_status__in=[
+                            "ELIGIBLE_FOR_RANKING",
+                            "INELIGIBLE",
+                            "RANKED",
+                            "CLOSED",
+                        ],
+                    ),
+                    distinct=True,
+                ),
             )
             .order_by("active_count", "first_name", "username")
         )
@@ -55,6 +83,8 @@ class DistributionService:
                 username=a.username,
                 full_name=a.get_full_name() or a.username,
                 active_count=a.active_count,
+                pending_count=a.pending_count,
+                completed_count=a.completed_count,
             )
             for a in analysts
         ]

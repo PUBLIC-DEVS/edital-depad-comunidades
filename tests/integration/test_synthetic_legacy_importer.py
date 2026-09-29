@@ -4,8 +4,8 @@ import pytest
 from django.core.management import call_command
 
 from apps.editais.models import Edital
+from apps.legacy_import.synthetic import generate_synthetic_legacy_workbook
 from apps.submissions.models import Assignment, Submission
-from apps.submissions.services.legacy_generator import generate_synthetic_legacy_workbook
 
 
 @pytest.mark.legacy
@@ -38,19 +38,19 @@ class TestSyntheticLegacyImporter:
         assert subs.count() == 282
 
         # 2. Grupo 1 (Mulheres e Mães Nutrizes)
-        g1_count = subs.filter(target_group=Submission.TargetGroup.G1).count()
+        g1_count = subs.filter(target_group="G1").count()
         assert g1_count == 9, f"Esperado 9 no G1, obtido {g1_count}"
 
         # 3. Grupo 2 (Municípios prioritários PRONASCI)
-        g2_count = subs.filter(target_group=Submission.TargetGroup.G2).count()
+        g2_count = subs.filter(target_group="G2").count()
         assert g2_count == 34, f"Esperado 34 no G2, obtido {g2_count}"
 
         # 4. Grupo 3 (Demais municípios)
-        g3_count = subs.filter(target_group=Submission.TargetGroup.G3).count()
+        g3_count = subs.filter(target_group="G3").count()
         assert g3_count == 212, f"Esperado 212 no G3, obtido {g3_count}"
 
         # 5. Sem Grupo (Vagas zeradas / pendentes)
-        sem_grupo_count = subs.filter(target_group=Submission.TargetGroup.SEM_GRUPO).count()
+        sem_grupo_count = subs.filter(target_group="SEM_GRUPO").count()
         assert sem_grupo_count == 27, f"Esperado 27 sem grupo, obtido {sem_grupo_count}"
 
         # 6. Soma exata

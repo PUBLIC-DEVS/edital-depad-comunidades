@@ -1,11 +1,14 @@
 """Formulários de captação e distribuição de processos."""
 
 from django import forms
+from django.core.exceptions import ValidationError
 
 from apps.accounts.models import User
+from apps.editais.models import Edital, TargetGroup
 from apps.institutions.cnpj import cnpj_validator, normalize_cnpj
 from apps.institutions.models import Institution
 from apps.submissions.models import Submission
+from apps.submissions.services.funding import FundingRuleNotFoundError, FundingService
 
 
 class SubmissionIntakeForm(forms.ModelForm):
@@ -23,6 +26,24 @@ class SubmissionIntakeForm(forms.ModelForm):
         widget=forms.TextInput(attrs={"class": "form-input"}),
     )
 
+    institution_email = forms.EmailField(
+        required=False,
+        label="E-mail de contato",
+        widget=forms.EmailInput(attrs={"class": "form-input"}),
+    )
+    institution_phone = forms.CharField(
+        required=False,
+        max_length=50,
+        label="Telefone",
+        widget=forms.TextInput(attrs={"class": "form-input"}),
+    )
+    institution_address = forms.CharField(
+        required=False,
+        max_length=255,
+        label="Endereço",
+        widget=forms.TextInput(attrs={"class": "form-input"}),
+    )
+
     class Meta:
         model = Submission
         fields = [
@@ -35,8 +56,7 @@ class SubmissionIntakeForm(forms.ModelForm):
             "vagas_maes_nutrizes",
             "vagas_solicitadas",
             "capacidade_total",
-            "valor_global",
-            "patrimonio_minimo",
+            "target_group_definition",
         ]
         widgets = {
             "received_at": forms.DateTimeInput(
@@ -46,6 +66,46 @@ class SubmissionIntakeForm(forms.ModelForm):
             "municipality": forms.Select(attrs={"class": "form-select"}),
             "processo_sei": forms.TextInput(attrs={"class": "form-input"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["edital"].queryset = Edital.objects.filter(status=Edital.Status.ACTIVE)
+        self.fields["target_group_definition"].label = "Grupo (somente para política manual)"
+        self.fields["target_group_definition"].required = False
+        edital_id = (
+            self.data.get("edital")
+            if self.is_bound
+            else self.instance.edital_id or self.initial.get("edital")
+        )
+        self.fields["target_group_definition"].queryset = (
+            TargetGroup.objects.filter(edital_id=edital_id, active=True)
+            if str(edital_id or "").isdigit()
+            else TargetGroup.objects.none()
+        )
+        if str(edital_id or "").isdigit():
+            selected_edital = Edital.objects.filter(pk=edital_id).first()
+            if (
+                selected_edital
+                and getattr(
+                    getattr(selected_edital, "classification_policy", None), "policy_type", None
+                )
+                != "MANUAL_TARGET_POLICY_V1"
+            ):
+                self.fields["target_group_definition"].disabled = True
+                self.fields["target_group_definition"].widget = forms.HiddenInput()
+        if self.instance.pk:
+            self.fields["edital"].disabled = True
+            self.fields["institution_cnpj"].disabled = True
+            self.fields["institution_name"].disabled = True
+            self.initial.update(
+                institution_cnpj=self.instance.institution.cnpj,
+                institution_name=self.instance.institution.name,
+                institution_email=self.instance.institution.contact_email,
+                institution_phone=self.instance.institution.contact_phone,
+                institution_address=self.instance.institution.address,
+            )
+            for field in ("institution_email", "institution_phone", "institution_address"):
+                self.fields[field].disabled = True
 
     def clean_institution_cnpj(self):
         return normalize_cnpj(self.cleaned_data["institution_cnpj"])
@@ -62,6 +122,55 @@ class SubmissionIntakeForm(forms.ModelForm):
                 "vagas_solicitadas",
                 f"O total solicitado ({solic}) difere da soma das vagas individuais ({fem + masc + mae}).",
             )
+        if solic > (cleaned_data.get("capacidade_total") or 0):
+            self.add_error("capacidade_total", "Capacidade inferior às vagas solicitadas.")
+        edital = cleaned_data.get("edital")
+        group = cleaned_data.get("target_group_definition")
+        if edital:
+            policy = getattr(edital, "classification_policy", None)
+            if not policy:
+                self.add_error("edital", "Edital sem política de classificação.")
+            elif policy.policy_type == "MANUAL_TARGET_POLICY_V1" and not group:
+                self.add_error("target_group_definition", "Selecione o grupo deste edital.")
+            elif (
+                policy.policy_type != "MANUAL_TARGET_POLICY_V1"
+                and group
+                and (not self.instance.pk or group.pk != self.instance.target_group_definition_id)
+            ):
+                self.add_error(
+                    "target_group_definition",
+                    "Este edital enquadra automaticamente pelas vagas/programa.",
+                )
+            try:
+                temporary = Submission(
+                    edital=edital,
+                    vagas_femininas=fem,
+                    vagas_masculinas=masc,
+                    vagas_maes_nutrizes=mae,
+                    received_at=cleaned_data.get("received_at"),
+                )
+                cleaned_data["calculated_funding"] = FundingService.calculate_submission_values(
+                    temporary
+                )
+            except (FundingRuleNotFoundError, ValidationError) as exc:
+                self.add_error("edital", str(exc))
+        cnpj = cleaned_data.get("institution_cnpj")
+        existing = Institution.objects.filter(cnpj=cnpj).first() if cnpj else None
+        if existing:
+            mapped = {
+                "institution_name": existing.name,
+                "institution_email": existing.contact_email,
+                "institution_phone": existing.contact_phone,
+                "institution_address": existing.address,
+            }
+            if any(
+                cleaned_data.get(field) and cleaned_data[field] != value
+                for field, value in mapped.items()
+            ):
+                self.add_error(
+                    "institution_cnpj",
+                    "CNPJ já cadastrado com dados diferentes. Atualize a instituição no cadastro antes de reutilizá-la.",
+                )
         return cleaned_data
 
     def save(self, commit=True):
@@ -74,9 +183,15 @@ class SubmissionIntakeForm(forms.ModelForm):
             defaults={
                 "name": name,
                 "municipality": municipality,
+                "contact_email": self.cleaned_data.get("institution_email", ""),
+                "contact_phone": self.cleaned_data.get("institution_phone", ""),
+                "address": self.cleaned_data.get("institution_address", ""),
             },
         )
         self.instance.institution = institution
+        self.instance.valor_global, self.instance.patrimonio_minimo = self.cleaned_data[
+            "calculated_funding"
+        ]
         return super().save(commit=commit)
 
 

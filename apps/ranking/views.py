@@ -5,7 +5,7 @@ import csv
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -22,7 +22,9 @@ def ranking_view(request: HttpRequest) -> HttpResponse:
     """Exibe o ranking oficial com filtros por edital, grupo e histórico de snapshots."""
     edital_id = request.GET.get("edital")
     if edital_id:
-        edital = get_object_or_404(Edital, id=edital_id)
+        if not edital_id.isdecimal():
+            raise Http404
+        edital = get_object_or_404(Edital, id=int(edital_id))
     else:
         edital = Edital.objects.order_by("-year", "-number").first()
 
@@ -32,6 +34,8 @@ def ranking_view(request: HttpRequest) -> HttpResponse:
     latest_snapshot = None
     if edital:
         if snapshot_id:
+            if not snapshot_id.isdecimal():
+                raise Http404
             latest_snapshot = RankingSnapshot.objects.filter(edital=edital, id=snapshot_id).first()
         else:
             latest_snapshot = (
@@ -49,7 +53,11 @@ def ranking_view(request: HttpRequest) -> HttpResponse:
             qs = qs.filter(target_group=group_filter)
         entries = list(qs)
 
-    can_generate = RolePermissionPolicy.can_generate_ranking(request.user)
+    can_generate = bool(
+        edital
+        and edital.status in {Edital.Status.ACTIVE, Edital.Status.CLOSED}
+        and RolePermissionPolicy.can_generate_ranking(request.user)
+    )
 
     context = {
         "edital": edital,
@@ -57,7 +65,11 @@ def ranking_view(request: HttpRequest) -> HttpResponse:
         "latest_snapshot": latest_snapshot,
         "entries": entries,
         "group_filter": group_filter,
-        "target_groups": ["G1", "G2", "G3"],
+        "target_groups": list(
+            edital.target_groups.filter(active=True).values_list("code", flat=True)
+        )
+        if edital
+        else [],
         "can_generate": can_generate,
         "snapshot_types": RankingSnapshot.SnapshotType.choices,
     }
@@ -71,11 +83,17 @@ def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
     """Gera um novo snapshot imutável de ranking para o edital selecionado."""
     if request.method == "POST":
         edital_id = request.POST.get("edital_id")
-        edital = get_object_or_404(Edital, id=edital_id)
+        if not edital_id or not edital_id.isdecimal():
+            raise Http404
+        edital = get_object_or_404(Edital, id=int(edital_id))
         snapshot_type = request.POST.get("snapshot_type", RankingSnapshot.SnapshotType.PRELIMINAR)
         description = request.POST.get("description", "").strip()
 
         try:
+            if edital.status not in {Edital.Status.ACTIVE, Edital.Status.CLOSED}:
+                raise ValidationError(
+                    "Publique o edital antes de classificar; editais arquivados são somente leitura."
+                )
             snapshot = RankingService.generate_snapshot(
                 edital=edital,
                 actor=request.user,

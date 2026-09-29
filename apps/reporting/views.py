@@ -3,7 +3,7 @@
 import csv
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from apps.accounts.permissions import require_role
@@ -18,7 +18,9 @@ def dashboard_metrics_view(request):
     edital_id = request.GET.get("edital")
     selected_edital = None
     if edital_id:
-        selected_edital = get_object_or_404(Edital, id=edital_id)
+        if not edital_id.isdecimal():
+            raise Http404
+        selected_edital = get_object_or_404(Edital, id=int(edital_id))
 
     editais = Edital.objects.all().order_by("-year", "-number")
     summary = DashboardMetricsService.get_summary_metrics(selected_edital)
@@ -43,7 +45,9 @@ def validation_insights_view(request):
     edital_id = request.GET.get("edital")
     selected_edital = None
     if edital_id:
-        selected_edital = get_object_or_404(Edital, id=edital_id)
+        if not edital_id.isdecimal():
+            raise Http404
+        selected_edital = get_object_or_404(Edital, id=int(edital_id))
 
     editais = Edital.objects.all().order_by("-year", "-number")
     insights = DashboardMetricsService.get_validation_insights(selected_edital)
@@ -64,9 +68,14 @@ def failed_requirement_processes_view(request, code: str):
     edital_id = request.GET.get("edital")
     selected_edital = None
     if edital_id:
-        selected_edital = get_object_or_404(Edital, id=edital_id)
+        if not edital_id.isdecimal():
+            raise Http404
+        selected_edital = get_object_or_404(Edital, id=int(edital_id))
 
-    requirement = Requirement.objects.filter(code=code).first()
+    requirements = Requirement.objects.filter(code=code)
+    if selected_edital:
+        requirements = requirements.filter(edital=selected_edital)
+    requirement = requirements.first()
     submissions = DashboardMetricsService.get_submissions_failing_requirement(code, selected_edital)
 
     context = {
@@ -86,7 +95,9 @@ def metrics_export_csv_view(request):
     edital_id = request.GET.get("edital")
     selected_edital = None
     if edital_id:
-        selected_edital = get_object_or_404(Edital, id=edital_id)
+        if not edital_id.isdecimal():
+            raise Http404
+        selected_edital = get_object_or_404(Edital, id=int(edital_id))
 
     summary = DashboardMetricsService.get_summary_metrics(selected_edital)
 
@@ -103,8 +114,10 @@ def metrics_export_csv_view(request):
     writer.writerow(["Em Revisão", summary["pending_review"]])
     writer.writerow(["Em Diligência", summary["pending_diligence"]])
     writer.writerow(["Concluídos", summary["concluded"]])
-    writer.writerow(["Aptos", summary["apt_count"]])
-    writer.writerow(["Inaptos", summary["inapt_count"]])
+    for result, count in summary["initial_results"].items():
+        writer.writerow([f"Análise inicial: {result}", count])
+    for result, count in summary["consolidated_results"].items():
+        writer.writerow([f"Workflow: {summary['consolidated_labels'][result]}", count])
     writer.writerow([])
     writer.writerow(["Grupo", "Total de Processos"])
     for grp, cnt in summary["by_group"].items():

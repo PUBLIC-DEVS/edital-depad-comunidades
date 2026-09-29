@@ -16,12 +16,6 @@ class Submission(models.Model):
         RANKED = "RANKED", "Classificada no Ranking"
         CLOSED = "CLOSED", "Encerrada"
 
-    class TargetGroup(models.TextChoices):
-        G1 = "G1", "Grupo 1 (Mulheres e Mães Nutrizes)"
-        G2 = "G2", "Grupo 2 (Masculino PRONASCI)"
-        G3 = "G3", "Grupo 3 (Masculino Demais Municípios)"
-        SEM_GRUPO = "SEM_GRUPO", "Sem Grupo Definido"
-
     edital = models.ForeignKey(
         "editais.Edital",
         on_delete=models.PROTECT,
@@ -95,11 +89,17 @@ class Submission(models.Model):
         verbose_name="Status do Workflow",
     )
     target_group = models.CharField(
-        max_length=20,
-        choices=TargetGroup.choices,
-        default=TargetGroup.SEM_GRUPO,
+        max_length=50,
+        default="SEM_GRUPO",
         db_index=True,
         verbose_name="Grupo de Enquadramento",
+    )
+    target_group_definition = models.ForeignKey(
+        "editais.TargetGroup",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="submissions",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

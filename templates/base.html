@@ -78,8 +78,9 @@
             <nav class="bg-govblue-800 border-t border-govblue-600">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="flex space-x-4 text-xs font-medium py-2 overflow-x-auto">
-                        <a href="{% url 'dashboard' %}" class="text-white hover:text-blue-200 px-2 py-1 rounded">Painel Geral</a>
+                        <a href="{% url 'dashboard' %}" class="text-white hover:text-blue-200 px-2 py-1 rounded">Início</a>
                         <a href="/processos/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Processos</a>
+                        <a href="{% url 'catalog-list' 'instituicoes' %}" class="text-blue-100 hover:text-white px-2 py-1 rounded">Instituições</a>
                         {% if user.is_analyst %}
                             <a href="/minhas-analises/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Minhas Análises</a>
                         {% endif %}
@@ -91,8 +92,8 @@
                             <a href="/classificacao/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Classificação & Ranking</a>
                             <a href="/metricas/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Métricas</a>
                         {% endif %}
-                        {% if user.is_admin_role or user.is_staff %}
-                            <a href="/admin/" class="text-amber-300 hover:text-amber-100 px-2 py-1 rounded ml-auto">Administração</a>
+                        {% if user.is_coordinator %}
+                            <a href="/administracao/" class="text-amber-300 hover:text-amber-100 px-2 py-1 rounded ml-auto">Administração</a>
                         {% endif %}
                     </div>
                 </div>

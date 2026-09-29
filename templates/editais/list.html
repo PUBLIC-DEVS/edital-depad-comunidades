@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex justify-between items-center mb-6"><div><p class="text-sm text-slate-500">Administração</p><h1 class="text-2xl font-bold">Editais</h1><p class="text-sm text-slate-600 mt-1">Configure uma nova edição ou reutilize a configuração de um edital anterior.</p></div>{% if can_configure %}<a href="{% url 'edital-create' %}" class="bg-govblue-700 text-white px-4 py-2 rounded">Novo edital</a>{% endif %}</div>
+<div class="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+{% for edital in editais %}<a href="{% url 'edital-detail' edital.pk %}" class="bg-white border border-slate-200 rounded-lg p-5 hover:border-govblue-600 focus:ring-2 focus:ring-blue-600"><span class="text-xs bg-slate-100 rounded px-2 py-1">{{ edital.get_status_display }}</span><h2 class="font-bold mt-4">{{ edital.number }}/{{ edital.year }} · {{ edital.name }}</h2><p class="text-sm text-slate-500 mt-2">Regras v{{ edital.rules_version }} · {{ edital.opens_at|date:"d/m/Y" }} a {{ edital.closes_at|date:"d/m/Y" }}</p></a>{% empty %}<p class="bg-white rounded-lg border p-6">Nenhum edital cadastrado. Comece pelos dados gerais.</p>{% endfor %}
+</div>
+{% endblock %}

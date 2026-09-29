@@ -78,6 +78,11 @@ class ReviewService:
         ).first()
         if check_result is None:
             raise ValidationError("Checagem não pertence à avaliação desta revisão.")
+        if (
+            not agrees_with_analyst
+            and reviewer_status not in check_result.definition.allowed_statuses
+        ):
+            raise ValidationError("Status não permitido para este item.")
 
         decision, created = ReviewItemDecision.objects.update_or_create(
             review=review,
@@ -99,7 +104,7 @@ class ReviewService:
             new_value="CONCORDA" if agrees_with_analyst else f"DIVERGE ({reviewer_status})",
             metadata={
                 "review_id": review.id,
-                "check_code": check_result.requirement_check.code,
+                "check_code": check_result.definition.code,
                 "justification": justification[:100],
             },
         )
@@ -126,6 +131,28 @@ class ReviewService:
             Review.PreliminaryResult.PRE_INABILITADO,
         ):
             raise ValidationError("Resultado preliminar inválido para conclusão.")
+        from apps.evaluations.services import EvaluationService
+
+        blocking = EvaluationService.blocking_check_results(review.evaluation)
+        decisions = {d.check_result_id: d for d in review.item_decisions.all()}
+        missing = [cr.definition.code for cr in blocking if cr.pk not in decisions]
+        if missing:
+            raise ValidationError(
+                f"Trate todos os itens impeditivos antes de concluir: {', '.join(missing)}."
+            )
+        overrides = {
+            pk: decision.reviewer_status
+            for pk, decision in decisions.items()
+            if not decision.agrees_with_analyst
+        }
+        assessment = EvaluationService.calculate_assessment(review.evaluation, overrides)
+        expected = (
+            "APTA" if preliminary_result == Review.PreliminaryResult.PRE_HABILITADO else "INAPTA"
+        )
+        if not assessment.is_complete or assessment.result != expected:
+            raise ValidationError(
+                "Resultado da revisão incoerente com as decisões dos itens. Corrija as decisões antes de concluir."
+            )
         review.status = Review.Status.COMPLETED
         review.preliminary_result = preliminary_result
         review.decision_notes = decision_notes

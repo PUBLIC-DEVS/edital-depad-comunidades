@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Gestão de editais{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+  <a href="{{ back_url }}" class="text-sm text-govblue-600">← Voltar</a>
+  <div><span class="text-xs font-semibold uppercase text-slate-500">Administração{% if edital %} · {{ edital.number }}/{{ edital.year }}{% endif %}</span><h1 class="text-2xl font-bold mt-1">{{ title }}</h1></div>
+  {% if help_text %}<p class="text-sm text-slate-600">{{ help_text }}</p>{% endif %}
+  <form method="post" class="bg-white border border-slate-200 rounded-lg p-6 space-y-5">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div role="alert" class="text-red-800 bg-red-50 p-3 rounded">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}
+      <div class="space-y-1">
+        <label for="{{ field.id_for_label }}" class="block text-sm font-semibold">{{ field.label }}{% if field.field.required %}<span class="text-red-600"> *</span>{% endif %}</label>
+        {{ field }}
+        {% if field.help_text %}<p class="text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
+        {% if field.errors %}<div role="alert" class="text-sm text-red-700">{{ field.errors }}</div>{% endif %}
+      </div>
+    {% endfor %}
+    <div class="border-t pt-5 flex gap-4 items-center"><button class="bg-govblue-700 text-white px-5 py-2 rounded font-semibold" type="submit">Salvar</button><a href="{{ back_url }}" class="text-sm text-slate-600">Cancelar</a></div>
+  </form>
+</div>
+{% endblock %}

@@ -10,7 +10,8 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
 from apps.accounts.permissions import RolePermissionPolicy, require_role
-from apps.editais.models import Requirement
+from apps.evaluations.assessment import blocking_results, definition_rows
+from apps.evaluations.models import CheckResult
 from apps.reviews.forms import DiligenceCreateForm, DiligenceResponseForm, ReviewConcludeForm
 from apps.reviews.models import Diligence, Review
 from apps.reviews.services import ReviewService
@@ -79,32 +80,30 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
         and not request.user.is_superuser
     ):
         raise PermissionDenied("Revisão atribuída a outro responsável.")
-    requirements = (
-        Requirement.objects.filter(edital=review.submission.edital, active=True)
-        .prefetch_related("checks")
-        .order_by("order", "code")
-    )
-
-    decisions_map = {
-        d.check_result_id: d for d in review.item_decisions.select_related("check_result")
-    }
-
-    results_map = {
-        cr.requirement_check_id: cr
-        for cr in evaluation.check_results.select_related("requirement_check")
-    }
-
-    req_sections = []
-    for req in requirements:
-        checks_data = []
-        for check in req.checks.filter(active=True).order_by("order", "code"):
-            res = results_map.get(check.id)
-            dec = decisions_map.get(res.id) if res else None
-            checks_data.append({"check": check, "result": res, "decision": dec})
-        req_sections.append({"requirement": req, "checks": checks_data})
+    decisions_map = {d.check_result_id: d for d in review.item_decisions.all()}
+    sections = {}
+    for req, definition, result in definition_rows(evaluation):
+        section = sections.setdefault(req.pk, {"requirement": req, "checks": []})
+        if result:
+            section["checks"].append(
+                {
+                    "check": definition,
+                    "result": result,
+                    "decision": decisions_map.get(result.pk),
+                    "status_choices": [
+                        (v, label)
+                        for v, label in CheckResult.Status.choices
+                        if v in definition.allowed_statuses
+                    ],
+                }
+            )
+    req_sections = list(sections.values())
 
     conclude_form = ReviewConcludeForm(instance=review)
     can_edit = RolePermissionPolicy.can_edit_review(request.user, review)
+    unresolved_checks = [
+        result for result in blocking_results(evaluation) if result.pk not in decisions_map
+    ]
 
     context = {
         "review": review,
@@ -114,6 +113,7 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
         "conclude_form": conclude_form,
         "can_edit": can_edit,
         "can_claim": review.status == Review.Status.PENDING and review.reviewer_id is None,
+        "unresolved_checks": unresolved_checks,
     }
     return render(request, "reviews/detail.html", context)
 
@@ -123,7 +123,10 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
 @require_POST
 def review_claim_view(request, review_id):
     review = get_object_or_404(Review, pk=review_id)
-    ReviewService.claim_review(review, request.user)
+    try:
+        ReviewService.claim_review(review, request.user)
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
     return redirect("review-detail", review_id=review.pk)
 
 
@@ -158,7 +161,7 @@ def review_item_decision_view(
             )
             messages.success(
                 request,
-                f"Decisão registrada para o item {decision.check_result.requirement_check.code}.",
+                f"Decisão registrada para o item {decision.check_result.definition.code}.",
             )
         except ValidationError as exc:
             messages.error(request, str(exc))
@@ -176,17 +179,20 @@ def review_conclude_view(request: HttpRequest, review_id: int) -> HttpResponse:
     if request.method == "POST":
         form = ReviewConcludeForm(request.POST, instance=review)
         if form.is_valid():
-            ReviewService.conclude_review(
-                review=review,
-                preliminary_result=form.cleaned_data["preliminary_result"],
-                decision_notes=form.cleaned_data["decision_notes"],
-                actor=request.user,
-            )
-            messages.success(
-                request,
-                f"Revisão do processo {review.submission.processo_sei} concluída com sucesso.",
-            )
-            return redirect("review-list")
+            try:
+                ReviewService.conclude_review(
+                    review=review,
+                    preliminary_result=form.cleaned_data["preliminary_result"],
+                    decision_notes=form.cleaned_data["decision_notes"],
+                    actor=request.user,
+                )
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+            else:
+                messages.success(request, "Revisão concluída com sucesso.")
+                return redirect("review-list")
+        else:
+            messages.error(request, "Informe um resultado e parecer válidos.")
     return redirect("review-detail", review_id=review.id)
 
 

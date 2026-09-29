@@ -129,6 +129,15 @@ class TestReviewsAndDiligenceIntegration:
         reviewer = setup_data["reviewer"]
         sub = setup_data["sub"]
 
+        ReviewService.record_item_decision(
+            review,
+            CheckResult.objects.get(evaluation=review.evaluation).pk,
+            False,
+            "ATENDE",
+            "Documento comprovado na revisão.",
+            reviewer,
+        )
+
         ReviewService.conclude_review(
             review=review,
             preliminary_result=Review.PreliminaryResult.PRE_HABILITADO,

@@ -3,6 +3,7 @@
 {% block title %}Processo {{ submission.processo_sei }} — DEPED/MDS{% endblock %}
 
 {% block content %}
+{% if can_edit %}<a class="btn-secondary mb-4 inline-block" href="{% url 'submission-edit' submission.pk %}">Editar dados administrativos</a>{% endif %}
 <div class="space-y-6">
     <!-- Breadcrumb & Top bar -->
     <div class="flex justify-between items-center pb-3 border-b border-slate-200">
@@ -116,7 +117,7 @@
             <div class="bg-govblue-50 border border-blue-200 p-4 rounded-lg flex justify-between items-center">
                 <div>
                     <h3 class="text-xs font-bold text-govblue-700">Análise Documental do Processo</h3>
-                    <p class="text-[11px] text-slate-600">Verificação de requisitos formais (4.2-I a 4.2-XVI) e emissão de parecer.</p>
+                    <p class="text-[11px] text-slate-600">Verificação dos requisitos configurados neste edital e emissão de parecer.</p>
                 </div>
                 <a href="/avaliacoes/processo/{{ submission.id }}/" class="px-4 py-2 bg-govblue-600 hover:bg-govblue-700 text-white text-xs font-semibold rounded shadow transition">
                     Acessar Espaço de Análise &rarr;

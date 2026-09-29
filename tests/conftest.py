@@ -5,6 +5,7 @@ from apps.accounts.models import User
 from apps.editais.models import Edital, Requirement, RequirementCheck
 from apps.institutions.models import Institution, Municipality
 from apps.submissions.models import Assignment, Submission
+from tests.group_configuration import configure_example_groups
 
 
 @pytest.fixture
@@ -26,6 +27,7 @@ def domain(db):
     edital = Edital.objects.create(
         name="Test", number="test", year=2025, opens_at=now, closes_at=now
     )
+    configure_example_groups(edital)
     municipality = Municipality.objects.create(name="São Paulo", state="SP", ibge_code="3550308")
     institution = Institution.objects.create(name="Test institution", cnpj="00000000000191")
     sub = Submission.objects.create(

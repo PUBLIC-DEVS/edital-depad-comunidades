@@ -92,6 +92,12 @@ class RankingService:
             duplicate_policy=edital.duplicate_policy,
             description=description,
             policy_metadata={
+                "configuration_snapshot_id": edital.configuration_snapshots.order_by("pk")
+                .values_list("pk", flat=True)
+                .last(),
+                "classification_policy_type": getattr(
+                    getattr(edital, "classification_policy", None), "policy_type", None
+                ),
                 "duplicate_scope": edital.duplicate_scope,
                 "tie_breaker_policy": edital.tie_breaker_policy,
                 "eligible_statuses": sorted(eligible),

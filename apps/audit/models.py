@@ -2,6 +2,8 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import models
 
+from .immutability import AppendOnlyQuerySet
+
 
 class AuditEvent(models.Model):
     """Registro append-only de eventos de auditoria e rastreabilidade no sistema.
@@ -11,9 +13,11 @@ class AuditEvent(models.Model):
     o histórico permanente de auditoria contra exclusões lógicas ou refatorações de modelos.
     """
 
+    objects = AppendOnlyQuerySet.as_manager()
+
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="audit_events",

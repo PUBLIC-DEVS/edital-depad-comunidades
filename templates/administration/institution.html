@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block content %}<h1 class="text-2xl font-bold">{{ institution.name }}</h1><p class="text-slate-500 mb-4">{{ institution.formatted_cnpj }}</p>
+<div class="card p-5 mb-6"><p>{{ institution.address }} · {{ institution.municipality }}</p><p>{{ institution.contact_email }} · {{ institution.contact_phone }}</p>{% if can_write %}<a class="text-blue-700" href="{% url 'catalog-edit' 'instituicoes' institution.pk %}">Editar dados cadastrais</a>{% endif %}</div>
+<h2 class="font-bold text-lg mb-3">Participações e processos autorizados</h2><div class="space-y-3">{% for sub in submissions %}<a class="card p-4 block" href="{% url 'submission-detail' sub.pk %}">{{ sub.processo_sei }} · {{ sub.edital.number }}/{{ sub.edital.year }} · {{ sub.get_workflow_status_display }}</a>{% empty %}<p>Sem processos disponíveis.</p>{% endfor %}</div>{% endblock %}

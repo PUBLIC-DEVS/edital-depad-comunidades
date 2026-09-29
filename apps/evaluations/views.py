@@ -1,7 +1,5 @@
 """Views para o espaço de trabalho da análise documental."""
 
-from decimal import Decimal
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
@@ -15,8 +13,9 @@ from apps.accounts.permissions import (
     enforce_evaluation_edit_access,
     enforce_submission_access,
 )
-from apps.editais.models import Requirement
-from apps.evaluations.models import CheckResult, Evaluation
+from apps.evaluations.assessment import definition_rows
+from apps.evaluations.forms import CheckResultForm
+from apps.evaluations.models import Evaluation
 from apps.evaluations.services import EvaluationService, InconsistentEvaluationError
 from apps.submissions.models import Submission
 
@@ -67,38 +66,7 @@ def evaluation_workspace_view(request: HttpRequest, submission_id: int) -> HttpR
             {"submission": submission, "can_start": can_start},
         )
 
-    # Carrega requisitos e checagens estruturadas
-    requirements = (
-        Requirement.objects.filter(edital=submission.edital, active=True)
-        .prefetch_related("checks")
-        .order_by("order", "code")
-    )
-
-    results_map = {
-        cr.requirement_check_id: cr
-        for cr in evaluation.check_results.select_related("requirement_check")
-    }
-
-    # Estrutura dados para o template vertical
-    req_sections = []
-    for req in requirements:
-        checks_data = []
-        for check in req.checks.filter(active=True).order_by("order", "code"):
-            res = results_map.get(check.id)
-            checks_data.append({"check": check, "result": res})
-        req_sections.append({"requirement": req, "checks": checks_data})
-
-    assessment = EvaluationService.calculate_assessment(evaluation)
-    can_edit = RolePermissionPolicy.can_edit_evaluation(request.user, evaluation)
-
-    context = {
-        "submission": submission,
-        "evaluation": evaluation,
-        "req_sections": req_sections,
-        "assessment": assessment,
-        "can_edit": can_edit,
-        "check_statuses": CheckResult.Status.choices,
-    }
+    context = workspace_context(request, evaluation)
     return render(request, "evaluations/workspace.html", context)
 
 
@@ -116,49 +84,68 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
     """Salva rascunho de preenchimento via POST normal ou HTMX."""
     evaluation = enforce_evaluation_edit_access(request, evaluation_id)
 
-    if request.method == "POST":
-        payloads = []
-        for cr in evaluation.check_results.all():
-            cid = cr.requirement_check_id
-            prefix = f"check_{cid}_"
-            if f"{prefix}status" in request.POST:
-                num_val = request.POST.get(f"{prefix}numeric_value", "").strip()
-                val_dec = Decimal(num_val.replace(",", ".")) if num_val else None
+    forms = {}
+    payloads = []
+    valid = True
+    allowed_prefixes = set()
+    for result in evaluation.check_results.select_related("requirement_check", "requirement"):
+        allowed_prefixes.add(f"{result.input_prefix}status")
+        if f"{result.input_prefix}status" not in request.POST:
+            continue
+        form = CheckResultForm(request.POST, result=result)
+        forms[result.pk] = form
+        if form.is_valid():
+            payloads.append(form.payload())
+        else:
+            valid = False
+    unexpected = [
+        key
+        for key in request.POST
+        if key.startswith(("check_", "requirement_"))
+        and key.endswith("_status")
+        and key not in allowed_prefixes
+    ]
+    errors = []
+    if unexpected:
+        valid = False
+        errors.append("Item enviado não pertence à avaliação.")
+    if valid:
+        from django.core.exceptions import ValidationError
 
-                payloads.append(
-                    {
-                        "requirement_check_id": cid,
-                        "status": request.POST.get(f"{prefix}status", CheckResult.Status.EM_BRANCO),
-                        "sei_number": request.POST.get(f"{prefix}sei_number", "").strip(),
-                        "pages": request.POST.get(f"{prefix}pages", "").strip(),
-                        "document_cnpj": request.POST.get(f"{prefix}document_cnpj", "").strip(),
-                        "valid_until": request.POST.get(f"{prefix}valid_until") or None,
-                        "numeric_value": val_dec,
-                        "notes": request.POST.get(f"{prefix}notes", "").strip(),
-                    }
-                )
-
-        general_notes = request.POST.get("general_notes", "")
-        assessment = EvaluationService.save_draft(
-            evaluation=evaluation,
-            check_payloads=payloads,
-            actor=request.user,
-            general_notes=general_notes,
-        )
-
-        if request.headers.get("HX-Request"):
-            return render(
-                request,
-                "evaluations/partials/summary_panel.html",
-                {
-                    "evaluation": evaluation,
-                    "assessment": assessment,
-                    "can_edit": True,
-                    "draft_saved": True,
-                },
+        try:
+            EvaluationService.save_draft(
+                evaluation, payloads, request.user, request.POST.get("general_notes")
             )
-
-        messages.success(request, "Rascunho da análise salvo com sucesso.")
+        except ValidationError as exc:
+            valid = False
+            errors.extend(exc.messages)
+    evaluation.refresh_from_db()
+    if not valid:
+        errors.extend(
+            str(error)
+            for form in forms.values()
+            for values in form.errors.values()
+            for error in values
+        )
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "evaluations/partials/summary_panel.html",
+            {
+                "evaluation": evaluation,
+                "assessment": EvaluationService.calculate_assessment(evaluation),
+                "can_edit": True,
+                "draft_saved": valid,
+                "validation_errors": errors,
+            },
+        )
+    if not valid:
+        return render(
+            request,
+            "evaluations/workspace.html",
+            {**workspace_context(request, evaluation, forms), "validation_errors": errors},
+        )
+    messages.success(request, "Rascunho da análise salvo com sucesso.")
     return redirect("evaluation-workspace", submission_id=evaluation.submission_id)
 
 
@@ -181,3 +168,22 @@ def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpRe
             messages.error(request, str(exc))
 
     return redirect("evaluation-workspace", submission_id=evaluation.submission_id)
+
+
+def workspace_context(request, evaluation, bound_forms=None):
+    can_edit = RolePermissionPolicy.can_edit_evaluation(request.user, evaluation)
+    sections = {}
+    for requirement, definition, result in definition_rows(evaluation):
+        section = sections.setdefault(requirement.pk, {"requirement": requirement, "checks": []})
+        if result:
+            form = (bound_forms or {}).get(result.pk) or CheckResultForm(
+                result=result, can_edit=can_edit
+            )
+            section["checks"].append({"check": definition, "result": result, "form": form})
+    return {
+        "submission": evaluation.submission,
+        "evaluation": evaluation,
+        "req_sections": list(sections.values()),
+        "assessment": EvaluationService.calculate_assessment(evaluation),
+        "can_edit": can_edit,
+    }

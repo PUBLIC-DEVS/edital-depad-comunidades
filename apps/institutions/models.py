@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from .cnpj import cnpj_validator, format_cnpj, normalize_cnpj
@@ -73,7 +74,12 @@ class Institution(models.Model):
         return f"{self.name} - {self.formatted_cnpj}"
 
     def save(self, *args, **kwargs):
-        self.cnpj = normalize_cnpj(self.cnpj)
+        normalized = normalize_cnpj(self.cnpj)
+        if self.pk:
+            previous = type(self).objects.get(pk=self.pk)
+            if previous.cnpj != normalized and previous.submissions.exists():
+                raise ValidationError("CNPJ de instituição com processos registrados é imutável.")
+        self.cnpj = normalized
         super().save(*args, **kwargs)
 
     @property

@@ -77,7 +77,7 @@ class TestReportingDashboardAndValidation:
             processo_sei="SEI-001",
             received_at=timezone.now(),
             municipality=muni_sp,
-            target_group=Submission.TargetGroup.G1,
+            target_group="G1",
             vagas_femininas=10,
             vagas_masculinas=0,
             vagas_maes_nutrizes=5,
@@ -110,7 +110,7 @@ class TestReportingDashboardAndValidation:
             processo_sei="SEI-002",
             received_at=timezone.now(),
             municipality=muni_rj,
-            target_group=Submission.TargetGroup.G2,
+            target_group="G2",
             vagas_femininas=5,
             vagas_masculinas=5,
             vagas_maes_nutrizes=0,
@@ -140,7 +140,7 @@ class TestReportingDashboardAndValidation:
             processo_sei="SEI-003",
             received_at=timezone.now(),
             municipality=None,
-            target_group=Submission.TargetGroup.SEM_GRUPO,
+            target_group="SEM_GRUPO",
             vagas_solicitadas=10,
             capacidade_total=20,
             workflow_status=Submission.WorkflowStatus.RECEIVED,
@@ -244,7 +244,7 @@ class TestReportingDashboardAndValidation:
         # 1. Dashboard
         resp = client.get("/metricas/")
         assert resp.status_code == 200
-        assert "Painel Operacional" in resp.content.decode("utf-8")
+        assert "Resultado da análise inicial" in resp.content.decode("utf-8")
         assert "4.2-XVI" in resp.content.decode("utf-8")
 
         # 2. Painel de Validações

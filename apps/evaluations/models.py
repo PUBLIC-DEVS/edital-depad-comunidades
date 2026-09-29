@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -48,6 +49,13 @@ class Evaluation(models.Model):
         blank=True,
         verbose_name="Observações Gerais da Análise",
     )
+    configuration_snapshot = models.ForeignKey(
+        "editais.EditalConfigurationSnapshot",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="evaluations",
+    )
     started_at = models.DateTimeField(null=True, blank=True, verbose_name="Início da Análise")
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Conclusão da Análise")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -84,6 +92,15 @@ class CheckResult(models.Model):
         on_delete=models.PROTECT,
         related_name="results",
         verbose_name="Checagem / Subcritério",
+        null=True,
+        blank=True,
+    )
+    requirement = models.ForeignKey(
+        "editais.Requirement",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="direct_and_check_results",
     )
     status = models.CharField(
         max_length=20,
@@ -133,7 +150,45 @@ class CheckResult(models.Model):
                 fields=["evaluation", "requirement_check"],
                 name="unique_evaluation_check_result",
             ),
+            models.CheckConstraint(
+                condition=models.Q(requirement__isnull=False), name="check_result_has_requirement"
+            ),
+            models.UniqueConstraint(
+                fields=["evaluation", "requirement"],
+                condition=models.Q(requirement_check__isnull=True),
+                name="unique_evaluation_direct_requirement",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.requirement_check.code}: {self.get_status_display()}"
+        return f"{self.definition.code}: {self.get_status_display()}"
+
+    @property
+    def definition(self):
+        return self.requirement_check if self.requirement_check_id else self.requirement
+
+    @property
+    def input_prefix(self):
+        return (
+            f"check_{self.requirement_check_id}_"
+            if self.requirement_check_id
+            else f"requirement_{self.requirement_id}_"
+        )
+
+    def clean(self):
+        super().clean()
+        if self.requirement_check_id:
+            parent_id = self.requirement_check.requirement_id
+            if self.requirement_id and self.requirement_id != parent_id:
+                raise ValidationError("Requisito e subcritério incompatíveis.")
+            self.requirement_id = parent_id
+        if (
+            not self.requirement_id
+            or self.requirement.edital_id != self.evaluation.submission.edital_id
+        ):
+            raise ValidationError("Requisito não pertence ao edital desta avaliação.")
+
+    def save(self, *args, **kwargs):
+        if self.requirement_check_id and not self.requirement_id:
+            self.requirement_id = self.requirement_check.requirement_id
+        return super().save(*args, **kwargs)

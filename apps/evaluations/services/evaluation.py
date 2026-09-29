@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
-from apps.editais.models import Requirement, RequirementCheck
+from apps.editais.models import EditalConfigurationSnapshot, Requirement, RequirementCheck
 from apps.evaluations.models import CheckResult, Evaluation
 from apps.submissions.models import Submission
 
@@ -38,82 +38,16 @@ class EvaluationService:
     """Serviço responsável pela execução, cálculo de conformidade e conclusão de análises documentais."""
 
     @staticmethod
-    def calculate_assessment(evaluation: Evaluation) -> EvaluationAssessment:
-        """Calcula o resultado da avaliação com base nas checagens documentais registradas.
+    def calculate_assessment(evaluation, status_overrides=None):
+        from apps.evaluations.assessment import assess
 
-        Regra de Domínio:
-        1. Se qualquer requisito OBRIGATÓRIO contiver checagem com status NAO_ATENDE ou NAO_ENVIADO
-           -> O requisito é considerado reprovado.
-        2. Se houver ao menos um requisito reprovado -> INAPTA (com lista explícita dos códigos reprovados).
-        3. Se todos os requisitos obrigatórios estiverem atendidos (ou NAO_APLICAVEL) e não houver
-           checagens pendentes (EM_BRANCO) -> APTA.
-        4. Caso contrário (há checagens EM_BRANCO e nenhum requisito reprovado ainda) -> EM_ANALISE.
-        """
-        edital = evaluation.submission.edital
-        requirements = Requirement.objects.filter(edital=edital, active=True).prefetch_related(
-            "checks"
-        )
-        results_by_check_id = {
-            cr.requirement_check_id: cr
-            for cr in evaluation.check_results.select_related("requirement_check__requirement")
-        }
+        return EvaluationAssessment(**assess(evaluation, status_overrides))
 
-        failed_req_codes: list[str] = []
-        result_failed = False
-        has_pending = False
-        total_checks = 0
-        evaluated_checks = 0
+    @staticmethod
+    def blocking_check_results(evaluation):
+        from apps.evaluations.assessment import blocking_results
 
-        for req in requirements:
-            req_checks = [c for c in req.checks.all() if c.active]
-            total_checks += len(req_checks)
-
-            req_failed = False
-            for check in req_checks:
-                res = results_by_check_id.get(check.id)
-                st = res.status if res else CheckResult.Status.EM_BRANCO
-                accepted = check.accepted_statuses or [
-                    CheckResult.Status.ATENDE,
-                    CheckResult.Status.NAO_APLICAVEL,
-                ]
-                failures = check.failure_statuses or [
-                    CheckResult.Status.NAO_ATENDE,
-                    CheckResult.Status.NAO_ENVIADO,
-                ]
-
-                if st == CheckResult.Status.EM_BRANCO:
-                    has_pending |= check.contributes_to_result
-                else:
-                    evaluated_checks += 1
-
-                if req.mandatory and st in (
-                    CheckResult.Status.NAO_ATENDE,
-                    CheckResult.Status.NAO_ENVIADO,
-                ):
-                    req_failed = True
-                if req.mandatory and check.contributes_to_result:
-                    result_failed |= st in failures
-                    if st not in accepted and st not in failures:
-                        has_pending = True
-
-            if req_failed:
-                failed_req_codes.append(req.code)
-
-        if result_failed:
-            result = Evaluation.Result.INAPTA
-        elif not has_pending and total_checks > 0:
-            result = Evaluation.Result.APTA
-        else:
-            result = Evaluation.Result.EM_ANALISE
-
-        return EvaluationAssessment(
-            result=result,
-            failed_requirement_codes=sorted(set(failed_req_codes)),
-            total_checks=total_checks,
-            evaluated_checks=evaluated_checks,
-            pending_checks=total_checks - evaluated_checks,
-            is_complete=(not has_pending and total_checks > 0),
-        )
+        return blocking_results(evaluation)
 
     @classmethod
     @transaction.atomic
@@ -126,6 +60,11 @@ class EvaluationService:
                 "status": Evaluation.Status.DRAFT,
                 "result": Evaluation.Result.EM_ANALISE,
                 "started_at": timezone.now(),
+                "configuration_snapshot": EditalConfigurationSnapshot.objects.filter(
+                    edital=submission.edital
+                )
+                .order_by("pk")
+                .last(),
             },
         )
         if evaluation.analyst_id != analyst.pk:
@@ -145,6 +84,7 @@ class EvaluationService:
             CheckResult(
                 evaluation=evaluation,
                 requirement_check=c,
+                requirement=c.requirement,
                 status=CheckResult.Status.EM_BRANCO,
             )
             for c in checks
@@ -152,6 +92,12 @@ class EvaluationService:
         ]
         if to_create:
             CheckResult.objects.bulk_create(to_create)
+
+        for req in Requirement.objects.filter(edital=submission.edital, active=True):
+            if not req.checks.filter(active=True).exists():
+                CheckResult.objects.get_or_create(
+                    evaluation=evaluation, requirement=req, requirement_check=None
+                )
 
         if created:
             AuditEvent.objects.create(
@@ -198,32 +144,27 @@ class EvaluationService:
         evaluation: Evaluation,
         check_payloads: list[dict[str, Any]],
         actor: User,
-        general_notes: str = "",
+        general_notes: str | None = None,
     ) -> EvaluationAssessment:
         """Salva rascunho de preenchimento das checagens sem exigir que todas estejam finalizadas."""
         evaluation = Evaluation.objects.select_for_update().get(pk=evaluation.pk)
         cls.enforce_edit(evaluation, actor)
+        from apps.evaluations.drafts import audit_value, update_result
+
         for item in check_payloads:
-            check_id = item.get("requirement_check_id")
-            if not check_id:
-                continue
-            if item.get("status", CheckResult.Status.EM_BRANCO) not in CheckResult.Status.values:
-                raise ValidationError("Status de checagem inválido.")
-            if not evaluation.check_results.filter(requirement_check_id=check_id).exists():
-                raise ValidationError("Checagem não pertence à avaliação.")
-
-            CheckResult.objects.filter(evaluation=evaluation, requirement_check_id=check_id).update(
-                status=item.get("status", CheckResult.Status.EM_BRANCO),
-                sei_number=item.get("sei_number", ""),
-                pages=item.get("pages", ""),
-                document_cnpj=item.get("document_cnpj", ""),
-                valid_until=item.get("valid_until"),
-                numeric_value=item.get("numeric_value"),
-                notes=item.get("notes", ""),
-            )
-
-        if general_notes:
+            update_result(evaluation, item, actor)
+        if general_notes is not None and evaluation.general_notes != general_notes:
+            old_notes = evaluation.general_notes
             evaluation.general_notes = general_notes
+            AuditEvent.objects.create(
+                actor=actor,
+                entity_type="Evaluation",
+                entity_id=str(evaluation.pk),
+                action="FIELD_CHANGE",
+                field="general_notes",
+                old_value=audit_value(old_notes),
+                new_value=audit_value(general_notes),
+            )
 
         assessment = cls.calculate_assessment(evaluation)
         evaluation.result = assessment.result

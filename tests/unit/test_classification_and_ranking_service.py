@@ -7,6 +7,7 @@ from apps.institutions.models import Institution, Municipality
 from apps.ranking.models import RankingSnapshot
 from apps.ranking.services import ClassificationService, RankingService
 from apps.submissions.models import Submission
+from tests.group_configuration import configure_example_groups
 
 
 @pytest.mark.django_db
@@ -25,6 +26,7 @@ class TestClassificationAndRankingService:
             closes_at=now + timezone.timedelta(days=30),
             rules_version="1.0",
         )
+        program = configure_example_groups(edital)
         mun_pronasci = Municipality.objects.create(
             ibge_code="3304557", name="Rio de Janeiro", state="RJ"
         )
@@ -37,6 +39,7 @@ class TestClassificationAndRankingService:
             edital=edital,
             municipality=mun_pronasci,
             program_name="PRONASCI",
+            program=program,
             active=True,
         )
 
@@ -77,7 +80,7 @@ class TestClassificationAndRankingService:
             vagas_femininas=10,
             vagas_masculinas=15,
         )
-        assert ClassificationService.classify_submission(s1) == Submission.TargetGroup.G1
+        assert ClassificationService.classify_submission(s1) == "G1"
 
         # G2: Sem feminino, com masculino, município PRONASCI (por código IBGE)
         s2 = Submission.objects.create(
@@ -89,7 +92,7 @@ class TestClassificationAndRankingService:
             vagas_femininas=0,
             vagas_masculinas=20,
         )
-        assert ClassificationService.classify_submission(s2) == Submission.TargetGroup.G2
+        assert ClassificationService.classify_submission(s2) == "G2"
 
         # G3: Sem feminino, com masculino, município NÃO PRONASCI
         s3 = Submission.objects.create(
@@ -101,7 +104,7 @@ class TestClassificationAndRankingService:
             vagas_femininas=0,
             vagas_masculinas=20,
         )
-        assert ClassificationService.classify_submission(s3) == Submission.TargetGroup.G3
+        assert ClassificationService.classify_submission(s3) == "G3"
 
         # SEM_GRUPO: Vagas zeradas
         s4 = Submission.objects.create(
@@ -113,7 +116,7 @@ class TestClassificationAndRankingService:
             vagas_femininas=0,
             vagas_masculinas=0,
         )
-        assert ClassificationService.classify_submission(s4) == Submission.TargetGroup.SEM_GRUPO
+        assert ClassificationService.classify_submission(s4) == "SEM_GRUPO"
 
     def test_ranking_snapshot_generation_and_ordering(self, setup_data):
         now = setup_data["now"]

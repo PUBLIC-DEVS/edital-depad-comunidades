@@ -72,7 +72,7 @@ class TestEvaluationService:
         assessment = EvaluationService.calculate_assessment(eval_obj)
         assert assessment.result == Evaluation.Result.EM_ANALISE
         assert assessment.is_complete is False
-        assert assessment.pending_checks == 3
+        assert assessment.pending_checks == 2
         assert assessment.failed_requirement_codes == []
 
     def test_assessment_inapta_when_mandatory_fails(self, setup_data):

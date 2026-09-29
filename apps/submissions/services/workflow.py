@@ -221,6 +221,20 @@ class WorkflowService:
             )
             return
 
+        from apps.evaluations.services import EvaluationService
+
+        if any(
+            cr.requirement.failure_behavior == "MARK_INELIGIBLE"
+            for cr in EvaluationService.blocking_check_results(evaluation)
+        ):
+            cls.transition(
+                submission,
+                Submission.WorkflowStatus.INELIGIBLE,
+                actor,
+                reason="Item impeditivo configurado para inabilitação direta.",
+            )
+            return
+
         # Only inapt evaluations require a review task.
         cls.transition(
             submission=submission,

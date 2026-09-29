@@ -9,15 +9,16 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "dj-database-url>=2.2",
     "python-dotenv>=1.0",
-    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
+legacy = ["openpyxl>=3.1"]
 dev = [
     "pytest>=8.0",
     "pytest-django>=4.9",
     "pytest-cov>=5.0",
     "ruff>=0.6",
+    "openpyxl>=3.1",  # historical regression is part of development/CI only
 ]
 
 [build-system]

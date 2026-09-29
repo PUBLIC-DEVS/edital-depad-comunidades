@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.db import connection
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect
 
 
 def health_check(request):
@@ -18,6 +18,17 @@ def health_check(request):
 
 
 @login_required
-def dashboard_view(request):
-    """View inicial do painel operacional."""
-    return render(request, "dashboard.html", {"title": "Painel Operacional"})
+def dashboard(request):
+    if request.user.is_superuser or request.user.role in {
+        "ADMINISTRADOR",
+        "COORDENADOR",
+        "CONSULTA",
+    }:
+        from apps.reporting.views import dashboard_metrics_view
+
+        return dashboard_metrics_view(request)
+    if request.user.role == "ANALISTA":
+        return redirect("my-evaluations")
+    if request.user.role == "REVISOR":
+        return redirect("review-list")
+    return redirect("submission-list")

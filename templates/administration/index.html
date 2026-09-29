@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}<h1 class="text-2xl font-bold mb-2">Administração</h1><p class="text-slate-500 mb-6">Configure editais e mantenha os cadastros da equipe.</p>
+<div class="grid md:grid-cols-3 gap-4">
+<a class="card p-6" href="{% url 'edital-list' %}"><h2 class="font-bold">Editais</h2><p>Criar, duplicar, configurar e publicar.</p></a>
+<a class="card p-6" href="{% url 'catalog-list' 'instituicoes' %}">Instituições</a>
+<a class="card p-6" href="{% url 'catalog-list' 'usuarios' %}">Usuários e perfis</a>
+<a class="card p-6" href="{% url 'catalog-list' 'municipios' %}">Municípios</a>
+<a class="card p-6" href="{% url 'catalog-list' 'programas' %}">Programas</a>
+</div>{% endblock %}

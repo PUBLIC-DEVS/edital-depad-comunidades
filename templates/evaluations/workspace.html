@@ -1,206 +1,27 @@
 {% extends "base.html" %}
-
-{% block title %}Análise Documental: {{ submission.processo_sei }} — DEPED/MDS{% endblock %}
-
+{% block title %}Análise {{ submission.processo_sei }}{% endblock %}
 {% block content %}
 <div class="space-y-6">
-    <!-- REGION 1: CABEÇALHO -->
-    <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
-            <div>
-                <span class="text-[11px] font-bold text-govblue-600 uppercase tracking-wider">Espaço de Trabalho do Analista</span>
-                <h1 class="text-xl font-bold text-slate-900 mt-0.5">{{ submission.processo_sei }}</h1>
-            </div>
-            <div class="flex items-center space-x-2">
-                <span class="badge-status
-                    {% if submission.workflow_status == 'UNDER_ANALYSIS' %}badge-emanalise
-                    {% elif submission.workflow_status == 'ELIGIBLE_FOR_RANKING' %}badge-apta
-                    {% elif submission.workflow_status == 'INELIGIBLE' %}badge-inapta
-                    {% else %}badge-naoaplicavel{% endif %}">
-                    {{ submission.get_workflow_status_display }}
-                </span>
-                <span class="inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">
-                    {{ submission.target_group }}
-                </span>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div>
-                <span class="text-slate-500 block">Instituição:</span>
-                <span class="font-semibold text-slate-800">{{ submission.institution.name }}</span>
-            </div>
-            <div>
-                <span class="text-slate-500 block">CNPJ:</span>
-                <span class="font-mono text-slate-800">{{ submission.institution.formatted_cnpj }}</span>
-            </div>
-            <div>
-                <span class="text-slate-500 block">Município / UF:</span>
-                <span class="text-slate-800">{{ submission.municipality.name }}/{{ submission.municipality.state }}</span>
-            </div>
-            <div>
-                <span class="text-slate-500 block">Recebimento:</span>
-                <span class="text-slate-800">{{ submission.received_at|date:"d/m/Y H:i:s" }}</span>
-            </div>
-            <div>
-                <span class="text-slate-500 block">Analista Designado:</span>
-                <span class="font-medium text-slate-800">{{ evaluation.analyst.get_full_name|default:evaluation.analyst.username }}</span>
-            </div>
-            <div>
-                <span class="text-slate-500 block">Total de Vagas:</span>
-                <span class="font-medium text-slate-800">{{ submission.vagas_solicitadas }} vagas (Fem: {{ submission.vagas_femininas }}, Masc: {{ submission.vagas_masculinas }})</span>
-            </div>
-            <div>
-                <span class="text-slate-500 block">Valor Global da Proposta:</span>
-                <span class="font-medium text-slate-800">R$ {{ submission.valor_global|default:"0,00" }}</span>
-            </div>
-            <div>
-                <span class="text-slate-500 block">Status da Análise:</span>
-                <span class="font-bold text-slate-800">{{ evaluation.get_status_display }}</span>
-            </div>
-        </div>
+ <div class="bg-white border rounded-lg p-5"><span class="text-xs uppercase text-slate-500">Espaço de análise · {{ submission.edital.number }}/{{ submission.edital.year }}</span><h1 class="text-2xl font-bold mt-2">{{ submission.processo_sei }}</h1><p class="text-sm mt-2">{{ submission.institution.name }} · {{ submission.institution.formatted_cnpj }}</p><p class="text-sm text-slate-500">{{ submission.get_workflow_status_display }} · {{ submission.target_group }} · Regras v{{ submission.edital.rules_version }}</p></div>
+ {% if validation_errors %}<div role="alert" class="bg-red-50 text-red-800 border rounded p-4">{% for error in validation_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+ <div class="grid lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2"><form id="evaluation-form" method="post" action="{% url 'evaluation-save-draft' evaluation.pk %}" hx-post="{% url 'evaluation-save-draft' evaluation.pk %}" hx-target="#summary-panel-container" hx-swap="innerHTML" class="space-y-5">
+  {% csrf_token %}
+  {% for section in req_sections %}
+   <details open class="bg-white border rounded-lg">
+    <summary class="p-4 font-semibold cursor-pointer bg-slate-50 rounded-t-lg"><span class="font-mono text-govblue-700">{{ section.requirement.code }}</span> · {{ section.requirement.name }}{% if section.requirement.mandatory %}<span class="text-xs bg-red-50 text-red-700 px-2 py-1 rounded ml-2">Obrigatório</span>{% else %}<span class="text-xs text-slate-500 ml-2">Facultativo</span>{% endif %}</summary>
+    <div class="p-4 space-y-5">{% if section.requirement.description %}<p class="text-sm text-slate-500">{{ section.requirement.description }}</p>{% endif %}
+    {% for item in section.checks %}<fieldset class="border rounded p-4"><legend class="px-2 font-semibold text-sm">{% if item.result.requirement_check_id %}{{ item.check.name }}{% else %}Resultado do requisito{% endif %}</legend>
+      {% if item.check.description and item.result.requirement_check_id %}<p class="text-xs text-slate-500 mb-3">{{ item.check.description }}</p>{% endif %}
+      {{ item.form.non_field_errors }}
+      <div class="grid sm:grid-cols-2 gap-4">{% for field in item.form %}<div{% if field.name == 'notes' %} class="sm:col-span-2"{% endif %}><label class="block text-xs font-semibold mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<p role="alert" class="text-red-700 text-sm">{{ field.errors }}</p>{% endif %}</div>{% endfor %}</div>
+    </fieldset>{% endfor %}
     </div>
-
-    <!-- MAIN TWO-COLUMN WORKSPACE: LEFT CONTENT & RIGHT SUMMARY PANEL -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- REGION 2: CONTEÚDO VERTICAL DE REQUISITOS -->
-        <div class="lg:col-span-2 space-y-6">
-            <form id="evaluation-form"
-                  method="post"
-                  action="{% url 'evaluation-save-draft' evaluation_id=evaluation.id %}"
-                  hx-post="{% url 'evaluation-save-draft' evaluation_id=evaluation.id %}"
-                  hx-target="#summary-panel-container"
-                  hx-swap="innerHTML"
-                  class="space-y-6">
-                {% csrf_token %}
-
-                {% for section in req_sections %}
-                    <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden" x-data="{ open: true }">
-                        <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none"
-                             @click="open = !open">
-                            <div class="flex items-center space-x-2">
-                                <span class="font-mono font-bold text-xs bg-govblue-700 text-white px-2 py-0.5 rounded">
-                                    {{ section.requirement.code }}
-                                </span>
-                                <h2 class="text-sm font-bold text-slate-800">
-                                    {{ section.requirement.name }}
-                                </h2>
-                                {% if section.requirement.mandatory %}
-                                    <span class="text-[10px] uppercase font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded">
-                                        Obrigatório
-                                    </span>
-                                {% else %}
-                                    <span class="text-[10px] uppercase font-medium text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded">
-                                        Facultativo
-                                    </span>
-                                {% endif %}
-                            </div>
-                            <span class="text-slate-400 text-xs font-semibold" x-text="open ? 'Recolher &#9650;' : 'Expandir &#9660;'"></span>
-                        </div>
-
-                        <div x-show="open" class="p-4 divide-y divide-slate-100 space-y-4">
-                            {% for item in section.checks %}
-                                <div class="pt-3 first:pt-0 space-y-3 text-xs">
-                                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                                        <div>
-                                            <span class="font-mono text-slate-500 font-semibold">{{ item.check.code }}:</span>
-                                            <span class="font-medium text-slate-800 ml-1">{{ item.check.name }}</span>
-                                        </div>
-                                        <div>
-                                            <label class="sr-only" for="status_{{ item.check.id }}">Status</label>
-                                            <select name="check_{{ item.check.id }}_status"
-                                                    id="status_{{ item.check.id }}"
-                                                    {% if not can_edit %}disabled{% endif %}
-                                                    class="px-2.5 py-1 border border-slate-300 rounded font-semibold text-xs focus:ring-2 focus:ring-blue-500
-                                                    {% if item.result.status == 'ATENDE' %}bg-green-50 text-green-800 border-green-300
-                                                    {% elif item.result.status == 'NAO_ATENDE' %}bg-red-50 text-red-800 border-red-300
-                                                    {% elif item.result.status == 'NAO_ENVIADO' %}bg-amber-50 text-amber-800 border-amber-300
-                                                    {% else %}bg-white text-slate-700{% endif %}">
-                                                {% for val, label in check_statuses %}
-                                                    <option value="{{ val }}" {% if item.result.status == val %}selected{% endif %}>
-                                                        {{ label }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    {% if item.check.description %}
-                                        <p class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
-                                            {{ item.check.description }}
-                                        </p>
-                                    {% endif %}
-
-                                    <!-- Fields for Evidence, SEI, Pages, Validity, Value -->
-                                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 bg-slate-50/50 p-2.5 rounded border border-slate-100">
-                                        <div>
-                                            <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Nº Documento SEI</label>
-                                            <input type="text"
-                                                   name="check_{{ item.check.id }}_sei_number"
-                                                   value="{{ item.result.sei_number|default:'' }}"
-                                                   {% if not can_edit %}disabled{% endif %}
-                                                   placeholder="Doc SEI"
-                                                   class="w-full px-2 py-1 border border-slate-200 rounded text-xs bg-white">
-                                        </div>
-                                        <div>
-                                            <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Folhas / Páginas</label>
-                                            <input type="text"
-                                                   name="check_{{ item.check.id }}_pages"
-                                                   value="{{ item.result.pages|default:'' }}"
-                                                   {% if not can_edit %}disabled{% endif %}
-                                                   placeholder="Ex: fl. 1-12"
-                                                   class="w-full px-2 py-1 border border-slate-200 rounded text-xs bg-white">
-                                        </div>
-                                        <div>
-                                            <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Data de Validade</label>
-                                            <input type="date"
-                                                   name="check_{{ item.check.id }}_valid_until"
-                                                   value="{{ item.result.valid_until|date:'Y-m-d'|default:'' }}"
-                                                   {% if not can_edit %}disabled{% endif %}
-                                                   class="w-full px-2 py-1 border border-slate-200 rounded text-xs bg-white">
-                                        </div>
-                                        <div>
-                                            <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Valor Atestado (R$)</label>
-                                            <input type="text"
-                                                   name="check_{{ item.check.id }}_numeric_value"
-                                                   value="{{ item.result.numeric_value|default:'' }}"
-                                                   {% if not can_edit %}disabled{% endif %}
-                                                   placeholder="0,00"
-                                                   class="w-full px-2 py-1 border border-slate-200 rounded text-xs bg-white">
-                                        </div>
-                                        <div class="sm:col-span-4 mt-1">
-                                            <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-0.5">Observações / Fundamentação do Item</label>
-                                            <input type="text"
-                                                   name="check_{{ item.check.id }}_notes"
-                                                   value="{{ item.result.notes|default:'' }}"
-                                                   {% if not can_edit %}disabled{% endif %}
-                                                   placeholder="Anotações técnicas, ressalvas ou trechos do estatuto/certidão..."
-                                                   class="w-full px-2 py-1 border border-slate-200 rounded text-xs bg-white">
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endfor %}
-
-                <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm space-y-2 text-xs">
-                    <label class="block font-bold text-slate-700 uppercase tracking-wider">
-                        Observações e Considerações Gerais da Análise
-                    </label>
-                    <textarea name="general_notes"
-                              rows="3"
-                              {% if not can_edit %}disabled{% endif %}
-                              placeholder="Parecer técnico consolidado, apontamentos gerais para a comissão..."
-                              class="w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500">{{ evaluation.general_notes }}</textarea>
-                </div>
-            </form>
-        </div>
-
-        <!-- REGION 3: PAINEL DE RESUMO (HTMX UPDATED) -->
-        <div id="summary-panel-container">
-            {% include "evaluations/partials/summary_panel.html" %}
-        </div>
-    </div>
+   </details>
+  {% endfor %}
+  <div class="bg-white border rounded-lg p-5"><label class="font-semibold text-sm block mb-2" for="general_notes">Considerações gerais</label><textarea id="general_notes" name="general_notes" class="form-input" rows="3" {% if not can_edit %}disabled{% endif %}>{{ evaluation.general_notes }}</textarea></div>
+  </form></div>
+  <aside id="summary-panel-container">{% include "evaluations/partials/summary_panel.html" %}</aside>
+ </div>
 </div>
 {% endblock %}
