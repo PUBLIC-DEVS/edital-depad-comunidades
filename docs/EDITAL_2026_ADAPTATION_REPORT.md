@@ -2,6 +2,8 @@
 
 ## Escopo e revisão
 
+Este documento registra a entrega original da Fase 17. A auditoria encontrou um bloqueador no Anexo III; a remediação e as verificações atuais estão em [PHASE_17_1_REMEDIATION_REPORT.md](PHASE_17_1_REMEDIATION_REPORT.md). As contagens abaixo pertencem à entrega original.
+
 - Branch: `feature/edital-2026-base-adaptation`
 - Branch base: `feature/edital-crud-productization`
 - Base SHA: `fc185fee64df818cc28a19d010f66566dd4b83ec`
@@ -19,7 +21,7 @@ Commits desta fase, em ordem:
 
 ## Resultado funcional
 
-**Sim.** Um administrador consegue criar e configurar o edital pelas telas do produto e o ciclo 2026 passa no teste `test_edital_2026_operational_lifecycle_without_workbook`. O teste cria o edital, grupos, programa e município, 14 requisitos, 23 checks e suas validações por requisições HTTP às telas; publica; registra restrição de participação; cadastra candidaturas; verifica alertas de duplicidade; distribui; analisa; encaminha INAPTA para revisão; classifica elegíveis; e consulta métricas.
+**Sim.** Um administrador consegue criar e configurar o edital pelas telas do produto e o ciclo 2026 passa no teste `test_edital_2026_operational_lifecycle_without_workbook`. O **HTTP integration lifecycle**, sem navegador, cria o edital, grupos, programa e município, 14 requisitos, 23 checks e suas validações por requisições HTTP às telas; publica; registra restrição de participação; cadastra candidaturas; verifica alertas de duplicidade; distribui; analisa; encaminha INAPTA para revisão; classifica elegíveis; e consulta métricas.
 
 O mesmo conjunto operacional passou com `ENABLE_LEGACY_IMPORT=false`. Esse teste não abre workbook, não importa `legacy_import` e confirma que a execução de um edital novo não depende do módulo histórico. O resultado não substitui a confirmação da coordenação das decisões ainda abertas abaixo.
 
@@ -39,7 +41,7 @@ O mesmo conjunto operacional passou com `ENABLE_LEGACY_IMPORT=false`. Esse teste
 - Configuração de programas e associações com municípios na administração; cadastro de município canônico continua disponível.
 - A fila de exceções e a lista de processos exibem restrição crítica, duplicidade, CNPJ inválido e grupo pendente com texto além da cor.
 - O workspace do analista apresenta resumo e cards agrupados por seção. Renderiza somente as evidências habilitadas por check, mostra validações e pendências, e mantém o resultado calculado no backend.
-- Anexo I identifica `Submission.cnpj` como CNPJ declarado na candidatura. A confirmação ou correção é explícita; CNPJ documental divergente é exibido como falha.
+- Anexo I identifica `submission.institution.cnpj` como CNPJ declarado na candidatura. A confirmação ou correção é explícita; CNPJ documental divergente é exibido como falha.
 - Restrição ativa impede distribuição e criação/início de avaliação normal. A diligência segue como workflow próprio com checks relacionados, responsável, prazo, resposta e auditoria.
 
 ## Modelo e migrations
@@ -82,3 +84,13 @@ O golden master da planilha histórica real continua **NOT_RUN** porque seu cami
 6. Confirmar política de desempate; empate sem decisão continua sujeito à política explícita configurada e não deve receber regra jurídica inventada.
 
 Este relatório comprova o ciclo testado e as verificações executadas; não declara aprovação jurídica final nem paridade com o workbook histórico.
+
+## Remediação 17.1
+
+O Anexo III é condicional com N/A permitido, não opcional: falha aplicável resulta INAPTA e pendência impede conclusão. O caminho HTTP negativo passa a exercer esse item e criar Review.
+
+A correção formal de CNPJ está disponível à Administração/Coordenação antes da avaliação e durante DRAFT/UNDER_ANALYSIS. Reassocia somente a candidatura; mantém Evaluation/CheckResults/documentos e registra old/new, justificativa e revalidação. Confirmação canônica deve ser renovada. Não altera decisões concluídas nem contorna restrição ativa do novo CNPJ: nessa situação a transação é rejeitada com mensagem explícita.
+
+Triagem manual/CSV unificada; liberação de bloqueio pré-análise explícita; atribuição em INELIGIBLE rejeitada; publicação exige campos coletáveis para validators; CEP administrável; CSVs operacionais protegidos; financeiro opcional respeitado; prévia alinhada aos checks ativos. Nenhuma migration, integração ou decisão jurídica nova.
+
+Configurações anteriormente publicadas não são reescritas por esta correção. Para uma configuração antiga do Anexo III, duplique/versione pelo CRUD e marque o check obrigatório, mantendo N/A permitido e aceito; em rascunho, ajuste pela interface antes da publicação.

@@ -36,7 +36,7 @@ O modelo declarativo contém 14 blocos e 23 checks. Todos os títulos, códigos,
 | --- | ---: | --- |
 | Anexo I — Requerimento de Participação | 1 | SEI, página, observação e confirmação explícita do CNPJ da candidatura. |
 | Anexo II — Ficha Cadastral | 1 | SEI, página, observação. |
-| Anexo III — Experiência Prévia | 2 | O comprovante de experiência autodeclarada é opcional e aceita `NÃO APLICÁVEL`. |
+| Anexo III — Experiência Prévia | 2 | Comprovação condicional, obrigatória quando aplicável; aceita `NÃO APLICÁVEL`. `NÃO ATENDE` reprova e pendência impede conclusão. |
 | Estatuto | 7 | Um check por alínea a–g; SEI, página e observação. |
 | SICAF de VI níveis | 1 | CNPJ, validade, SEI, página; valida CNPJ e vigência. |
 | Ata de eleição | 2 | Vigência do mandato e registro em cartório; SEI, página e observação. |
@@ -73,3 +73,14 @@ Não há `eval`, código fornecido por usuário, nem linguagem de regras. Datas 
 7. APTA segue para elegibilidade/classificação; INAPTA cria revisão sem responsável. Revisor assume explicitamente e revisa todos os itens impeditivos.
 
 O seed `seed_edital_2026_base` é auxiliar de desenvolvimento. Ele não substitui as telas. Exige usuário administrador, datas de abertura/encerramento e deixa a data oficial de referência vazia se a coordenação ainda não a tiver definido.
+
+## Correções da auditoria — Fase 17.1
+
+- A fonte canônica é `submission.institution.cnpj`. Administração/Coordenação corrige formalmente uma candidatura, inclusive durante análise em rascunho, sem alterar a instituição compartilhada nem apagar evidências.
+- A confirmação do Anexo I é invalidada após correção e deve ser feita novamente. Validators de CNPJ são reexecutados e o evento guarda identificadores/status, sem duplicar documentos.
+- Manual e CSV usam `SubmissionIntakeService`: mesma classificação, triagem, warnings e auditoria; o CSV continua atômico por arquivo.
+- Desativar uma fonte não reabre processos. A ação **Liberar bloqueio pré-análise**, com justificativa e confirmação, retorna a RECEIVED após todas as restrições cessarem, sem atribuição automática.
+- Publicação e edição de validators verificam as evidências necessárias. CEP é editável no cadastro institucional; exports operacionais neutralizam fórmulas.
+- A prévia e o assessment usam o mesmo selector de checks ativos. Edital sem financeiro não recebe alerta de valor global ausente.
+
+Evidências compartilhadas por bloco (F17-07) e otimização do workspace (F17-11) permanecem adiadas. O ciclo automatizado é **HTTP integration lifecycle**, não teste de navegador.

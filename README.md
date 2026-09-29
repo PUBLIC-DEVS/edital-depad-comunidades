@@ -4,7 +4,7 @@ Plataforma Django para criar e executar **novos editais configuráveis**: cadast
 
 A planilha histórica continua disponível apenas para migração e regressão. O golden master real permanece `FAIL` nas diferenças já documentadas; testes verdes do comparador não transformam isso em paridade aprovada. Consulte [o relatório de hardening](docs/POST_AUDIT_HARDENING_REPORT.md), [a comparação real](docs/REAL_LEGACY_PARITY.md) e [o resumo sanitizado](artifacts/legacy-real-summary.json).
 
-Para a configuração funcional do Edital 2026, consulte o [mapeamento da base](docs/EDITAL_2026_BASE_MAPPING.md), as [decisões ainda abertas](docs/EDITAL_2026_OPEN_DECISIONS.md) e o [relatório desta adaptação](docs/EDITAL_2026_ADAPTATION_REPORT.md). O teste de lifecycle configura pela interface os 14 blocos e 23 checks sem abrir o XLSX.
+Para a configuração funcional do Edital 2026, consulte o [mapeamento da base](docs/EDITAL_2026_BASE_MAPPING.md), as [decisões ainda abertas](docs/EDITAL_2026_OPEN_DECISIONS.md) e o [relatório desta adaptação](docs/EDITAL_2026_ADAPTATION_REPORT.md). O HTTP integration lifecycle configura pelas views/forms os 14 blocos e 23 checks sem abrir o XLSX.
 
 ## Ambiente local
 
@@ -36,7 +36,7 @@ Aplicação: `http://localhost:8000/`; health check: `/health/`.
 
 Entre como `ADMINISTRADOR` e abra `/administracao/` → **Editais** → **Novo edital**. Preencha número, ano, abertura/encerramento e versão. Na visão geral, cadastre grupos/públicos, requisitos, subcritérios e evidências, política de classificação, regras financeiras e vínculos de programas/municípios; crie analista e revisor em **Usuários e perfis**. O checklist exibe o que falta antes de **Publicar edital**. A publicação grava um snapshot imutável das regras. Para outra edição, use **Duplicar edital**; apenas a configuração é copiada.
 
-O CRUD permite ajustar nomes e códigos de requisitos, ordem, obrigatoriedade, checks, status aceitos, evidências, validadores tipados, grupos, regra financeira, referência do programa e política de classificação. Use **Pré-visualizar formulário do analista** antes de publicar. As restrições contratuais são fontes configuráveis e auditadas; a duplicidade de novos editais começa como alerta `WARN_ONLY`. Uma divergência de CNPJ aparece na análise e só pode ser corrigida pela ação explícita de Administração/Coordenação, com justificativa, antes da análise começar. A validação automática de datas requer a data oficial de referência definida pela coordenação.
+O CRUD permite ajustar nomes e códigos de requisitos, ordem, obrigatoriedade, checks, status aceitos, evidências, validadores tipados, grupos, regra financeira, referência do programa e política de classificação. Use **Pré-visualizar formulário do analista** antes de publicar. As restrições contratuais são fontes configuráveis e auditadas; a duplicidade de novos editais começa como alerta `WARN_ONLY`. Uma divergência de CNPJ aparece na análise e só pode ser corrigida pela ação explícita de Administração/Coordenação, com justificativa e confirmação, antes da avaliação ou durante análise em rascunho. A operação reassocia somente a candidatura e preserva documentos; decisões concluídas e correções para CNPJ restrito durante análise não são alteradas por essa ação. A validação automática de datas requer a data oficial de referência definida pela coordenação.
 
 Para criar uma edição rascunho a partir da configuração 2026 de desenvolvimento, cadastre primeiro um usuário administrador e informe datas operacionais explícitas:
 
@@ -52,7 +52,7 @@ O comando não escolhe uma data de referência jurídica nem inventa a lista de 
 
 O distribuidor usa `/processos/novo/` ou `/processos/importar-csv/` e atribui processos individuais/em lote. O analista atribuído inicia por POST, salva a análise dinâmica e conclui. `APTA` segue para ranking sem revisão automática; `INAPTA` vai a revisão não atribuída. O revisor assume a revisão, registra decisões de todos os itens impeditivos e conclui um parecer coerente. Uma diligência saneada retorna ao estágio de origem. Coordenador/Admin geram ranking; métricas exibem separadamente análise inicial e resultado consolidado. Consulte [o roteiro e as permissões](docs/CRUD_PRODUCTIZATION_REPORT.md).
 
-O ranking oficial admite somente elegíveis, exclui duplicatas das posições e preserva exclusões auditáveis. Empates absolutos permanecem bloqueados enquanto a política estiver `UNRESOLVED`. Snapshots, entradas e exclusões são protegidos nas rotas/ORM comuns. Uma avaliação iniciada bloqueia redistribuição até haver operação formal de transferência.
+O ranking oficial admite somente elegíveis, suprime duplicatas das posições quando a política configurada determina supressão e preserva exclusões auditáveis. Com `WARN_ONLY`, candidaturas duplicadas são mantidas e sinalizadas. Empates absolutos permanecem bloqueados enquanto a política estiver `UNRESOLVED`. Snapshots, entradas e exclusões são protegidos nas rotas/ORM comuns. Uma avaliação iniciada bloqueia redistribuição até haver operação formal de transferência. Desativar restrição não reabre processos: Administração/Coordenação deve usar **Liberar bloqueio pré-análise**, após todas as fontes cessarem, para retornar à recepção sem atribuição automática.
 
 ## Importação histórica e golden master
 
@@ -94,3 +94,7 @@ ruff format --check .
 ## Autenticação institucional
 
 `apps.accounts.adapters.microsoft.MicrosoftAuthAdapter` é uma **authentication boundary / adapter ready for integration**. Recebe claims já decodificados; não realiza sozinho validação JWT, descoberta OIDC, redirect/login Entra ou integração SharePoint. A integração do colaborador não foi localizada no checkout verificado. Login local continua disponível para desenvolvimento. Não trate esse scaffold como SSO implementado.
+
+## Remediação da auditoria 17.1
+
+Veja [o relatório de correções e validações](docs/PHASE_17_1_REMEDIATION_REPORT.md). Comprovação do Anexo III é obrigatória quando aplicável, com N/A permitido; validators exigem evidências coletáveis antes da publicação. Manual e CSV compartilham triagem, CEP é administrável e exports operacionais são protegidos contra fórmulas. O teste automatizado permanece integração HTTP; homologação em navegador ainda é necessária.

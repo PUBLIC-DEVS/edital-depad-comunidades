@@ -8,4 +8,6 @@ Estas escolhas não estão respondidas inequivocamente pela especificação func
 4. **Mães nutrizes em G1:** confirmar formalmente se vagas de mães nutrizes sempre devem enquadrar a entidade no G1 em 2026. O template atual configura essa prioridade conforme a regra indicada, sem torná-la universal.
 5. **Municípios PRONASCI:** qual fonte oficial/lista deve alimentar as associações município-programa do edital 2026? O workbook especifica o grupo, mas não traz a lista de municípios.
 
+6. **Desempate absoluto:** qual critério formal deve ser aplicado quando os timestamps empatam? O estado `UNRESOLVED` mantém o bloqueio; nenhum critério jurídico novo foi escolhido na remediação.
+
 Até a coordenação confirmar os itens, não interprete o template como aprovação jurídica final do edital.
