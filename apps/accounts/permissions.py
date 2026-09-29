@@ -4,7 +4,7 @@ from functools import wraps
 from typing import Any
 
 from django.core.exceptions import PermissionDenied
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -81,10 +81,7 @@ class RolePermissionPolicy:
             ).exists()
         if user.role == User.Role.REVISOR:
             # Revisor acessa se houver revisão ativa ou pendente
-            return (
-                submission.reviews.exists()
-                or submission.workflow_status == Submission.WorkflowStatus.PENDING_REVIEW
-            )
+            return submission.reviews.filter(Q(reviewer=user) | Q(reviewer__isnull=True)).exists()
         return False
 
     @staticmethod
@@ -141,12 +138,7 @@ class ScopedQuerySetSelector:
         if user.role == User.Role.REVISOR:
             # Revisor vê processos em revisão ou que possuam revisão
             return queryset.filter(
-                workflow_status__in=[
-                    Submission.WorkflowStatus.PENDING_REVIEW,
-                    Submission.WorkflowStatus.PENDING_DILIGENCE,
-                    Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
-                    Submission.WorkflowStatus.INELIGIBLE,
-                ]
+                Q(reviews__reviewer=user) | Q(reviews__reviewer__isnull=True, reviews__isnull=False)
             ).distinct()
 
         return queryset.none()
@@ -160,7 +152,11 @@ class ScopedQuerySetSelector:
         if not user.is_authenticated:
             return queryset.none()
 
-        if user.is_superuser or user.role in {User.Role.COORDENADOR, User.Role.ADMINISTRADOR}:
+        if user.is_superuser or user.role in {
+            User.Role.COORDENADOR,
+            User.Role.ADMINISTRADOR,
+            User.Role.CONSULTA,
+        }:
             return queryset
 
         if user.role == User.Role.ANALISTA:
@@ -168,10 +164,7 @@ class ScopedQuerySetSelector:
 
         if user.role == User.Role.REVISOR:
             return queryset.filter(
-                submission__workflow_status__in=[
-                    Submission.WorkflowStatus.PENDING_REVIEW,
-                    Submission.WorkflowStatus.PENDING_DILIGENCE,
-                ]
+                Q(review__reviewer=user) | Q(review__reviewer__isnull=True, review__isnull=False)
             )
 
         return queryset.none()

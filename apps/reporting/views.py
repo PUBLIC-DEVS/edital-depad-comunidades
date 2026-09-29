@@ -12,6 +12,7 @@ from apps.reporting.services.metrics import DashboardMetricsService
 
 
 @login_required
+@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA")
 def dashboard_metrics_view(request):
     """Exibe o painel operacional consolidado com métricas agregadas em tempo real."""
     edital_id = request.GET.get("edital")
@@ -36,6 +37,7 @@ def dashboard_metrics_view(request):
 
 
 @login_required
+@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA")
 def validation_insights_view(request):
     """Exibe o painel de conferência, exceções e auditoria de validações."""
     edital_id = request.GET.get("edital")
@@ -56,6 +58,7 @@ def validation_insights_view(request):
 
 
 @login_required
+@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA")
 def failed_requirement_processes_view(request, code: str):
     """Lista detalhada de processos reprovados em um requisito específico."""
     edital_id = request.GET.get("edital")

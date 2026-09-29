@@ -2,7 +2,7 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -73,6 +73,12 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
     )
 
     evaluation = review.evaluation
+    if (
+        request.user.role == User.Role.REVISOR
+        and review.reviewer_id not in (None, request.user.pk)
+        and not request.user.is_superuser
+    ):
+        raise PermissionDenied("Revisão atribuída a outro responsável.")
     requirements = (
         Requirement.objects.filter(edital=review.submission.edital, active=True)
         .prefetch_related("checks")
@@ -193,6 +199,8 @@ def diligence_list_view(request: HttpRequest) -> HttpResponse:
         .select_related("submission", "submission__institution", "requested_by")
         .order_by("-requested_at")
     )
+    if request.user.role == User.Role.REVISOR and not request.user.is_superuser:
+        diligences = diligences.filter(submission__reviews__reviewer=request.user).distinct()
     return render(
         request,
         "reviews/diligence_list.html",

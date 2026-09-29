@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
 from apps.accounts.permissions import RolePermissionPolicy, require_role
@@ -15,6 +16,7 @@ from apps.ranking.services import RankingService
 
 
 @login_required
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
 def ranking_view(request: HttpRequest) -> HttpResponse:
     """Exibe o ranking oficial com filtros por edital, grupo e histórico de snapshots."""
     edital_id = request.GET.get("edital")
@@ -63,6 +65,7 @@ def ranking_view(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
 def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
     """Gera um novo snapshot imutável de ranking para o edital selecionado."""
     if request.method == "POST":
@@ -87,6 +90,7 @@ def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
 def ranking_snapshots_history_view(request: HttpRequest) -> HttpResponse:
     """Exibe o histórico auditável de snapshots de classificação gerados."""
     snapshots = (
@@ -102,6 +106,7 @@ def ranking_snapshots_history_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
 def ranking_export_csv_view(request: HttpRequest, snapshot_id: int) -> HttpResponse:
     """Exporta o snapshot oficial em formato CSV delimitado por ponto e vírgula."""
     snapshot = get_object_or_404(RankingSnapshot, id=snapshot_id)
@@ -140,11 +145,11 @@ def ranking_export_csv_view(request: HttpRequest, snapshot_id: int) -> HttpRespo
             [
                 entry.position,
                 entry.target_group,
-                entry.submission.processo_sei,
-                entry.submission.institution.name,
-                entry.submission.institution.formatted_cnpj,
-                entry.submission.municipality.name,
-                entry.submission.municipality.state,
+                entry.snapshot_data.get("processo_sei", entry.submission.processo_sei),
+                entry.snapshot_data.get("institution", ""),
+                entry.snapshot_data.get("cnpj", ""),
+                entry.snapshot_data.get("municipality", ""),
+                entry.snapshot_data.get("state", ""),
                 entry.received_at.strftime("%d/%m/%Y %H:%M:%S"),
                 entry.total_vacancies,
                 entry.qualification_status,

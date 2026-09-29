@@ -52,6 +52,8 @@ class User(AbstractUser):
     )
     email = models.EmailField(
         unique=True,
+        null=True,
+        blank=True,
         verbose_name="E-mail Institucional",
     )
     azure_oid = models.CharField(

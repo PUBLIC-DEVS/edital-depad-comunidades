@@ -108,6 +108,11 @@ class Submission(models.Model):
         verbose_name = "Inscrição / Processo"
         verbose_name_plural = "Inscrições / Processos"
         ordering = ["received_at", "processo_sei"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["edital", "processo_sei"], name="unique_submission_edital_sei"
+            )
+        ]
 
     def __str__(self):
         status_disp = self.get_workflow_status_display()
@@ -174,6 +179,13 @@ class Assignment(models.Model):
         verbose_name = "Atribuição de Processo"
         verbose_name_plural = "Atribuições de Processos"
         ordering = ["-assigned_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["submission"],
+                condition=models.Q(status="ACTIVE"),
+                name="unique_active_assignment_submission",
+            )
+        ]
 
     def __str__(self):
         st = self.get_status_display()

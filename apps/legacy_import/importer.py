@@ -87,7 +87,8 @@ class LegacyImporter:
             return None
         user, created = User.objects.get_or_create(
             username="legacy." + slugify(normalized_text(name)),
-            defaults={"first_name": text(name), "role": role, "is_active": False},
+            defaults={"first_name": text(name),
+                "email": None, "role": role, "is_active": False},
         )
         if created:
             user.set_unusable_password()

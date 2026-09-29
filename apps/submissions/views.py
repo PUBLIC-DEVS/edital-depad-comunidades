@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
 from apps.accounts.permissions import (
@@ -14,6 +15,7 @@ from apps.accounts.permissions import (
     enforce_submission_access,
     require_role,
 )
+from apps.audit.models import AuditEvent
 from apps.ranking.services import ClassificationService
 from apps.submissions.forms import BulkAssignmentForm, SingleAssignmentForm, SubmissionIntakeForm
 from apps.submissions.models import Assignment, Submission
@@ -97,8 +99,14 @@ def submission_create_view(request: HttpRequest) -> HttpResponse:
         form = SubmissionIntakeForm(request.POST)
         if form.is_valid():
             submission = form.save()
+            AuditEvent.objects.create(
+                actor=request.user,
+                entity_type="Submission",
+                entity_id=str(submission.pk),
+                action="CREATE",
+            )
             # Enquadramento automático preliminar
-            ClassificationService.classify_and_update(submission)
+            ClassificationService.classify_and_update(submission, request.user)
             messages.success(request, f"Processo {submission.processo_sei} cadastrado com sucesso.")
             return redirect("submission-detail", submission_id=submission.id)
     else:
@@ -132,6 +140,7 @@ def submission_detail_view(request: HttpRequest, submission_id: int) -> HttpResp
 
 @login_required
 @require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
 def submission_assign_view(request: HttpRequest, submission_id: int) -> HttpResponse:
     """Atribui ou redistribui um processo individualmente."""
     submission = enforce_submission_access(request, submission_id)
@@ -155,6 +164,7 @@ def submission_assign_view(request: HttpRequest, submission_id: int) -> HttpResp
 
 @login_required
 @require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
 def submission_bulk_assign_view(request: HttpRequest) -> HttpResponse:
     """Atribui múltiplos processos selecionados a um analista."""
     if request.method == "POST":

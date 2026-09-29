@@ -87,8 +87,10 @@
                             <a href="/revisoes/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Fila de Revisão</a>
                             <a href="/diligencias/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Diligências</a>
                         {% endif %}
-                        <a href="/classificacao/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Classificação & Ranking</a>
-                        <a href="/metricas/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Métricas</a>
+                        {% if user.is_superuser or user.role == 'ADMINISTRADOR' or user.role == 'COORDENADOR' or user.role == 'CONSULTA' %}
+                            <a href="/classificacao/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Classificação & Ranking</a>
+                            <a href="/metricas/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Métricas</a>
+                        {% endif %}
                         {% if user.is_admin_role or user.is_staff %}
                             <a href="/admin/" class="text-amber-300 hover:text-amber-100 px-2 py-1 rounded ml-auto">Administração</a>
                         {% endif %}
