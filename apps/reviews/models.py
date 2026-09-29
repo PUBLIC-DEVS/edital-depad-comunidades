@@ -31,6 +31,8 @@ class Review(models.Model):
         on_delete=models.PROTECT,
         related_name="reviews_conducted",
         verbose_name="Revisor Responsável",
+        null=True,
+        blank=True,
     )
     status = models.CharField(
         max_length=20,
@@ -60,7 +62,7 @@ class Review(models.Model):
     def __str__(self):
         sei = self.submission.processo_sei
         res = self.get_preliminary_result_display()
-        return f"Revisão {sei} por {self.reviewer.username} ({res})"
+        return f"Revisão {sei} por {self.reviewer or 'não atribuído'} ({res})"
 
 
 class ReviewItemDecision(models.Model):
@@ -115,6 +117,7 @@ class Diligence(models.Model):
     """Representa uma diligência / pedido de esclarecimento no fluxo processual."""
 
     class Status(models.TextChoices):
+        LEGACY_UNKNOWN = "LEGACY_UNKNOWN", "Histórico: estado operacional desconhecido"
         OPEN = "OPEN", "Aberta / Aguardando Resposta"
         ANSWERED = "ANSWERED", "Respondida"
         CONCLUDED = "CONCLUDED", "Concluída"
@@ -136,13 +139,17 @@ class Diligence(models.Model):
         on_delete=models.PROTECT,
         related_name="requested_diligences",
         verbose_name="Solicitado por",
+        null=True,
+        blank=True,
     )
-    requested_at = models.DateTimeField(auto_now_add=True, verbose_name="Data da Solicitação")
+    requested_at = models.DateTimeField(null=True, blank=True, verbose_name="Data da Solicitação")
+    origin_status = models.CharField(max_length=30, blank=True)
+    unsatisfied_return_status = models.CharField(max_length=30, blank=True)
     reason = models.TextField(
         verbose_name="Motivo e Fundamentação da Diligência",
         help_text="Detalhes dos itens ou inconsistências a serem esclarecidos.",
     )
-    deadline = models.DateField(verbose_name="Prazo Limite para Resposta")
+    deadline = models.DateField(null=True, blank=True, verbose_name="Prazo Limite para Resposta")
     answered_at = models.DateTimeField(null=True, blank=True, verbose_name="Data da Resposta")
     response = models.TextField(blank=True, verbose_name="Teor da Resposta Apresentada")
     result = models.CharField(

@@ -153,8 +153,10 @@ class Assignment(models.Model):
         on_delete=models.PROTECT,
         related_name="made_assignments",
         verbose_name="Distribuído por",
+        null=True,
+        blank=True,
     )
-    assigned_at = models.DateTimeField(auto_now_add=True, verbose_name="Data de Atribuição")
+    assigned_at = models.DateTimeField(null=True, blank=True, verbose_name="Data de Atribuição")
     ended_at = models.DateTimeField(null=True, blank=True, verbose_name="Data de Encerramento")
     status = models.CharField(
         max_length=20,

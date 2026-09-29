@@ -53,3 +53,5 @@ coverage.xml
 *.swp
 *.swo
 *.zip
+artifacts/private/
+*.xlsx

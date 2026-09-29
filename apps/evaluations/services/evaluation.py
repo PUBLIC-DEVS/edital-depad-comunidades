@@ -58,6 +58,7 @@ class EvaluationService:
         }
 
         failed_req_codes: list[str] = []
+        result_failed = False
         has_pending = False
         total_checks = 0
         evaluated_checks = 0
@@ -70,9 +71,17 @@ class EvaluationService:
             for check in req_checks:
                 res = results_by_check_id.get(check.id)
                 st = res.status if res else CheckResult.Status.EM_BRANCO
+                accepted = check.accepted_statuses or [
+                    CheckResult.Status.ATENDE,
+                    CheckResult.Status.NAO_APLICAVEL,
+                ]
+                failures = check.failure_statuses or [
+                    CheckResult.Status.NAO_ATENDE,
+                    CheckResult.Status.NAO_ENVIADO,
+                ]
 
                 if st == CheckResult.Status.EM_BRANCO:
-                    has_pending = True
+                    has_pending |= check.contributes_to_result
                 else:
                     evaluated_checks += 1
 
@@ -81,11 +90,15 @@ class EvaluationService:
                     CheckResult.Status.NAO_ENVIADO,
                 ):
                     req_failed = True
+                if req.mandatory and check.contributes_to_result:
+                    result_failed |= st in failures
+                    if st not in accepted and st not in failures:
+                        has_pending = True
 
             if req_failed:
                 failed_req_codes.append(req.code)
 
-        if failed_req_codes:
+        if result_failed:
             result = Evaluation.Result.INAPTA
         elif not has_pending and total_checks > 0:
             result = Evaluation.Result.APTA

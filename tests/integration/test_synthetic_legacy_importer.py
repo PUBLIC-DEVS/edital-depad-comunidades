@@ -1,4 +1,4 @@
-"""Harness de teste e verificação de paridade estrita com o Excel legado (282 processos)."""
+"""Synthetic importer round-trip only; does not establish real workbook parity."""
 
 import pytest
 from django.core.management import call_command
@@ -10,15 +10,15 @@ from apps.submissions.services.legacy_generator import generate_synthetic_legacy
 
 @pytest.mark.legacy
 @pytest.mark.django_db
-class TestLegacyExcelParityHarness:
+class TestSyntheticLegacyImporter:
     @pytest.fixture
     def synthetic_excel(self, tmp_path):
         excel_path = tmp_path / "edital_legado_282_processos.xlsx"
         generate_synthetic_legacy_workbook(str(excel_path))
         return str(excel_path)
 
-    def test_legacy_import_and_parity_counts(self, synthetic_excel):
-        """Verifica a paridade matemática contra os números do Edital:
+    def test_synthetic_import_counts(self, synthetic_excel):
+        """Verifica os números explicitamente gerados nesta fixture sintética:
 
         Total = 282
         G1 = 9

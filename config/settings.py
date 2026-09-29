@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.ranking.apps.RankingConfig",
     "apps.reporting.apps.ReportingConfig",
     "apps.audit.apps.AuditConfig",
+    "apps.legacy_import",
 ]
 
 MIDDLEWARE = [

@@ -9,6 +9,8 @@ class Municipality(models.Model):
     ibge_code = models.CharField(
         max_length=7,
         unique=True,
+        null=True,
+        blank=True,
         db_index=True,
         verbose_name="Código IBGE",
         help_text="Código IBGE oficial de 7 dígitos.",
@@ -22,6 +24,13 @@ class Municipality(models.Model):
         verbose_name = "Município"
         verbose_name_plural = "Municípios"
         ordering = ["state", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "state"],
+                condition=models.Q(ibge_code__isnull=True),
+                name="unique_unresolved_municipality_name_state",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.name}/{self.state} ({self.ibge_code})"

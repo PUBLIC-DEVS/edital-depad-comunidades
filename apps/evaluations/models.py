@@ -48,7 +48,7 @@ class Evaluation(models.Model):
         blank=True,
         verbose_name="Observações Gerais da Análise",
     )
-    started_at = models.DateTimeField(auto_now_add=True, verbose_name="Início da Análise")
+    started_at = models.DateTimeField(null=True, blank=True, verbose_name="Início da Análise")
     completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Conclusão da Análise")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -91,6 +91,7 @@ class CheckResult(models.Model):
         default=Status.EM_BRANCO,
         verbose_name="Status da Checagem",
     )
+    legacy_raw_value = models.JSONField(null=True, blank=True)
     sei_number = models.CharField(
         max_length=100,
         blank=True,

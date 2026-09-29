@@ -83,6 +83,7 @@ class ProgramMunicipality(models.Model):
         db_index=True,
     )
     active = models.BooleanField(default=True, verbose_name="Ativo")
+    legacy_original_name = models.CharField(max_length=150, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -207,6 +208,9 @@ class RequirementCheck(models.Model):
     description = models.TextField(blank=True, verbose_name="Orientações ao Analista")
     order = models.PositiveIntegerField(default=0, verbose_name="Ordem")
     active = models.BooleanField(default=True, verbose_name="Ativo")
+    accepted_statuses = models.JSONField(default=list, blank=True)
+    failure_statuses = models.JSONField(default=list, blank=True)
+    contributes_to_result = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
