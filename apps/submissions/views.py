@@ -5,12 +5,12 @@ import io
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
@@ -24,9 +24,17 @@ from apps.audit.models import AuditEvent
 from apps.editais.models import Edital, TargetGroup
 from apps.institutions.models import Institution, Municipality
 from apps.ranking.services import ClassificationService
-from apps.submissions.forms import BulkAssignmentForm, SingleAssignmentForm, SubmissionIntakeForm
-from apps.submissions.models import Assignment, Submission
+from apps.submissions.forms import (
+    BulkAssignmentForm,
+    ParticipationRestrictionForm,
+    SingleAssignmentForm,
+    SubmissionCnpjCorrectionForm,
+    SubmissionIntakeForm,
+)
+from apps.submissions.models import Assignment, ParticipationRestriction, Submission
 from apps.submissions.services.distribution import DistributionService
+from apps.submissions.services.eligibility import ParticipationEligibilityService
+from apps.submissions.services.identity import SubmissionIdentityService
 from apps.submissions.services.validation import SubmissionAnomalyDetector
 from apps.submissions.services.workflow import WorkflowService
 
@@ -145,7 +153,18 @@ def submission_create_view(request: HttpRequest) -> HttpResponse:
             )
             # Enquadramento automático preliminar
             ClassificationService.classify_and_update(submission, request.user)
-            messages.success(request, f"Processo {submission.processo_sei} cadastrado com sucesso.")
+            restrictions = ParticipationEligibilityService.apply_preanalysis_block(
+                submission, request.user
+            )
+            if restrictions:
+                messages.error(
+                    request,
+                    "CNPJ com contrato/restrição ativa. A participação foi bloqueada antes da análise.",
+                )
+            else:
+                messages.success(
+                    request, f"Processo {submission.processo_sei} cadastrado com sucesso."
+                )
             return redirect("submission-detail", submission_id=submission.id)
     else:
         form = SubmissionIntakeForm(initial={"edital": request.GET.get("edital")})
@@ -163,7 +182,8 @@ def submission_detail_view(request: HttpRequest, submission_id: int) -> HttpResp
     )
 
     assignment_form = None
-    if RolePermissionPolicy.can_distribute_submissions(request.user):
+    restricted = ParticipationEligibilityService.is_restricted(submission)
+    if RolePermissionPolicy.can_distribute_submissions(request.user) and not restricted:
         assignment_form = SingleAssignmentForm()
 
     context = {
@@ -172,11 +192,48 @@ def submission_detail_view(request: HttpRequest, submission_id: int) -> HttpResp
         "assignment_history": assignment_history,
         "assignment_form": assignment_form,
         "can_distribute": RolePermissionPolicy.can_distribute_submissions(request.user),
+        "restricted": restricted,
         "can_edit": RolePermissionPolicy.can_distribute_submissions(request.user)
         and not hasattr(submission, "evaluation")
         and submission.edital.status == "ACTIVE",
+        "can_correct_cnpj": (
+            request.user.is_superuser
+            or request.user.role
+            in {
+                User.Role.ADMINISTRADOR,
+                User.Role.COORDENADOR,
+            }
+        )
+        and not hasattr(submission, "evaluation"),
     }
     return render(request, "submissions/detail.html", context)
+
+
+@login_required
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
+def submission_cnpj_correction_view(request, submission_id):
+    submission = enforce_submission_access(request, submission_id)
+    form = SubmissionCnpjCorrectionForm(request.POST)
+    if form.is_valid():
+        try:
+            SubmissionIdentityService.correct_cnpj(
+                submission,
+                form.cleaned_data["cnpj"],
+                form.cleaned_data["reason"],
+                request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(
+                request,
+                "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc),
+            )
+        else:
+            messages.success(request, "CNPJ corrigido com justificativa e trilha de auditoria.")
+    else:
+        errors = [*form.errors.get("cnpj", []), *form.errors.get("reason", [])]
+        messages.error(request, "; ".join(errors))
+    return redirect("submission-detail", submission_id=submission_id)
 
 
 @login_required
@@ -192,8 +249,11 @@ def submission_assign_view(request: HttpRequest, submission_id: int) -> HttpResp
             reason = form.cleaned_data["reason"]
             try:
                 WorkflowService.assign_analyst(submission, analyst, request.user, reason)
-            except ValidationError as exc:
-                messages.error(request, "; ".join(exc.messages))
+            except (PermissionDenied, ValidationError) as exc:
+                messages.error(
+                    request,
+                    "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc),
+                )
             else:
                 messages.success(request, f"Processo atribuído a {analyst.username}.")
     return redirect("submission-detail", submission_id=submission.id)
@@ -219,8 +279,11 @@ def submission_bulk_assign_view(request: HttpRequest) -> HttpResponse:
                     assigned_by=request.user,
                     reason=reason,
                 )
-            except ValidationError as exc:
-                messages.error(request, "; ".join(exc.messages))
+            except (PermissionDenied, ValidationError) as exc:
+                messages.error(
+                    request,
+                    "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc),
+                )
             else:
                 messages.success(request, f"{count} processos atribuídos a {analyst.username}.")
         else:
@@ -246,6 +309,7 @@ def submission_suggest_distribution_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
 def submission_anomalies_view(request: HttpRequest) -> HttpResponse:
     """Fila de exceções e anomalias cadastrais/processuais."""
     base_qs = ScopedQuerySetSelector.for_submissions(request.user).select_related(
@@ -255,6 +319,9 @@ def submission_anomalies_view(request: HttpRequest) -> HttpResponse:
     anomalous_submissions = []
     for sub in base_qs:
         alerts = SubmissionAnomalyDetector.check_submission(sub)
+        filter_type = request.GET.get("tipo", "")
+        if filter_type:
+            alerts = [alert for alert in alerts if alert.code == filter_type]
         if alerts:
             sub.alerts = alerts
             anomalous_submissions.append(sub)
@@ -265,6 +332,59 @@ def submission_anomalies_view(request: HttpRequest) -> HttpResponse:
         {
             "submissions": anomalous_submissions,
             "total_anomalies": len(anomalous_submissions),
+            "filter_type": request.GET.get("tipo", ""),
+            "exception_types": (
+                "ACTIVE_CONTRACT_RESTRICTION",
+                "DUPLICATE_CNPJ",
+                "INVALID_CNPJ",
+                "NO_TARGET_GROUP",
+            ),
+        },
+    )
+
+
+@login_required
+@require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+def restriction_list_view(request):
+    return render(
+        request,
+        "submissions/restrictions.html",
+        {
+            "restrictions": ParticipationRestriction.objects.select_related(
+                "edital", "created_by"
+            ).order_by("-created_at"),
+        },
+    )
+
+
+@login_required
+@require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+def restriction_form_view(request, restriction_id=None):
+    restriction = (
+        get_object_or_404(ParticipationRestriction, pk=restriction_id)
+        if restriction_id
+        else ParticipationRestriction()
+    )
+    form = ParticipationRestrictionForm(request.POST or None, instance=restriction)
+    if request.method == "POST" and form.is_valid():
+        instance = form.save(commit=False)
+        try:
+            if restriction_id:
+                ParticipationEligibilityService.update_restriction(instance, request.user)
+            else:
+                ParticipationEligibilityService.create_restriction(instance, request.user)
+        except ValidationError as exc:
+            form.add_error(None, "; ".join(exc.messages))
+        else:
+            messages.success(request, "Restrição salva e auditada.")
+            return redirect("restriction-list")
+    return render(
+        request,
+        "administration/form.html",
+        {
+            "form": form,
+            "title": "Editar restrição" if restriction_id else "Nova restrição de participação",
+            "back_url": "/processos/restricoes/",
         },
     )
 

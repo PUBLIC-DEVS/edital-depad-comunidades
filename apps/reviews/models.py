@@ -148,6 +148,12 @@ class Diligence(models.Model):
         related_name="diligences",
         verbose_name="Inscrição Objeto de Diligência",
     )
+    related_check_results = models.ManyToManyField(
+        "evaluations.CheckResult",
+        blank=True,
+        related_name="diligences",
+        verbose_name="Itens da análise relacionados",
+    )
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

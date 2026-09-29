@@ -51,7 +51,10 @@ class DashboardMetricsService:
 
         # Two mutually exclusive dimensions, never an OR across lifecycle phases.
         initial_results = {"APTA": 0, "INAPTA": 0, "EM_ANALISE": 0}
-        for result in subs.values_list("evaluation__result", flat=True):
+        initial_evaluations = Evaluation.objects.all()
+        if edital:
+            initial_evaluations = initial_evaluations.filter(submission__edital=edital)
+        for result in initial_evaluations.values_list("result", flat=True):
             initial_results[result or "EM_ANALISE"] += 1
         outcome_by_workflow = {
             "RECEIVED": ("RECEBIDO", "Recebido"),

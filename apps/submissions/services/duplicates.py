@@ -50,7 +50,11 @@ class DuplicateService:
         """
         if policy not in Edital.DuplicatePolicy.values:
             raise ValidationError("Política de duplicidade desconhecida.")
+        submissions = list(submissions)
         groups = cls.group_by_institution_cnpj(submissions)
+
+        if policy == Edital.DuplicatePolicy.WARN_ONLY:
+            return DuplicateResolution(retained=submissions, suppressed=[], suppression_reasons={})
 
         retained: list[Submission] = []
         suppressed: list[Submission] = []

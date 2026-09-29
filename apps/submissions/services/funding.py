@@ -53,6 +53,8 @@ class FundingService:
 
     @classmethod
     def calculate_submission_values(cls, submission):
+        if not submission.edital.requires_financial_rules:
+            return None, None
         amounts = [
             (FundingRule.VacancyType.FEMALE, submission.vagas_femininas),
             (FundingRule.VacancyType.MALE, submission.vagas_masculinas),

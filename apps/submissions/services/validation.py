@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from apps.institutions.cnpj import normalize_cnpj, validate_cnpj
 from apps.submissions.models import Submission
+from apps.submissions.services.eligibility import ParticipationEligibilityService
 
 
 @dataclass(frozen=True)
@@ -11,6 +12,7 @@ class AnomalyAlert:
     code: str
     severity: str  # 'danger', 'warning', 'info'
     message: str
+    details: tuple[str, ...] = ()
 
 
 class SubmissionAnomalyDetector:
@@ -33,21 +35,60 @@ class SubmissionAnomalyDetector:
 
         # 2. CNPJ Duplicado no mesmo edital
         norm_cnpj = normalize_cnpj(raw_cnpj)
-        dup_cnpj_count = (
+        duplicates = (
             Submission.objects.filter(
                 edital=submission.edital,
                 institution__cnpj=norm_cnpj,
             )
             .exclude(id=submission.id)
-            .exclude(workflow_status=Submission.WorkflowStatus.CLOSED)
-            .count()
+            .select_related("institution")
+            .order_by("received_at")
         )
-        if dup_cnpj_count > 0:
+        if duplicates.exists():
+            previous = tuple(
+                (
+                    f"Processo {other.processo_sei}; recebimento "
+                    f"{other.received_at:%d/%m/%Y %H:%M}; "
+                    f"{other.get_workflow_status_display()}; analista "
+                    f"{other.assigned_analyst.get_full_name() or other.assigned_analyst.username}"
+                    if other.assigned_analyst
+                    else f"Processo {other.processo_sei}; recebimento "
+                    f"{other.received_at:%d/%m/%Y %H:%M}; {other.get_workflow_status_display()}; "
+                    "sem analista atribuído"
+                )
+                for other in duplicates
+            )
             alerts.append(
                 AnomalyAlert(
                     code="DUPLICATE_CNPJ",
+                    severity="warning",
+                    message="Já existe outra inscrição deste CNPJ neste edital.",
+                    details=previous,
+                )
+            )
+
+        restrictions = list(
+            ParticipationEligibilityService.active_restrictions(submission.edital, raw_cnpj)
+        )
+        if restrictions:
+            alerts.append(
+                AnomalyAlert(
+                    code="ACTIVE_CONTRACT_RESTRICTION",
                     severity="danger",
-                    message=f"Existem outras {dup_cnpj_count} inscrição(ões) com o mesmo CNPJ neste edital.",
+                    message="Participação vedada por restrição ativa; análise documental bloqueada.",
+                    details=tuple(
+                        f"{rule.reason} · {rule.source} · {rule.reference_period}".strip(" ·")
+                        for rule in restrictions
+                    ),
+                )
+            )
+
+        if submission.target_group == "SEM_GRUPO":
+            alerts.append(
+                AnomalyAlert(
+                    code="NO_TARGET_GROUP",
+                    severity="warning",
+                    message="Sem grupo: revise vagas, município e associação ao programa.",
                 )
             )
 

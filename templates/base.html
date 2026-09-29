@@ -92,8 +92,10 @@
                             <a href="/classificacao/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Classificação & Ranking</a>
                             <a href="/metricas/" class="text-blue-100 hover:text-white px-2 py-1 rounded">Métricas</a>
                         {% endif %}
-                        {% if user.is_coordinator %}
+                        {% if user.role == 'ADMINISTRADOR' or user.role == 'COORDENADOR' %}
                             <a href="/administracao/" class="text-amber-300 hover:text-amber-100 px-2 py-1 rounded ml-auto">Administração</a>
+                            <a href="{% url 'edital-list' %}" class="text-amber-200 hover:text-white px-2 py-1 rounded">Configurar editais</a>
+                            <a href="{% url 'program-list' %}" class="text-amber-200 hover:text-white px-2 py-1 rounded">Programas</a>
                         {% endif %}
                     </div>
                 </div>

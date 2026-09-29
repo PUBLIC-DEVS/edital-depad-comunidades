@@ -29,12 +29,14 @@ class WorkflowService:
     ALLOWED_TRANSITIONS: dict[str, set[str]] = {
         Submission.WorkflowStatus.RECEIVED: {
             Submission.WorkflowStatus.ASSIGNED,
+            Submission.WorkflowStatus.INELIGIBLE,
             Submission.WorkflowStatus.CLOSED,
         },
         Submission.WorkflowStatus.ASSIGNED: {
             Submission.WorkflowStatus.UNDER_ANALYSIS,
             Submission.WorkflowStatus.PENDING_REVIEW,
             Submission.WorkflowStatus.ASSIGNED,  # Redistribuição
+            Submission.WorkflowStatus.INELIGIBLE,
             Submission.WorkflowStatus.CLOSED,
         },
         Submission.WorkflowStatus.UNDER_ANALYSIS: {
@@ -143,6 +145,9 @@ class WorkflowService:
             raise PermissionDenied("Sem permissão de distribuição.")
         if analyst.role != User.Role.ANALISTA:
             raise ValidationError("Responsável deve ser analista.")
+        from apps.submissions.services.eligibility import ParticipationEligibilityService
+
+        ParticipationEligibilityService.require_assignable(submission)
         if Evaluation.objects.filter(submission=submission).exists():
             raise ValidationError(
                 "Redistribuição bloqueada após início da avaliação; transferência formal necessária."
@@ -272,6 +277,7 @@ class WorkflowService:
         reason: str,
         deadline: datetime.date,
         unsatisfied_return_status: str | None = None,
+        related_check_result_ids: list[int] | None = None,
     ) -> Diligence:
         """Abre uma diligência e move o processo para PENDING_DILIGENCE."""
         submission = Submission.objects.select_for_update().get(pk=submission.pk)
@@ -294,6 +300,14 @@ class WorkflowService:
             or requested_by.role in {User.Role.ADMINISTRADOR, User.Role.COORDENADOR}
         ):
             raise PermissionDenied("Somente coordenação pode definir consequência jurídica.")
+        from apps.evaluations.models import CheckResult
+
+        requested_ids = set(related_check_result_ids or [])
+        related_results = CheckResult.objects.filter(
+            pk__in=requested_ids, evaluation__submission=submission
+        )
+        if related_results.count() != len(requested_ids):
+            raise ValidationError("Item documental não pertence à avaliação deste processo.")
         diligence = Diligence.objects.create(
             submission=submission,
             requested_by=requested_by,
@@ -305,13 +319,17 @@ class WorkflowService:
             status=Diligence.Status.OPEN,
             result=Diligence.Result.PENDENTE,
         )
+        diligence.related_check_results.set(related_results)
 
         AuditEvent.objects.create(
             actor=requested_by,
             entity_type="Diligence",
             entity_id=str(diligence.pk),
             action="OPEN_DILIGENCE",
-            metadata={"origin_status": diligence.origin_status},
+            metadata={
+                "origin_status": diligence.origin_status,
+                "related_check_result_ids": sorted(requested_ids),
+            },
         )
 
         cls.transition(

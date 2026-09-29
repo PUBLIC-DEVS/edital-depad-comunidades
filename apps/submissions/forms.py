@@ -7,7 +7,7 @@ from apps.accounts.models import User
 from apps.editais.models import Edital, TargetGroup
 from apps.institutions.cnpj import cnpj_validator, normalize_cnpj
 from apps.institutions.models import Institution
-from apps.submissions.models import Submission
+from apps.submissions.models import ParticipationRestriction, Submission
 from apps.submissions.services.funding import FundingRuleNotFoundError, FundingService
 
 
@@ -16,7 +16,7 @@ class SubmissionIntakeForm(forms.ModelForm):
 
     institution_cnpj = forms.CharField(
         max_length=20,
-        label="CNPJ da Instituição",
+        label="CNPJ da candidatura / declarado no Anexo I",
         validators=[cnpj_validator],
         widget=forms.TextInput(attrs={"placeholder": "00.000.000/0000-00", "class": "form-input"}),
     )
@@ -42,6 +42,12 @@ class SubmissionIntakeForm(forms.ModelForm):
         max_length=255,
         label="Endereço",
         widget=forms.TextInput(attrs={"class": "form-input"}),
+    )
+    institution_postal_code = forms.CharField(
+        required=False,
+        max_length=9,
+        label="CEP",
+        widget=forms.TextInput(attrs={"class": "form-input", "placeholder": "00000-000"}),
     )
 
     class Meta:
@@ -103,8 +109,14 @@ class SubmissionIntakeForm(forms.ModelForm):
                 institution_email=self.instance.institution.contact_email,
                 institution_phone=self.instance.institution.contact_phone,
                 institution_address=self.instance.institution.address,
+                institution_postal_code=self.instance.institution.postal_code,
             )
-            for field in ("institution_email", "institution_phone", "institution_address"):
+            for field in (
+                "institution_email",
+                "institution_phone",
+                "institution_address",
+                "institution_postal_code",
+            ):
                 self.fields[field].disabled = True
 
     def clean_institution_cnpj(self):
@@ -162,6 +174,7 @@ class SubmissionIntakeForm(forms.ModelForm):
                 "institution_email": existing.contact_email,
                 "institution_phone": existing.contact_phone,
                 "institution_address": existing.address,
+                "institution_postal_code": existing.postal_code,
             }
             if any(
                 cleaned_data.get(field) and cleaned_data[field] != value
@@ -186,6 +199,7 @@ class SubmissionIntakeForm(forms.ModelForm):
                 "contact_email": self.cleaned_data.get("institution_email", ""),
                 "contact_phone": self.cleaned_data.get("institution_phone", ""),
                 "address": self.cleaned_data.get("institution_address", ""),
+                "postal_code": self.cleaned_data.get("institution_postal_code", ""),
             },
         )
         self.instance.institution = institution
@@ -228,3 +242,53 @@ class BulkAssignmentForm(forms.Form):
             attrs={"placeholder": "Motivo da distribuição em lote", "class": "form-input"}
         ),
     )
+
+
+class ParticipationRestrictionForm(forms.ModelForm):
+    cnpj = forms.CharField(
+        max_length=20,
+        label="CNPJ impedido",
+        validators=[cnpj_validator],
+        widget=forms.TextInput(attrs={"placeholder": "00.000.000/0000-00"}),
+    )
+
+    class Meta:
+        model = ParticipationRestriction
+        fields = ["edital", "cnpj", "reason", "source", "reference_period", "active"]
+        labels = {
+            "edital": "Edital",
+            "reason": "Motivo do impedimento",
+            "source": "Fonte da informação",
+            "reference_period": "Período de referência",
+            "active": "Restrição ativa",
+        }
+        help_texts = {
+            "reference_period": "Ex.: contrato vigente em 2024 e 2025.",
+            "source": "Ex.: cadastro manual, CSV ou integração futura.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["edital"].queryset = Edital.objects.filter(status=Edital.Status.ACTIVE)
+        if self.instance.pk:
+            self.fields["edital"].disabled = True
+            self.fields["cnpj"].disabled = True
+
+    def clean_cnpj(self):
+        return normalize_cnpj(self.cleaned_data["cnpj"])
+
+
+class SubmissionCnpjCorrectionForm(forms.Form):
+    cnpj = forms.CharField(
+        max_length=20,
+        label="CNPJ correto declarado no Anexo I",
+        validators=[cnpj_validator],
+    )
+    reason = forms.CharField(
+        label="Justificativa da correção",
+        min_length=10,
+        widget=forms.Textarea(attrs={"rows": 4}),
+    )
+
+    def clean_cnpj(self):
+        return normalize_cnpj(self.cleaned_data["cnpj"])

@@ -16,6 +16,12 @@
         </div>
     </div>
 
+    <nav aria-label="Filtros de exceções" class="flex flex-wrap gap-2 text-sm">
+        <a class="rounded border bg-white px-3 py-2" href="{% url 'submission-anomalies' %}">Todas</a>
+        {% for code in exception_types %}<a class="rounded border bg-white px-3 py-2" href="?tipo={{ code }}">{{ code|cut:"_"|title }}</a>{% endfor %}
+        <a class="rounded border bg-amber-50 px-3 py-2" href="{% url 'restriction-list' %}">Fontes de restrição contratual</a>
+    </nav>
+
     <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
@@ -51,7 +57,7 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3">
-                                {{ sub.assigned_analyst.get_full_name|default:sub.assigned_analyst.username|default:"Não atribuído" }}
+                                {% with analyst=sub.assigned_analyst %}{% if analyst %}{{ analyst.get_full_name|default:analyst.username }}{% else %}Não atribuído{% endif %}{% endwith %}
                             </td>
                             <td class="px-4 py-3 space-y-1">
                                 {% for alert in sub.alerts %}

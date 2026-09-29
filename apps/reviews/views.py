@@ -222,7 +222,7 @@ def diligence_create_view(request: HttpRequest, submission_id: int) -> HttpRespo
     WorkflowService.enforce_diligence_actor(submission, request.user)
 
     if request.method == "POST":
-        form = DiligenceCreateForm(request.POST, actor=request.user)
+        form = DiligenceCreateForm(request.POST, actor=request.user, submission=submission)
         if form.is_valid():
             reason = form.cleaned_data["reason"]
             deadline = form.cleaned_data["deadline"]
@@ -234,6 +234,9 @@ def diligence_create_view(request: HttpRequest, submission_id: int) -> HttpRespo
                     deadline=deadline,
                     unsatisfied_return_status=form.cleaned_data.get("unsatisfied_return_status")
                     or None,
+                    related_check_result_ids=list(
+                        form.cleaned_data["related_check_results"].values_list("pk", flat=True)
+                    ),
                 )
             except ValidationError as exc:
                 form.add_error(None, exc)
@@ -243,7 +246,7 @@ def diligence_create_view(request: HttpRequest, submission_id: int) -> HttpRespo
                 )
                 return redirect("diligence-list")
     else:
-        form = DiligenceCreateForm(actor=request.user)
+        form = DiligenceCreateForm(actor=request.user, submission=submission)
 
     return render(
         request,

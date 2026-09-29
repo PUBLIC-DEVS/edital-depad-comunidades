@@ -45,6 +45,7 @@
             <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Motivo da Diligência:</span>
             <p class="text-slate-800 whitespace-pre-line">{{ diligence.reason }}</p>
         </div>
+        {% if diligence.related_check_results.exists %}<section class="rounded border border-blue-200 bg-blue-50 p-4 text-xs"><h2 class="font-bold">Itens documentais relacionados</h2><ul class="mt-2 list-disc pl-5">{% for result in diligence.related_check_results.all %}<li>{{ result.definition.requirement.code }} · {{ result.definition.name }} — {{ result.get_status_display }}</li>{% endfor %}</ul></section>{% endif %}
 
         <!-- Response & Conclusion Form if still open -->
         {% if diligence.status == 'OPEN' or diligence.status == 'ANSWERED' %}

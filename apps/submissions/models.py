@@ -190,3 +190,32 @@ class Assignment(models.Model):
     def __str__(self):
         st = self.get_status_display()
         return f"{self.submission.processo_sei} -> {self.analyst.username} ({st})"
+
+
+class ParticipationRestriction(models.Model):
+    """Edital-scoped source record that blocks participation before document review."""
+
+    edital = models.ForeignKey(
+        "editais.Edital", on_delete=models.PROTECT, related_name="participation_restrictions"
+    )
+    cnpj = models.CharField(max_length=20, db_index=True, verbose_name="CNPJ")
+    reason = models.CharField(max_length=255)
+    source = models.CharField(
+        max_length=150, help_text="Ex.: cadastro manual, CSV ou sistema fonte."
+    )
+    reference_period = models.CharField(
+        max_length=100, blank=True, help_text="Período de referência do contrato ou impedimento."
+    )
+    active = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_restrictions"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "cnpj"]
+        indexes = [models.Index(fields=["edital", "cnpj", "active"])]
+
+    def __str__(self):
+        return f"{self.cnpj} — {self.reason}"

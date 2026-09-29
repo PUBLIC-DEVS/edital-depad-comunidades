@@ -31,16 +31,18 @@
     {% if alerts %}
         <div class="bg-amber-50 border-l-4 border-amber-500 p-4 rounded shadow-sm">
             <h3 class="text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Alertas e Inconsistências Detectadas</h3>
-            <ul class="space-y-1">
+            <ul class="space-y-2" aria-label="Alertas de triagem">
                 {% for alert in alerts %}
                     <li class="text-xs text-amber-800 flex items-start space-x-2">
-                        <span>&#9888;</span>
-                        <span><strong>[{{ alert.code }}]</strong> {{ alert.message }}</span>
+                        <span aria-hidden="true">{% if alert.severity == 'danger' %}✕{% else %}⚠{% endif %}</span>
+                        <span><strong>{{ alert.code }}:</strong> {{ alert.message }}{% for detail in alert.details %}<span class="block pl-2">{{ detail }}</span>{% endfor %}</span>
                     </li>
                 {% endfor %}
             </ul>
         </div>
     {% endif %}
+    {% if restricted %}<section role="alert" class="rounded border-2 border-red-600 bg-red-50 p-4 text-red-900"><h2 class="font-bold">⛔ CONTRATO VIGENTE / PARTICIPAÇÃO BLOQUEADA</h2><p class="text-sm">Este processo não pode ser distribuído nem iniciar análise enquanto a restrição estiver ativa.</p></section>{% endif %}
+    {% if can_correct_cnpj %}<section class="rounded border border-amber-300 bg-amber-50 p-4"><h2 class="font-semibold">Corrigir CNPJ da candidatura</h2><p class="text-sm">A correção substitui a instituição somente nesta inscrição, exige justificativa e gera trilha de auditoria. O CNPJ nunca é alterado automaticamente a partir de um documento.</p><form method="post" action="{% url 'submission-cnpj-correction' submission.pk %}" class="mt-3 grid gap-2">{% csrf_token %}<label for="correct-cnpj">CNPJ correto declarado no Anexo I</label><input class="form-input" id="correct-cnpj" name="cnpj" required><label for="correction-reason">Justificativa</label><textarea class="form-input" id="correction-reason" name="reason" minlength="10" required></textarea><button class="justify-self-start rounded bg-amber-700 px-3 py-2 text-white">Registrar correção auditada</button></form></section>{% endif %}
 
     <!-- Main Overview Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -56,9 +58,10 @@
                         <span class="font-semibold text-slate-900">{{ submission.institution.name }}</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 block">CNPJ:</span>
+                        <span class="text-slate-500 block">CNPJ da candidatura / declarado no Anexo I:</span>
                         <span class="font-mono font-semibold text-slate-900">{{ submission.institution.formatted_cnpj }}</span>
                     </div>
+                    <div><span class="text-slate-500 block">Endereço e CEP:</span><span class="font-medium text-slate-900">{{ submission.institution.address|default:"Não informado" }} · {{ submission.institution.postal_code|default:"CEP não informado" }}</span></div>
                     <div>
                         <span class="text-slate-500 block">Município / UF da Execução:</span>
                         <span class="font-medium text-slate-900">{{ submission.municipality.name }}/{{ submission.municipality.state }} (IBGE: {{ submission.municipality.ibge_code }})</span>
@@ -128,7 +131,7 @@
         <!-- Right: Assignment & History Panel -->
         <div class="space-y-6">
             <!-- Assignment Form (Distributors/Coordinators only) -->
-            {% if can_distribute %}
+            {% if can_distribute and assignment_form %}
                 <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-3">
                     <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">
                         Atribuição / Redistribuição

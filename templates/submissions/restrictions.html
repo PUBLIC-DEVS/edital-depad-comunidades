@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Restrições de participação{% endblock %}
+{% block content %}
+<div class="space-y-5">
+    <a href="{% url 'submission-anomalies' %}" class="text-sm text-govblue-700 underline">← Fila de exceções</a>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div><h1 class="text-2xl font-bold">Restrições de participação</h1><p class="text-sm text-slate-600">Fontes configuráveis de impedimento por edital e CNPJ. Ativar uma restrição bloqueia distribuição e início de análise.</p></div>
+        <a href="{% url 'restriction-create' %}" class="rounded bg-govblue-700 px-4 py-2 text-white">Cadastrar restrição</a>
+    </div>
+    <div class="space-y-3">
+        {% for restriction in restrictions %}
+            <article class="rounded-lg border bg-white p-5">
+                <div class="flex flex-wrap justify-between gap-3">
+                    <div>
+                        <p class="font-semibold">{% if restriction.active %}<span aria-label="Restrição ativa">⛔ IMPEDIMENTO ATIVO</span>{% else %}<span>Restrição inativa</span>{% endif %} · {{ restriction.edital.number }}/{{ restriction.edital.year }}</p>
+                        <p class="font-mono text-sm">CNPJ {{ restriction.cnpj }}</p>
+                        <p class="mt-2">{{ restriction.reason }}</p>
+                        <p class="text-xs text-slate-600">Fonte: {{ restriction.source }} · Referência: {{ restriction.reference_period|default:"não informada" }} · cadastrada por {{ restriction.created_by|default:"sistema" }} em {{ restriction.created_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    <a class="text-govblue-700 underline" href="{% url 'restriction-edit' restriction.pk %}">Editar</a>
+                </div>
+            </article>
+        {% empty %}<p class="rounded-lg border bg-white p-6">Nenhuma fonte de restrição cadastrada.</p>{% endfor %}
+    </div>
+</div>
+{% endblock %}

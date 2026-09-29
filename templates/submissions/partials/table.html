@@ -32,6 +32,9 @@
                     <tr class="hover:bg-slate-50 transition">
                         {% if can_distribute %}
                             <td class="px-4 py-3">
+                              {% if sub.workflow_status == 'INELIGIBLE' %}
+                                <span class="text-red-800 font-semibold">Bloqueado</span>
+                              {% else %}
                                 <input type="checkbox" value="{{ sub.id }}"
                                        :checked="selectedIds.includes('{{ sub.id }}')"
                                        @change="
@@ -42,6 +45,7 @@
                                            }
                                        "
                                        class="submission-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                              {% endif %}
                             </td>
                         {% endif %}
                         <td class="px-4 py-3 font-semibold text-govblue-600">
@@ -84,11 +88,16 @@
                         </td>
                         <td class="px-4 py-3">
                             {% if sub.alerts %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800" title="{{ sub.alerts|length }} alerta(s)">
-                                    &#9888; {{ sub.alerts|length }}
-                                </span>
+                                <div class="space-y-1" aria-label="Alertas de triagem">
+                                  {% for alert in sub.alerts %}
+                                    <span class="block text-[10px] font-semibold {% if alert.severity == 'danger' %}text-red-800{% elif alert.code == 'DUPLICATE_CNPJ' %}text-amber-800{% else %}text-slate-700{% endif %}">
+                                      {% if alert.severity == 'danger' %}✕{% elif alert.severity == 'warning' %}⚠{% else %}ℹ{% endif %}
+                                      {% if alert.code == 'ACTIVE_CONTRACT_RESTRICTION' %}CONTRATO VIGENTE{% elif alert.code == 'DUPLICATE_CNPJ' %}DUPLICIDADE{% elif alert.code == 'NO_TARGET_GROUP' %}SEM GRUPO{% else %}{{ alert.code }}{% endif %}
+                                    </span>
+                                  {% endfor %}
+                                </div>
                             {% else %}
-                                <span class="text-emerald-600 font-bold" title="Nenhuma inconsistência detectada">&check;</span>
+                                <span class="text-emerald-700 font-semibold">✓ PRONTO</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">

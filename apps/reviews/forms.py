@@ -2,6 +2,7 @@
 
 from django import forms
 
+from apps.evaluations.models import CheckResult
 from apps.reviews.models import Diligence, Review
 from apps.submissions.models import Submission
 
@@ -45,9 +46,22 @@ class DiligenceCreateForm(forms.ModelForm):
         ],
         help_text="Decisão expressa do coordenador. Sem política, a conclusão não saneada será bloqueada.",
     )
+    related_check_results = forms.ModelMultipleChoiceField(
+        queryset=CheckResult.objects.none(),
+        required=False,
+        label="Itens documentais relacionados",
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Selecione somente os itens que fundamentam esta diligência.",
+    )
 
-    def __init__(self, *args, actor=None, **kwargs):
+    def __init__(self, *args, actor=None, submission=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if submission and hasattr(submission, "evaluation"):
+            self.fields[
+                "related_check_results"
+            ].queryset = submission.evaluation.check_results.select_related(
+                "requirement_check", "requirement"
+            )
         if actor and not (actor.is_superuser or actor.role in {"COORDENADOR", "ADMINISTRADOR"}):
             self.fields.pop("unsatisfied_return_status")
 

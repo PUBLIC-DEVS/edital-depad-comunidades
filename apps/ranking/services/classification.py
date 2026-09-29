@@ -24,6 +24,13 @@ class ClassificationService:
         if policy.policy_type == "MANUAL_TARGET_POLICY_V1":
             group = groups.filter(pk=submission.target_group_definition_id).first()
             return group.code if group else "SEM_GRUPO"
+        if (
+            policy.policy_type == "VACANCY_TARGET_POLICY_V2_MIXED_FIRST"
+            and submission.vagas_femininas > 0
+            and submission.vagas_masculinas > 0
+            and groups.filter(code=policy.mixed_group_code).exists()
+        ):
+            return policy.mixed_group_code
         for group in groups.select_related("program").order_by("order", "code"):
             if not any(
                 getattr(submission, VACANCY_FIELDS[t], 0) > 0
