@@ -1,6 +1,6 @@
 """Serviços de domínio para o fluxo de revisão e diligências processuais."""
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -21,6 +21,36 @@ class ReviewService:
 
     @classmethod
     @transaction.atomic
+    def claim_review(cls, review, actor):
+        from apps.accounts.permissions import RolePermissionPolicy
+
+        if not RolePermissionPolicy.can_conduct_review(actor):
+            raise PermissionDenied("Sem permissão de revisão.")
+        locked = Review.objects.select_for_update().select_related("evaluation").get(pk=review.pk)
+        if locked.evaluation.analyst_id == actor.pk:
+            raise PermissionDenied("Analista não pode revisar sua própria análise.")
+        if locked.status != Review.Status.PENDING or locked.reviewer_id is not None:
+            raise ValidationError("Revisão já assumida ou concluída.")
+        claimed = Review.objects.filter(
+            pk=locked.pk, reviewer__isnull=True, status=Review.Status.PENDING
+        ).update(reviewer=actor)
+        if claimed != 1:
+            raise ValidationError("Outro revisor assumiu a revisão.")
+        locked.reviewer = actor
+        AuditEvent.objects.create(
+            actor=actor, entity_type="Review", entity_id=str(locked.pk), action="CLAIM_REVIEW"
+        )
+        return locked
+
+    @staticmethod
+    def enforce_edit(review, actor):
+        from apps.accounts.permissions import RolePermissionPolicy
+
+        if actor is None or not RolePermissionPolicy.can_edit_review(actor, review):
+            raise PermissionDenied("Revisão exige responsável atribuído e estado pendente.")
+
+    @classmethod
+    @transaction.atomic
     def record_item_decision(
         cls,
         review: Review,
@@ -35,11 +65,17 @@ class ReviewService:
         Regra de Integridade: Em caso de discordância (divergência),
         a justificativa técnica fundamentada é obrigatória.
         """
+        review = Review.objects.select_for_update().get(pk=review.pk)
+        cls.enforce_edit(review, actor)
+        if not agrees_with_analyst and reviewer_status not in CheckResult.Status.values:
+            raise ValidationError("Status do revisor inválido.")
         if not agrees_with_analyst and not justification.strip():
             msg = "Justificativa obrigatória em caso de discordância do parecer do analista."
             raise ValidationError(msg)
 
         check_result = CheckResult.objects.get(id=check_result_id)
+        if check_result.evaluation_id != review.evaluation_id:
+            raise ValidationError("Checagem não pertence à avaliação desta revisão.")
 
         decision, created = ReviewItemDecision.objects.update_or_create(
             review=review,
@@ -81,11 +117,17 @@ class ReviewService:
         - PRE_HABILITADO -> ELIGIBLE_FOR_RANKING
         - PRE_INABILITADO -> INELIGIBLE
         """
+        review = Review.objects.select_for_update().select_related("submission").get(pk=review.pk)
+        cls.enforce_edit(review, actor)
+        if preliminary_result not in (
+            Review.PreliminaryResult.PRE_HABILITADO,
+            Review.PreliminaryResult.PRE_INABILITADO,
+        ):
+            raise ValidationError("Resultado preliminar inválido para conclusão.")
         review.status = Review.Status.COMPLETED
         review.preliminary_result = preliminary_result
         review.decision_notes = decision_notes
         review.completed_at = timezone.now()
-        review.reviewer = actor
         review.save()
 
         submission = review.submission

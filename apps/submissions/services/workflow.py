@@ -3,6 +3,7 @@
 import datetime
 from typing import Any
 
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -37,6 +38,7 @@ class WorkflowService:
             Submission.WorkflowStatus.CLOSED,
         },
         Submission.WorkflowStatus.UNDER_ANALYSIS: {
+            Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
             Submission.WorkflowStatus.PENDING_REVIEW,
             Submission.WorkflowStatus.PENDING_DILIGENCE,
             Submission.WorkflowStatus.INELIGIBLE,
@@ -50,6 +52,7 @@ class WorkflowService:
             Submission.WorkflowStatus.CLOSED,
         },
         Submission.WorkflowStatus.PENDING_DILIGENCE: {
+            Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
             Submission.WorkflowStatus.UNDER_ANALYSIS,
             Submission.WorkflowStatus.PENDING_REVIEW,
             Submission.WorkflowStatus.INELIGIBLE,
@@ -87,6 +90,10 @@ class WorkflowService:
     ) -> Submission:
         """Executa a transição de estado da submissão com validação estrita e auditoria."""
         current_status = submission.workflow_status
+        locked = Submission.objects.select_for_update().get(pk=submission.pk)
+        current_status = locked.workflow_status
+        if actor is not None and actor.role == User.Role.CONSULTA and not actor.is_superuser:
+            raise PermissionDenied("Consulta não pode alterar workflow.")
         allowed = cls.ALLOWED_TRANSITIONS.get(current_status, set())
 
         if target_status not in allowed:
@@ -127,6 +134,19 @@ class WorkflowService:
     ) -> Assignment:
         """Atribui ou redistribui a submissão a um analista."""
         now = timezone.now()
+        Submission.objects.select_for_update().get(pk=submission.pk)
+        if not (
+            assigned_by.is_superuser
+            or assigned_by.role
+            in {User.Role.ADMINISTRADOR, User.Role.COORDENADOR, User.Role.DISTRIBUIDOR}
+        ):
+            raise PermissionDenied("Sem permissão de distribuição.")
+        if analyst.role != User.Role.ANALISTA:
+            raise ValidationError("Responsável deve ser analista.")
+        if Evaluation.objects.filter(submission=submission).exists():
+            raise ValidationError(
+                "Redistribuição bloqueada após início da avaliação; transferência formal necessária."
+            )
 
         # Encerra atribuições ativas anteriores
         active_assignments = submission.assignments.filter(status=Assignment.Status.ACTIVE)
@@ -142,6 +162,7 @@ class WorkflowService:
             assigned_by=assigned_by,
             status=Assignment.Status.ACTIVE,
             reason=reason,
+            assigned_at=now,
         )
 
         # Transiciona workflow para ASSIGNED se estiver em RECEIVED
@@ -189,7 +210,18 @@ class WorkflowService:
         """
         submission = evaluation.submission
 
-        # Transiciona para PENDING_REVIEW
+        if evaluation.result not in (Evaluation.Result.APTA, Evaluation.Result.INAPTA):
+            raise ValidationError("Análise em andamento não pode ser concluída.")
+        if evaluation.result == Evaluation.Result.APTA:
+            cls.transition(
+                submission,
+                Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
+                actor,
+                reason="Análise apta concluída.",
+            )
+            return
+
+        # Only inapt evaluations require a review task.
         cls.transition(
             submission=submission,
             target_status=Submission.WorkflowStatus.PENDING_REVIEW,
@@ -202,7 +234,7 @@ class WorkflowService:
             evaluation=evaluation,
             submission=submission,
             defaults={
-                "reviewer": actor,  # Provisório até ser assumido por revisor
+                "reviewer": None,
                 "status": Review.Status.PENDING,
                 "preliminary_result": Review.PreliminaryResult.PENDING_DECISION,
             },
@@ -225,15 +257,42 @@ class WorkflowService:
         requested_by: User,
         reason: str,
         deadline: datetime.date,
+        unsatisfied_return_status: str | None = None,
     ) -> Diligence:
         """Abre uma diligência e move o processo para PENDING_DILIGENCE."""
+        submission = Submission.objects.select_for_update().get(pk=submission.pk)
+        cls.enforce_diligence_actor(submission, requested_by)
+        if deadline is None:
+            raise ValidationError("Nova diligência exige prazo.")
+        origins = {
+            Submission.WorkflowStatus.UNDER_ANALYSIS,
+            Submission.WorkflowStatus.PENDING_REVIEW,
+            Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
+            Submission.WorkflowStatus.INELIGIBLE,
+        }
+        if submission.workflow_status not in origins:
+            raise ValidationError("Origem não autorizada para diligência.")
+        # A legal failure consequence must be explicitly supplied. Do not assume ineligibility.
+        if unsatisfied_return_status is not None and unsatisfied_return_status not in origins:
+            raise ValidationError("Consequência inválida para diligência não saneada.")
         diligence = Diligence.objects.create(
             submission=submission,
             requested_by=requested_by,
             reason=reason,
             deadline=deadline,
+            requested_at=timezone.now(),
+            origin_status=submission.workflow_status,
+            unsatisfied_return_status=unsatisfied_return_status or "",
             status=Diligence.Status.OPEN,
             result=Diligence.Result.PENDENTE,
+        )
+
+        AuditEvent.objects.create(
+            actor=requested_by,
+            entity_type="Diligence",
+            entity_id=str(diligence.pk),
+            action="OPEN_DILIGENCE",
+            metadata={"origin_status": diligence.origin_status},
         )
 
         cls.transition(
@@ -246,6 +305,19 @@ class WorkflowService:
 
         return diligence
 
+    @staticmethod
+    def enforce_diligence_actor(submission, actor):
+        if actor.is_superuser or actor.role in {User.Role.ADMINISTRADOR, User.Role.COORDENADOR}:
+            return
+        if (
+            actor.role == User.Role.REVISOR
+            and submission.reviews.filter(reviewer=actor, status=Review.Status.PENDING).exists()
+        ):
+            return
+        raise PermissionDenied(
+            "Diligência exige coordenação ou revisor responsável pela revisão pendente."
+        )
+
     @classmethod
     @transaction.atomic
     def conclude_diligence(
@@ -256,6 +328,25 @@ class WorkflowService:
         response_text: str = "",
     ) -> Diligence:
         """Conclui a diligência e retorna o processo para o estado adequado de workflow."""
+        diligence = (
+            Diligence.objects.select_for_update().select_related("submission").get(pk=diligence.pk)
+        )
+        cls.enforce_diligence_actor(diligence.submission, actor)
+        if diligence.status not in (Diligence.Status.OPEN, Diligence.Status.ANSWERED):
+            raise ValidationError("Diligência não está aberta/respondida.")
+        if result not in (Diligence.Result.SANEADA, Diligence.Result.NAO_SANEADA):
+            raise ValidationError("Resultado conclusivo inválido.")
+        if result == Diligence.Result.NAO_SANEADA and not diligence.unsatisfied_return_status:
+            raise ValidationError(
+                "OPEN BUSINESS QUESTION: defina explicitamente a consequência da diligência não saneada."
+            )
+        if response_text:
+            AuditEvent.objects.create(
+                actor=actor,
+                entity_type="Diligence",
+                entity_id=str(diligence.pk),
+                action="ANSWER_DILIGENCE",
+            )
         diligence.status = Diligence.Status.CONCLUDED
         diligence.result = result
         diligence.concluded_at = timezone.now()
@@ -267,12 +358,12 @@ class WorkflowService:
         submission = diligence.submission
         # Retorno adequado do subfluxo
         if result == Diligence.Result.SANEADA:
-            next_status = Submission.WorkflowStatus.UNDER_ANALYSIS
+            next_status = diligence.origin_status
             reason = (
                 "Diligência concluída com êxito (falha saneada). Retornado para análise/revisão."
             )
         else:
-            next_status = Submission.WorkflowStatus.INELIGIBLE
+            next_status = diligence.unsatisfied_return_status
             reason = "Diligência não saneada ou sem resposta satisfatória."
 
         cls.transition(
@@ -281,6 +372,14 @@ class WorkflowService:
             actor=actor,
             reason=reason,
             metadata={"diligence_id": diligence.id, "diligence_result": result},
+        )
+
+        AuditEvent.objects.create(
+            actor=actor,
+            entity_type="Diligence",
+            entity_id=str(diligence.pk),
+            action="CONCLUDE_DILIGENCE",
+            new_value=result,
         )
 
         return diligence

@@ -56,14 +56,14 @@ class TestReviewsAndDiligenceIntegration:
             submission=sub, analyst=analyst, assigned_by=coord, status=Assignment.Status.ACTIVE
         )
 
-        eval_obj = EvaluationService.initialize_evaluation(sub, analyst=analyst)
+        eval_obj = EvaluationService.start_evaluation(sub, analyst=analyst)
         CheckResult.objects.filter(evaluation=eval_obj, requirement_check=check).update(
-            status=CheckResult.Status.ATENDE,
+            status=CheckResult.Status.NAO_ATENDE,
             sei_number="DOC-1234",
         )
         EvaluationService.conclude_evaluation(eval_obj, actor=analyst)
         sub.refresh_from_db()
-        review = Review.objects.get(submission=sub)
+        review = ReviewService.claim_review(Review.objects.get(submission=sub), reviewer)
 
         return {
             "analyst": analyst,
@@ -179,7 +179,7 @@ class TestReviewsAndDiligenceIntegration:
         assert diligence.result == Diligence.Result.SANEADA
 
         sub.refresh_from_db()
-        assert sub.workflow_status == Submission.WorkflowStatus.UNDER_ANALYSIS
+        assert sub.workflow_status == Submission.WorkflowStatus.PENDING_REVIEW
 
         # Verifica evento de auditoria gerado
         audit_exists = AuditEvent.objects.filter(

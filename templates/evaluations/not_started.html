@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ submission.processo_sei }}</h1>
+<p>A análise documental ainda não foi iniciada.</p>
+{% if can_start %}
+<form method="post" action="{% url 'evaluation-start' submission_id=submission.id %}">
+    {% csrf_token %}<button type="submit" class="btn-primary">Iniciar análise</button>
+</form>
+{% endif %}
+{% endblock %}

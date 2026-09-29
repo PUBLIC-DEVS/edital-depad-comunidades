@@ -99,7 +99,7 @@ class RolePermissionPolicy:
             # Não pode editar avaliação já concluída
             return evaluation.status == Evaluation.Status.DRAFT
         if user.is_superuser:
-            return True
+            return evaluation.status == Evaluation.Status.DRAFT
         return False
 
     @staticmethod
@@ -107,10 +107,12 @@ class RolePermissionPolicy:
         """Revisor só pode editar sua própria revisão enquanto pendente."""
         if not user.is_authenticated:
             return False
-        if user.is_superuser:
+        if review.status != Review.Status.PENDING or review.reviewer_id is None:
+            return False
+        if user.is_superuser or user.role in {User.Role.COORDENADOR, User.Role.ADMINISTRADOR}:
             return True
-        if user.role in {User.Role.REVISOR, User.Role.COORDENADOR}:
-            return review.status == Review.Status.PENDING
+        if user.role == User.Role.REVISOR:
+            return review.reviewer_id == user.pk
         return False
 
 

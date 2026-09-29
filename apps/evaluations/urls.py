@@ -4,6 +4,11 @@ from . import views
 
 urlpatterns = [
     path(
+        "processo/<int:submission_id>/iniciar/",
+        views.evaluation_start_view,
+        name="evaluation-start",
+    ),
+    path(
         "processo/<int:submission_id>/",
         views.evaluation_workspace_view,
         name="evaluation-workspace",

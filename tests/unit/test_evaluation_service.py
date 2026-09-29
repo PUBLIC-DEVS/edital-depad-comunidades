@@ -138,5 +138,5 @@ class TestEvaluationService:
         assert concluded.result == Evaluation.Result.APTA
 
         sub.refresh_from_db()
-        assert sub.workflow_status == Submission.WorkflowStatus.PENDING_REVIEW
-        assert hasattr(concluded, "review")
+        assert sub.workflow_status == Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING
+        assert not hasattr(concluded, "review")

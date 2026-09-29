@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.accounts.models import User
 from apps.accounts.permissions import (
@@ -48,25 +49,22 @@ def my_evaluations_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_GET
 def evaluation_workspace_view(request: HttpRequest, submission_id: int) -> HttpResponse:
     """Espaço de trabalho vertical estruturado para conferência de requisitos do edital."""
     submission = enforce_submission_access(request, submission_id)
 
-    # Inicializa ou carrega a avaliação
-    evaluation = EvaluationService.initialize_evaluation(submission, analyst=request.user)
-
-    # Se a submissão estava em ASSIGNED, transiciona para UNDER_ANALYSIS
-    if (
-        submission.workflow_status == Submission.WorkflowStatus.ASSIGNED
-        and request.user.role == User.Role.ANALISTA
-    ):
-        from apps.submissions.services.workflow import WorkflowService
-
-        WorkflowService.transition(
-            submission=submission,
-            target_status=Submission.WorkflowStatus.UNDER_ANALYSIS,
-            actor=request.user,
-            reason="Analista iniciou a conferência documental no workspace.",
+    evaluation = Evaluation.objects.filter(submission=submission).first()
+    if evaluation is None:
+        can_start = (
+            request.user.role == User.Role.ANALISTA
+            and submission.assigned_analyst == request.user
+            and submission.workflow_status == Submission.WorkflowStatus.ASSIGNED
+        )
+        return render(
+            request,
+            "evaluations/not_started.html",
+            {"submission": submission, "can_start": can_start},
         )
 
     # Carrega requisitos e checagens estruturadas
@@ -105,6 +103,15 @@ def evaluation_workspace_view(request: HttpRequest, submission_id: int) -> HttpR
 
 
 @login_required
+@require_POST
+def evaluation_start_view(request, submission_id):
+    submission = enforce_submission_access(request, submission_id)
+    EvaluationService.start_evaluation(submission, request.user)
+    return redirect("evaluation-workspace", submission_id=submission.pk)
+
+
+@login_required
+@require_POST
 def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> HttpResponse:
     """Salva rascunho de preenchimento via POST normal ou HTMX."""
     evaluation = enforce_evaluation_edit_access(request, evaluation_id)
@@ -156,6 +163,7 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
 
 
 @login_required
+@require_POST
 def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpResponse:
     """Conclui a avaliação documental após validação formal de consistência."""
     evaluation = enforce_evaluation_edit_access(request, evaluation_id)

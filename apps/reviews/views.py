@@ -3,11 +3,13 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
-from apps.accounts.permissions import require_role
+from apps.accounts.permissions import RolePermissionPolicy, require_role
 from apps.editais.models import Requirement
 from apps.reviews.forms import DiligenceCreateForm, DiligenceResponseForm, ReviewConcludeForm
 from apps.reviews.models import Diligence, Review
@@ -34,6 +36,9 @@ def review_list_view(request: HttpRequest) -> HttpResponse:
         )
         .order_by("-created_at")
     )
+
+    if request.user.role == User.Role.REVISOR and not request.user.is_superuser:
+        qs = qs.filter(Q(reviewer=request.user) | Q(reviewer__isnull=True))
 
     if status_filter:
         qs = qs.filter(status=status_filter)
@@ -93,7 +98,7 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
         req_sections.append({"requirement": req, "checks": checks_data})
 
     conclude_form = ReviewConcludeForm(instance=review)
-    can_edit = review.status == Review.Status.PENDING
+    can_edit = RolePermissionPolicy.can_edit_review(request.user, review)
 
     context = {
         "review": review,
@@ -102,12 +107,23 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
         "req_sections": req_sections,
         "conclude_form": conclude_form,
         "can_edit": can_edit,
+        "can_claim": review.status == Review.Status.PENDING and review.reviewer_id is None,
     }
     return render(request, "reviews/detail.html", context)
 
 
 @login_required
 @require_role(User.Role.REVISOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
+def review_claim_view(request, review_id):
+    review = get_object_or_404(Review, pk=review_id)
+    ReviewService.claim_review(review, request.user)
+    return redirect("review-detail", review_id=review.pk)
+
+
+@login_required
+@require_role(User.Role.REVISOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
 def review_item_decision_view(
     request: HttpRequest,
     review_id: int,
@@ -115,6 +131,7 @@ def review_item_decision_view(
 ) -> HttpResponse:
     """Salva decisão individual de confirmação ou divergência de um item."""
     review = get_object_or_404(Review, id=review_id)
+    ReviewService.enforce_edit(review, request.user)
     if review.status != Review.Status.PENDING:
         messages.error(request, "Revisão já concluída não pode ser alterada.")
         return redirect("review-detail", review_id=review.id)
@@ -145,9 +162,11 @@ def review_item_decision_view(
 
 @login_required
 @require_role(User.Role.REVISOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
 def review_conclude_view(request: HttpRequest, review_id: int) -> HttpResponse:
     """Conclui a revisão e emite o parecer oficial."""
     review = get_object_or_404(Review, id=review_id)
+    ReviewService.enforce_edit(review, request.user)
     if request.method == "POST":
         form = ReviewConcludeForm(request.POST, instance=review)
         if form.is_valid():
@@ -186,6 +205,7 @@ def diligence_list_view(request: HttpRequest) -> HttpResponse:
 def diligence_create_view(request: HttpRequest, submission_id: int) -> HttpResponse:
     """Abertura de diligência para um processo."""
     submission = get_object_or_404(Submission, id=submission_id)
+    WorkflowService.enforce_diligence_actor(submission, request.user)
 
     if request.method == "POST":
         form = DiligenceCreateForm(request.POST)
@@ -220,6 +240,7 @@ def diligence_detail_view(request: HttpRequest, diligence_id: int) -> HttpRespon
         Diligence.objects.select_related("submission", "submission__institution", "requested_by"),
         id=diligence_id,
     )
+    WorkflowService.enforce_diligence_actor(diligence.submission, request.user)
 
     if request.method == "POST":
         form = DiligenceResponseForm(request.POST, instance=diligence)

@@ -81,6 +81,7 @@ class TestEvaluationWorkspaceIntegration:
         client.force_login(analyst_a)
         # Abre o workspace
         url_ws = reverse("evaluation-workspace", kwargs={"submission_id": sub.id})
+        client.post(reverse("evaluation-start", args=[sub.id]))
         response = client.get(url_ws)
         assert response.status_code == 200
         assert "4.2-I" in response.content.decode("utf-8")
@@ -109,7 +110,7 @@ class TestEvaluationWorkspaceIntegration:
         client.force_login(analyst_a)
         from apps.evaluations.services import EvaluationService
 
-        eval_obj = EvaluationService.initialize_evaluation(sub, analyst=analyst_a)
+        eval_obj = EvaluationService.start_evaluation(sub, analyst=analyst_a)
 
         # Marca check como ATENDE
         CheckResult.objects.filter(evaluation=eval_obj, requirement_check=check).update(
@@ -125,7 +126,7 @@ class TestEvaluationWorkspaceIntegration:
         assert eval_obj.result == Evaluation.Result.APTA
 
         sub.refresh_from_db()
-        assert sub.workflow_status == Submission.WorkflowStatus.PENDING_REVIEW
+        assert sub.workflow_status == Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING
 
     def test_analyst_b_forbidden_from_analyst_a_workspace(self, client, setup_data):
         analyst_b = setup_data["b"]
@@ -133,6 +134,7 @@ class TestEvaluationWorkspaceIntegration:
 
         client.force_login(analyst_b)
         url_ws = reverse("evaluation-workspace", kwargs={"submission_id": sub.id})
+        client.post(reverse("evaluation-start", args=[sub.id]))
         response = client.get(url_ws)
         # Negação de acesso
         assert response.status_code == 403

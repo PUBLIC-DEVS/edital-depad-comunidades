@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -111,6 +112,18 @@ class ReviewItemDecision(models.Model):
     def __str__(self):
         status_txt = "Concorda" if self.agrees_with_analyst else f"Diverge ({self.reviewer_status})"
         return f"{self.check_result.requirement_check.code} - {status_txt}"
+
+    def clean(self):
+        if (
+            self.review_id
+            and self.check_result_id
+            and self.check_result.evaluation_id != self.review.evaluation_id
+        ):
+            raise ValidationError("CheckResult não pertence à Evaluation do Review.")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        return super().save(*args, **kwargs)
 
 
 class Diligence(models.Model):

@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -124,8 +125,11 @@ class EvaluationService:
                 "analyst": analyst,
                 "status": Evaluation.Status.DRAFT,
                 "result": Evaluation.Result.EM_ANALISE,
+                "started_at": timezone.now(),
             },
         )
+        if evaluation.analyst_id != analyst.pk:
+            raise PermissionDenied("Avaliação pertence a outro analista.")
 
         # Se já existia mas não possuía checks criados, inicializa
         checks = RequirementCheck.objects.filter(
@@ -163,6 +167,32 @@ class EvaluationService:
 
     @classmethod
     @transaction.atomic
+    def start_evaluation(cls, submission, analyst):
+        submission = Submission.objects.select_for_update().get(pk=submission.pk)
+        if analyst.role != User.Role.ANALISTA or submission.assigned_analyst != analyst:
+            raise PermissionDenied("Somente o analista atribuído pode iniciar análise.")
+        if submission.workflow_status != Submission.WorkflowStatus.ASSIGNED:
+            raise ValidationError("Processo não está no estágio de início da análise.")
+        evaluation = cls.initialize_evaluation(submission, analyst)
+        from apps.submissions.services.workflow import WorkflowService
+
+        WorkflowService.transition(
+            submission,
+            Submission.WorkflowStatus.UNDER_ANALYSIS,
+            analyst,
+            reason="Análise iniciada por POST.",
+        )
+        return evaluation
+
+    @staticmethod
+    def enforce_edit(evaluation, actor):
+        from apps.accounts.permissions import RolePermissionPolicy
+
+        if not RolePermissionPolicy.can_edit_evaluation(actor, evaluation):
+            raise PermissionDenied("Análise não pode ser editada por este usuário.")
+
+    @classmethod
+    @transaction.atomic
     def save_draft(
         cls,
         evaluation: Evaluation,
@@ -171,10 +201,16 @@ class EvaluationService:
         general_notes: str = "",
     ) -> EvaluationAssessment:
         """Salva rascunho de preenchimento das checagens sem exigir que todas estejam finalizadas."""
+        evaluation = Evaluation.objects.select_for_update().get(pk=evaluation.pk)
+        cls.enforce_edit(evaluation, actor)
         for item in check_payloads:
             check_id = item.get("requirement_check_id")
             if not check_id:
                 continue
+            if item.get("status", CheckResult.Status.EM_BRANCO) not in CheckResult.Status.values:
+                raise ValidationError("Status de checagem inválido.")
+            if not evaluation.check_results.filter(requirement_check_id=check_id).exists():
+                raise ValidationError("Checagem não pertence à avaliação.")
 
             CheckResult.objects.filter(evaluation=evaluation, requirement_check_id=check_id).update(
                 status=item.get("status", CheckResult.Status.EM_BRANCO),
@@ -221,6 +257,12 @@ class EvaluationService:
 
         Valida que não existem checagens pendentes em branco antes de permitir conclusão.
         """
+        evaluation = (
+            Evaluation.objects.select_for_update()
+            .select_related("submission")
+            .get(pk=evaluation.pk)
+        )
+        cls.enforce_edit(evaluation, actor)
         assessment = cls.calculate_assessment(evaluation)
 
         if not assessment.is_complete:
