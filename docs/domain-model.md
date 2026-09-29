@@ -44,6 +44,10 @@ erDiagram
     Review ||--o{ ReviewItemDecision : "contem_decisoes"
 
     RankingSnapshot ||--o{ RankingEntry : "composto_por"
+    RankingSnapshot ||--o{ RankingExclusion : "exclui_sem_posicao"
+    Edital ||--o{ LegacyImportRun : "rastreia_importacao"
+    LegacyImportRun ||--o{ LegacyImportIssue : "registra_problemas"
+    LegacyImportRun ||--o{ LegacySourceRecord : "preserva_fonte"
 ```
 
 ---
@@ -51,13 +55,13 @@ erDiagram
 ## Descrição dos Domínios e Entidades
 
 ### 1. Núcleo Institucional e Municípios (`apps.institutions`)
-- **`Municipality`**: Registra municípios com chave primária natural/oficial pelo **Código IBGE de 7 dígitos** (`ibge_code`), nome e UF. Elimina divergências causadas por variações de acentuação ou grafia textual.
+- **`Municipality`**: Nome/UF e código IBGE único quando resolvido. Legados sem código oficial mantêm `ibge_code=NULL`, com unicidade nome/UF para registros não resolvidos. Nenhum código é fabricado; a identidade textual ainda pode exigir saneamento.
 - **`Institution`**: Representa a organização da sociedade civil proponente. O campo `cnpj` é validado e normalizado pelo módulo dedicado `apps.institutions.cnpj`, suportando tanto o padrão numérico clássico (14 dígitos) quanto a nova especificação alfanumérica da Receita Federal.
 
 ### 2. Parâmetros e Regras do Edital (`apps.editais`)
 - **`Edital`**: Entidade versionável que armazena número, ano, vigência, status, versão de regras e política de duplicidade (`KEEP_EARLIEST_SUBMISSION` vs `KEEP_LATEST_SUBMISSION`). Garante que modificações futuras em editais novos não alterem retroativamente o histórico de editais encerrados.
 - **`ProgramMunicipality`**: Mapeia a adesão de municípios a programas prioritários vinculados ao edital (ex: **PRONASCI**), base essencial para o enquadramento no Grupo 2 (G2).
-- **`FundingRule`**: Parametriza valores mensais por vaga, duração em meses e percentual de patrimônio líquido mínimo exigido, evitando números mágicos no código.
+- **`FundingRule`**: Regra por FEMALE/MALE/NURSING_MOTHER, valor mensal Decimal e duração. Percentual mínimo fica em Edital. `LegacyGroupFundingRule` conserva parâmetros antigos sem inferir sua conversão para tipos de vaga.
 - **`Requirement`**: Requisitos formais (ex.: `4.2-I`, `4.2-V Estatuto`, `4.2-XVI`).
 - **`RequirementCheck`**: Subcritérios atômicos de cada requisito (ex.: finalidade estatutária, ausência de remuneração de dirigentes, dissolução patrimonial).
 
@@ -70,13 +74,14 @@ erDiagram
 - **`CheckResult`**: Normalização individual por subcritério (status `ATENDE`, `NAO_ATENDE`, `NAO_ENVIADO`, `NAO_APLICAVEL`), número SEI do documento, folhas/páginas, data de validade de certidão, valor financeiro e notas. Substitui a dispersão de 80 colunas flat do Excel.
 
 ### 5. Revisão e Diligência (`apps.reviews`)
-- **`Review`**: Revisão hierárquica/de conformidade sobre a `Evaluation`. Não duplica dados da análise; preserva a decisão do revisor (`PRE_HABILITADO`, `PRE_INABILITADO`).
+- **`Review`**: Criada automaticamente somente para INAPTA, inicialmente sem responsável. Claim atribui revisor distinto do analista; ownership e estado pendente controlam edição. Preserva a decisão PRE_HABILITADO/PRE_INABILITADO; decisões históricas continuam distintas do cálculo dos checks.
 - **`ReviewItemDecision`**: Confirmação ou divergência item a item em relação ao parecer do analista, exigindo justificativa obrigatória em caso de discordância.
-- **`Diligence`**: Subfluxo formal de saneamento de pendências documentais, com registro de motivo, prazo limite, resposta da entidade e resultado do contraditório.
+- **`Diligence`**: Novas operações exigem prazo e preservam estágio de origem/consequência expressa. Históricos incompletos conservam datas, prazo e solicitante nulos e estado LEGACY_UNKNOWN; cada linha repetida é um evento próprio.
 
 ### 6. Classificação e Ranking (`apps.ranking`)
 - **`RankingSnapshot`**: Snapshot imutável gerado em determinada data de publicação, gravando a versão das regras, política de duplicidade e responsável pela geração.
-- **`RankingEntry`**: Posição ordinal no grupo (G1, G2, G3), timestamp de desempate, total de vagas e anotação de supressão por duplicidade.
+- **`RankingEntry`**: Apenas candidatos elegíveis efetivamente ranqueados, com posições consecutivas por grupo e dados capturados no snapshot. Supressões ficam em RankingExclusion, sem posição oficial.
+- **`RankingExclusion`**: Motivo, inscrição, duplicate_of e metadados separados das entradas. Snapshots e seus registros são protegidos por model/queryset/service/admin; SQL privilegiado não está coberto por essas barreiras.
 
 ### 7. Trilha de Auditoria (`apps.audit`)
-- **`AuditEvent`**: Registro append-only de alterações e transições de workflow. Grava ator, timestamp, entidade, ID, ação executada, campo alterado, valor antigo, valor novo e metadados contextuais em JSON. Proíbe qualquer mutação ou exclusão via ORM.
+- **`AuditEvent`**: Registro append-only do fluxo. Preserva a proteção existente de save/delete e admin; serviços críticos emitem eventos. Essa proteção não equivale a uma política de imutabilidade aplicada por triggers a todo SQL privilegiado.

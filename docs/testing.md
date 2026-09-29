@@ -1,103 +1,23 @@
-# Estratégia de Testes e Garantia da Qualidade — DEPED/MDS
+# Testes e limites da evidência
 
-Este documento descreve a arquitetura de testes automatizados, cobertura em camadas e diretrizes de execução contínua.
+A suíte verifica regras de domínio, autorização nas views, ownership, IDOR, início de análise por POST, retorno de diligência, posições oficiais, exclusões, proteção dos snapshots, auditoria de transições, finanças Decimal, exemplos oficiais de CNPJ e preservação das regras financeiras antigas na migration.
 
----
-
-## 1. Pirâmide e Camadas de Teste
-
-A plataforma adota uma abordagem de testes em três camadas complementares:
-
-```
-          / \
-         /   \     Testes de Paridade Legada (@pytest.mark.legacy)
-        /  *  \    (Workbook sintético com 282 processos, idempotência e paridade matemática)
-       /-------\
-      /         \    Testes de Integração (Workspaces, RBAC, Isolamento, HTMX)
-     /    ***    \   (Intake, Triagem, Workspace Documental, Revisão, Diligência, Ranking)
-    /-------------\
-   /               \   Testes Unitários de Domínio (Services e Modelos)
-  /     *******     \  (CNPJ, Regras Financeiras, Workflow FSM, Classificação, Duplicidades)
- /-------------------\
-```
-
----
-
-## 2. Estrutura dos Módulos de Teste
-
-```
-tests/
-├── unit/
-│   ├── test_cnpj.py                             # Validação e normalização de CNPJ numérico e alfanumérico
-│   ├── test_domain_models.py                    # Modelos, restrições e append-only de AuditEvent
-│   ├── test_evaluation_service.py               # Cálculo imperativo de aptidão/inaptidão
-│   ├── test_workflow_service.py                 # Máquina de estados finita e transições válidas
-│   ├── test_funding_service.py                  # Cálculos de valores e patrimônio sem hardcoding
-│   ├── test_duplicates_service.py               # Políticas de duplicidade (mais antigo vs retificador)
-│   ├── test_classification_and_ranking_service.py # Enquadramento G1/G2/G3/sem grupo e ordenação SEI
-│   └── test_permissions_and_isolation.py        # Políticas de RBAC e isolamento de analistas
-├── integration/
-│   ├── test_submissions_intake_and_distribution.py # Triagem, busca, anomalias e distribuição
-│   ├── test_evaluation_workspace.py             # Workspace documental com HTMX e isolamento
-│   ├── test_reviews_and_diligence.py            # Fila de revisão, justificativas e diligências
-│   ├── test_ranking_flow.py                     # Geração de ranking, imutabilidade e exportação CSV
-│   ├── test_reporting_dashboard.py              # Métricas em tempo real e painel de exceções
-│   └── test_legacy_parity.py                    # Paridade exata contra universo de 282 processos
-└── test_bootstrap.py                            # Health check, migrações e bootstrap inicial
-```
-
----
-
-## 3. Instruções de Execução
-
-### 3.1 Execução Completa da Suíte
 ```bash
+python manage.py check
+python manage.py makemigrations --check
 pytest
-```
-
-### 3.2 Execução com Relatório de Cobertura de Código
-```bash
-pytest --cov=apps --cov-report=term-missing
-```
-
-### 3.3 Execução Apenas do Harness de Paridade Legada
-```bash
+pytest -m "not legacy_real"
 pytest -m legacy
-```
-
-### 3.4 Execução de Testes Específicos por Arquivo
-```bash
-pytest tests/unit/test_cnpj.py
-pytest tests/integration/test_evaluation_workspace.py
-```
-
----
-
-## 4. Verificação de Linter e Formatação
-
-O projeto utiliza **Ruff** para linting ultra-rápido e formatação padronizada:
-
-```bash
-# Executa análise estática de código
+LEGACY_XLSX_PATH="/caminho/arquivo.xlsx" pytest -m legacy_real
+pytest --cov=apps --cov=config --cov-report=term-missing
 ruff check .
-
-# Aplica correções automáticas
-ruff check --fix .
-
-# Verifica consistência de formatação
 ruff format --check .
-
-# Formata o código
-ruff format .
 ```
 
----
+`legacy` contém casos sintéticos de schema/importação e segurança. `legacy_real` exige um arquivo externo e nunca o gera. Seus testes verificam o fingerprint conhecido, a completude dos diffs, preservação do SHA-256 e idempotência em processos Python separados usando banco isolado. Um status FAIL na comparação pode coexistir com testes verdes que comprovam que a divergência foi corretamente detectada e registrada.
 
-## 5. Integração Contínua (CI)
+Sem LEGACY_XLSX_PATH o teste real é SKIP explícito; arquivo indicado e inexistente é falha. Nenhum desses casos significa paridade aprovada. O status da execução privada é registrado no summary, não inferido do exit code de pytest.
 
-Todo pull request ou push na branch `feature/**` ou `main` aciona o pipeline GitHub Actions (`.github/workflows/ci.yml`), que valida:
-1. Lint e formatação de código com Ruff.
-2. Checagem estática do Django (`manage.py check`).
-3. Verificação de migrações pendentes (`manage.py makemigrations --check --dry-run`).
-4. Execução da suíte completa de testes no PostgreSQL 16.
-5. Geração de relatório de cobertura de código.
+CI pública executa `pytest -m "not legacy_real"` com PostgreSQL 16, Ruff, Django check e migration check. A execução privada/manual deve fornecer o XLSX por caminho externo e proteger os artefatos por processo; o workbook nunca é enviado ao repositório. A validação local desta fase usa SQLite; a CI PostgreSQL deve ser conferida antes de aprovar o PR.
+
+Resultados finais, cobertura e limitações estão em [POST_AUDIT_HARDENING_REPORT.md](POST_AUDIT_HARDENING_REPORT.md) e `artifacts/final-audit.json`.

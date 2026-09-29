@@ -1,67 +1,100 @@
 {
   "project": "edital-depad-comunidades",
-  "audit_date": "2026-09-28T20:22:00-03:00",
-  "branch": "feature/initial-edital-platform",
-  "status": "APPROVED",
-  "system_check": {
-    "django_check": "PASSED",
-    "makemigrations_check": "PASSED",
-    "unmigrated_changes": false
-  },
-  "code_quality": {
-    "ruff_lint": "PASSED",
-    "ruff_format": "PASSED",
-    "total_files_checked": 105,
-    "blocking_todos": 0,
-    "sensitive_data_leaks": 0
-  },
-  "test_suite": {
-    "total_tests": 67,
-    "passed": 67,
-    "failed": 0,
-    "skipped": 0,
-    "execution_time_seconds": 5.49,
-    "code_coverage_percentage": 87,
-    "statements_analyzed": 2306,
-    "statements_missed": 297
+  "verification_date": "2026-09-28",
+  "status": "READY_FOR_INDEPENDENT_AUDIT_WITH_RECORDED_DIFFERENCES",
+  "base_branch": "feature/initial-edital-platform",
+  "base_commit": "8849b2ec5463eb3ec47b1c0ad391d4f1de13cfeb",
+  "hardening_branch": "feature/initial-edital-platform-hardening",
+  "implementation_head": "724512325e0368c3d49128e6f2542ea048c5de49",
+  "publication_head_ref": "feature/initial-edital-platform-hardening",
+  "main_commit": "230ec63b49dffe4263ca4c8336216cf84d19aee8",
+  "main_unchanged": true,
+  "base_branch_unchanged": true,
+  "framework": "Django 5.2.17 LTS line",
+  "verification": {
+    "pytest": {
+      "passed": 193,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 79.469,
+      "real_workbook_included": true
+    },
+    "legacy": {
+      "passed": 5
+    },
+    "legacy_real": {
+      "passed": 2,
+      "workbook_executed": true,
+      "parity_status": "FAIL"
+    },
+    "coverage": {
+      "percent": 87.67,
+      "covered_lines": 2845,
+      "statements": 3245,
+      "scope": "apps + config per pyproject"
+    },
+    "ruff_check": "PASS",
+    "ruff_format": "PASS",
+    "django_check": "PASS",
+    "migration_check": "PASS",
+    "git_diff_check": "PASS"
   },
   "legacy_parity": {
-    "total_processes": 282,
-    "group_1_fem_nutrizes": 9,
-    "group_2_pronasci": 34,
-    "group_3_ampla": 212,
-    "sem_grupo_zeradas": 27,
-    "idempotent_import": true,
-    "parity_matched": true
+    "status": "FAIL",
+    "real_workbook_executed": true,
+    "source_sha256": "030b28f5ca61a3fa79e1b07834cee952fa262d3aef7b6641242d44865bf55ac2",
+    "processes_compared": 282,
+    "mismatch_count": 302,
+    "field_mismatch_count": 297,
+    "source_errors": 3,
+    "metric_mismatch_count": 2,
+    "mismatch_codes": {
+      "PATRIMONIO_MINIMO": 1,
+      "INSTITUTION": 6,
+      "MUNICIPALITY": 12,
+      "INITIAL_RESULT": 109,
+      "RECALCULATED_INITIAL_POSITION": 169
+    },
+    "incomplete_areas": [
+      "Legal review outcome is a stored decision, not derivable from initial checks",
+      "Historical diligence dates, deadlines and legal effects are not established",
+      "Official RankingService snapshot was not generated for comparison"
+    ]
   },
-  "architecture_compliance": {
-    "framework": "Django 5.1 LTS",
-    "python_version": "3.12.8",
-    "database": "PostgreSQL with SQLite fallback",
-    "frontend": "Django Templates + Tailwind CSS + HTMX + Alpine.js",
-    "custom_user_model": "apps.accounts.User",
-    "auth_adapter_pattern": true,
-    "audit_trail": "Append-Only (AuditEvent)",
-    "ranking_snapshot": "Immutable (RankingSnapshot)",
-    "analyst_isolation": "Server-Side (RolePermissionPolicy)",
-    "csrf_protected": true,
-    "session_cookies_secure": true
+  "migrations": [
+    "apps/accounts/migrations/0002_alter_user_email.py",
+    "apps/editais/migrations/0002_programmunicipality_legacy_original_name_and_more.py",
+    "apps/editais/migrations/0003_edital_duplicate_scope_edital_tie_breaker_policy.py",
+    "apps/editais/migrations/0004_vacancy_type_funding.py",
+    "apps/evaluations/migrations/0002_checkresult_legacy_raw_value_and_more.py",
+    "apps/institutions/migrations/0002_alter_municipality_ibge_code_and_more.py",
+    "apps/legacy_import/migrations/0001_initial.py",
+    "apps/ranking/migrations/0003_rankingexclusion_rankingentry_snapshot_data_and_more.py",
+    "apps/reviews/migrations/0002_diligence_origin_status_and_more.py",
+    "apps/reviews/migrations/0003_unknown_historical_diligence_result.py",
+    "apps/submissions/migrations/0003_alter_assignment_assigned_at_and_more.py",
+    "apps/submissions/migrations/0004_assignment_unique_active_assignment_submission_and_more.py"
+  ],
+  "microsoft_auth": "Authentication boundary / adapter ready for integration; JWT/OIDC/Entra login/SharePoint not integrated",
+  "ci_postgresql": {
+    "status": "completed",
+    "conclusion": "success",
+    "headSha": "724512325e0368c3d49128e6f2542ea048c5de49",
+    "url": "https://github.com/PUBLIC-DEVS/edital-depad-comunidades/actions/runs/36510344583",
+    "database": "PostgreSQL 16",
+    "pytest_passed": 191,
+    "pytest_deselected": 2,
+    "real_workbook_included": false,
+    "coverage_display_percent": 82,
+    "coverage_scope": "apps; public job excludes legacy_real"
   },
-  "phases_completed": [
-    {"phase": 0, "title": "Inspeção, Segurança e Criação da Branch", "status": "COMPLETED"},
-    {"phase": 1, "title": "Arquitetura e Bootstrap do Django", "status": "COMPLETED"},
-    {"phase": 2, "title": "Modelo de Domínio e Banco de Dados", "status": "COMPLETED"},
-    {"phase": 3, "title": "Motor de Regras e Workflow", "status": "COMPLETED"},
-    {"phase": 4, "title": "RBAC e Isolamento de Analistas", "status": "COMPLETED"},
-    {"phase": 5, "title": "Intake e Distribuição", "status": "COMPLETED"},
-    {"phase": 6, "title": "Workspace Documental e Checklist", "status": "COMPLETED"},
-    {"phase": 7, "title": "Filas de Revisão e Diligência", "status": "COMPLETED"},
-    {"phase": 8, "title": "Classificação e Ranking Determinístico", "status": "COMPLETED"},
-    {"phase": 9, "title": "Dashboard Operacional, Métricas e Validação", "status": "COMPLETED"},
-    {"phase": 10, "title": "Importador do Excel Legado e Harness de Paridade", "status": "COMPLETED"},
-    {"phase": 11, "title": "Design System e Refinamento de Interface", "status": "COMPLETED"},
-    {"phase": 12, "title": "Testes, CI, Segurança e Hardening", "status": "COMPLETED"},
-    {"phase": 13, "title": "Documentação Operacional e Seed Demo", "status": "COMPLETED"},
-    {"phase": 14, "title": "Auditoria Final Interna", "status": "COMPLETED"}
+  "private_data_committed": false,
+  "merge_performed": false,
+  "remaining_questions": [
+    "Timestamp tie precedence",
+    "Legal effect of historical diligences",
+    "Meaning of unrecognized source values",
+    "Mapping displayed 177 APTAS to processes: consolidated result caches missing"
   ]
 }

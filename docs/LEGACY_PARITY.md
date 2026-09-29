@@ -1,55 +1,13 @@
-# Relatório e Harness de Paridade com a Planilha Excel Legada
+# Paridade legada: escopo da evidência
 
-Este documento registra a validação de paridade entre o sistema Django e o histórico operacional executado originalmente na planilha Excel do Edital DEPED/MDS.
+O teste anterior foi renomeado para `tests/integration/test_synthetic_legacy_importer.py`. Ele testa importação de dados gerados pelo próprio projeto, incluindo idempotência, sem provar comportamento da planilha histórica.
 
----
+O golden master externo está em `apps/legacy_import/parity.py` e `tests/integration/test_real_legacy_workbook.py`, com marcador `legacy_real`. O arquivo real foi efetivamente lido nesta fase. Status atual: **FAIL**. Os resultados por SEI e a reconciliação estão documentados em [REAL_LEGACY_PARITY.md](REAL_LEGACY_PARITY.md).
 
-## 1. Números de Referência do Edital Histórico
+Estados admitidos: NOT_RUN (arquivo real não executado), PARTIAL (execução com áreas ainda não comparadas), PASS (critérios satisfeitos ou diferenças formalmente aceitas), FAIL (divergências ainda não resolvidas). A ausência do XLSX gera skip do teste externo e mantém NOT_RUN para essa execução. Resultado verde de pytest não muda o status de paridade.
 
-A auditoria da planilha legada consolidou o universo de **282 processos** distribuídos conforme as regras de enquadramento:
+O harness compara identidade, timestamp, analista, município/UF, vagas, grupos, valores financeiros, resultado inicial calculado, requisitos descumpridos, decisão de revisão importada, eventos de diligência e classificação por processo. Diferencia decisão histórica armazenada de resultado recalculado. Não tenta recalcular o Excel genericamente.
 
-| Grupo de Enquadramento | Definição Operacional | Quantidade Esperada | Status no Django |
-| :--- | :--- | :--- | :--- |
-| **Grupo 1 (G1)** | Propostas contemplando Mulheres, Mães Nutrizes e/ou Gestantes (`vagas_femininas + vagas_maes_nutrizes > 0`) | **9** | Identificado rigorosamente |
-| **Grupo 2 (G2)** | Vagas masculinas exclusivas em municípios prioritários integrantes do Programa **PRONASCI** | **34** | Identificado via tabela de municípios e convênios |
-| **Grupo 3 (G3)** | Vagas masculinas exclusivas nos demais municípios (ampla concorrência) | **212** | Identificado rigorosamente |
-| **Sem Grupo** | Inscrições sem vagas válidas solicitadas, pendentes ou zeradas | **27** | Quarentena / Pendência de saneamento |
-| **TOTAL** | **Universo Total de Processos Protocolados** | **282** | **100% de paridade** |
+O cálculo histórico usando BY materializado e primeira inscrição absoluta reproduziu os 172 classificados, inclusive posições por SEI. O novo cálculo dos checks e o workflow que considera revisões produzem outra população; não se presume equivalência. Empates do ranking operacional seguem bloqueados por decisão do responsável.
 
----
-
-## 2. Divergências Documentadas do Legado (Vulnerabilidades do Excel)
-
-Durante a migração para o motor determinístico em Python/Django, foram catalogadas falhas sistemáticas inerentes ao uso de planilhas como sistema operacional:
-
-### 2.1 Erros de Fórmulas e Referências Quebradas no Excel
-1. **Fórmulas de Enquadramento `SE(E(...))` Quebradas por Inserção de Linhas:**
-   - No Excel legada, a inserção manual de linhas intermediárias por diferentes analistas quebrava referências relativas das fórmulas de classificação, deixando proponentes elegíveis classificados como `#REF!` ou caindo silenciosamente no Grupo 3.
-   - **Correção no Django:** O `ClassificationService` avalia cada linha a partir do modelo relacional com testes unitários exaustivos.
-
-2. **Divergências de Nome de Município vs. PRONASCI:**
-   - Variações ortográficas na digitação da planilha (ex: `São Luís` vs `Sao Luis`, espaços extras após o nome) faziam com que o `PROCV` não encontrasse o município na lista do PRONASCI, rebaixando inadvertidamente propostas do Grupo 2 para o Grupo 3.
-   - **Correção no Django:** Comparação mandatória por Código IBGE de 7 dígitos (`Municipality.ibge_code`) e `ProgramMunicipality`.
-
-3. **Sobrescrita Concorrente em Abas de Analistas:**
-   - Edições simultâneas via SharePoint / Excel Online resultavam em sobrescrita de células de conferência documental sem trilha de auditoria.
-   - **Correção no Django:** Isolamento rigoroso no backend (`RolePermissionPolicy`), bloqueio de edição por analistas não autorizados e histórico append-only em `AuditEvent`.
-
-4. **Inconsistências de Parecer vs. Itens Reprovados:**
-   - Na planilha, constatou-se a ocorrência de propostas com a célula de status final preenchida manualmente como "APTA", apesar de conterem "NÃO ATENDE" em requisitos eliminatórios da mesma linha.
-   - **Correção no Django:** O `EvaluationService` calcula o status de aptidão de forma imperativa: se qualquer item obrigatório for `NAO_ATENDE` ou `NAO_ENVIADO`, o resultado é obrigatoriamente `INAPTA`. Adicionalmente, o painel de validações (`/metricas/validacoes/`) aponta qualquer discrepância residual.
-
----
-
-## 3. Harness de Paridade Automatizado
-
-O comando `manage.py import_legacy_edital` executa a leitura da planilha legada (ou do gerador sintético homologado), persistindo os dados e comparando os resultados agregados.
-
-O teste automatizado:
-```bash
-pytest -m legacy
-```
-assegura que:
-- O número total de 282 processos é recuperado integralmente.
-- As contagens por grupo (G1=9, G2=34, G3=212, Sem Grupo=27) coincidem com precisão de 100%.
-- A execução repetida do comando é estritamente idempotente (sem duplicação de submissões ou atribuições).
+Relatórios privados não são commitados. O Git contém apenas contagens, códigos de divergência, schema e resumo sanitizado. O arquivo histórico não foi salvo nem alterado.

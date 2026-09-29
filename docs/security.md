@@ -59,11 +59,15 @@ Em `config/settings.py`, foram estabelecidas diretivas de segurança:
 
 ---
 
-## 5. Trilha de Auditoria Audit-Ready
+## 5. Trilha de eventos e limites da proteção
 
 Todas as ações críticas (criação de processo, redistribuição, conclusão de análise, divergência de revisor, snapshot de classificação) registram uma entrada append-only na tabela `audit_auditevent`. O registro armazena:
 - `actor_id`: Usuário autenticado responsável.
-- `timestamp`: Data e hora exata em fuso horário oficial de Brasília.
+- `timestamp`: Instante da operação, armazenado conforme USE_TZ e exibido no fuso da aplicação. Não representa datas históricas ausentes no Excel.
 - `entity_type` e `entity_id`: Identificação clara do recurso afetado.
 - `action`: Código padronizado da ação realizada.
-- `metadata`: Carga útil com valores anteriores e novos.
+- `field`, `old_value`, `new_value` e `metadata`: Alteração e contexto da operação.
+
+O hardening inclui início e conclusão de análise, claim e decisões de revisão, abertura/resposta/conclusão de diligência, mudanças de grupo e transições para ranking. Administradores consultam entidades operacionais em modo somente leitura; a interface de operação usa os serviços auditados. A proteção existente de AuditEvent em save/delete e admin foi preservada. Não é uma garantia por triggers contra SQL privilegiado.
+
+RankingSnapshot/Entry/Exclusion têm bloqueios adicionais para save/delete/update/bulk_update e updates por conflito, além de admin somente leitura e criação de entradas apenas durante geração do snapshot. Ranking e métricas globais exigem papel permitido nas views, inclusive exports. A validação local não substitui a conferência da CI em PostgreSQL nem revisão independente.

@@ -1,0 +1,202 @@
+{
+  "source_sha256": "030b28f5ca61a3fa79e1b07834cee952fa262d3aef7b6641242d44865bf55ac2",
+  "real_workbook_executed": true,
+  "status": "FAIL",
+  "processes_compared": 282,
+  "sheet_count": 23,
+  "analyst_sheet_count": 11,
+  "analyst_workloads": [
+    25,
+    25,
+    25,
+    25,
+    26,
+    26,
+    26,
+    26,
+    26,
+    26,
+    26
+  ],
+  "raw_groups_system": {
+    "G3": 212,
+    "G2": 34,
+    "SEM_GRUPO": 27,
+    "G1": 9
+  },
+  "initial_results_excel": {
+    "INAPTA": 102,
+    "APTA": 180
+  },
+  "initial_results_calculated": {
+    "INAPTA": 211,
+    "APTA": 71
+  },
+  "consolidated_results_excel": {
+    "": 283
+  },
+  "consolidated_rows_without_sei": 8,
+  "displayed_legacy_metrics": {
+    "APTA": 177,
+    "INAPTA": 105,
+    "EM_ANALISE": 0
+  },
+  "displayed_group_metrics": {
+    "INAPTA": {
+      "G1": 5,
+      "G2": 10,
+      "G3": 63,
+      "SEM_GRUPO": 27
+    },
+    "APTA": {
+      "G1": 4,
+      "G2": 24,
+      "G3": 149,
+      "SEM_GRUPO": 0
+    }
+  },
+  "review_rows": 216,
+  "review_cached_results": {
+    "PRÉ INABILITADO": 131,
+    "PRÉ HABILITADO": 70,
+    "EMPTY": 15
+  },
+  "diligence_rows": 165,
+  "diligence_unique_seis": 158,
+  "materialized_ranking_groups": {
+    "G1": 5,
+    "G2": 24,
+    "G3": 143
+  },
+  "historical_formula_groups": {
+    "G3": 143,
+    "G2": 24,
+    "G1": 5
+  },
+  "recalculated_initial_ranking_groups": {
+    "G3": 60,
+    "G2": 8,
+    "G1": 1
+  },
+  "official_operational_ranking_groups": {},
+  "duplicate_cnpjs": 20,
+  "duplicate_excess": 21,
+  "reconciliation": {
+    "initial_aptas": 180,
+    "suppressed_initial_aptas": 8,
+    "no_group_initial_aptas_retained": 0,
+    "historical_formula_ranked": 172,
+    "displayed_ranked": 172,
+    "metrics_aptas": 177
+  },
+  "mismatches_by_code": {
+    "PATRIMONIO_MINIMO": 1,
+    "INSTITUTION": 6,
+    "MUNICIPALITY": 12,
+    "INITIAL_RESULT": 109,
+    "RECALCULATED_INITIAL_POSITION": 169
+  },
+  "field_mismatch_count": 297,
+  "mismatch_count": 302,
+  "records_with_mismatches": {
+    "submissions": 18,
+    "evaluations": 109,
+    "reviews": 0,
+    "diligences": 0,
+    "ranking": 169,
+    "reconciliation": 0,
+    "duplicates": 0
+  },
+  "source_issue_codes": {
+    "MISSING_SEI": 1,
+    "MISSING_FORMULA_CACHE": 802,
+    "MISSING_MUNICIPALITY": 4,
+    "INVALID_DOCUMENT_DATE": 32,
+    "UNKNOWN_CHECK_STATUS": 2
+  },
+  "source_errors": 3,
+  "metric_mismatch_count": 2,
+  "incomplete_areas": [
+    "Legal review outcome is a stored decision, not derivable from initial checks",
+    "Historical diligence dates, deadlines and legal effects are not established",
+    "Official RankingService snapshot was not generated for comparison"
+  ],
+  "intentional_differences": [
+    "New official workflow uses review decisions; Excel CLASSIFICAÇÃO uses initial BY",
+    "Financial values rounded to cents with Decimal HALF_UP",
+    "No invented historical operational context"
+  ],
+  "entity_counts": {
+    "Submission": 282,
+    "Institution": 261,
+    "Municipality": 228,
+    "Assignment": 282,
+    "Evaluation": 282,
+    "Review": 216,
+    "Diligence": 165,
+    "ProgramMunicipality": 33
+  },
+  "counts_before_import": {
+    "Submission": 282,
+    "Institution": 261,
+    "Municipality": 228,
+    "Assignment": 282,
+    "Evaluation": 282,
+    "Review": 216,
+    "Diligence": 165,
+    "ProgramMunicipality": 33
+  },
+  "counts_after_import": {
+    "Submission": 282,
+    "Institution": 261,
+    "Municipality": 228,
+    "Assignment": 282,
+    "Evaluation": 282,
+    "Review": 216,
+    "Diligence": 165,
+    "ProgramMunicipality": 33
+  },
+  "snapshot_error": "['OPEN BUSINESS QUESTION: configure a política de empate absoluto.']",
+  "idempotency": {
+    "before_count": {
+      "Submission": 0,
+      "Institution": 0,
+      "Municipality": 0,
+      "Assignment": 0,
+      "Evaluation": 0,
+      "Review": 0,
+      "Diligence": 0,
+      "ProgramMunicipality": 0
+    },
+    "after_first": {
+      "Submission": 282,
+      "Institution": 261,
+      "Municipality": 228,
+      "Assignment": 282,
+      "Evaluation": 282,
+      "Review": 216,
+      "Diligence": 165,
+      "ProgramMunicipality": 33
+    },
+    "after_second": {
+      "Submission": 282,
+      "Institution": 261,
+      "Municipality": 228,
+      "Assignment": 282,
+      "Evaluation": 282,
+      "Review": 216,
+      "Diligence": 165,
+      "ProgramMunicipality": 33
+    },
+    "separate_python_processes_verified": true
+  },
+  "accepted_business_decisions": [
+    "2026-09-28: retain manual BY as history; operational initial result is recalculated",
+    "2026-09-28: absolute timestamp tie policy remains UNRESOLVED and blocks operational snapshot"
+  ],
+  "operational_ranking_block": {
+    "eligible_after_reviews_and_absolute_duplicates": 130,
+    "tie_groups": 2,
+    "tied_candidates": 4
+  }
+}

@@ -14,3 +14,7 @@ Implementamos uma **Fronteira de Autenticação com Padrão Adapter**:
 ## Consequências
 - **Positivas:** Desacoplamento total; desenvolvimento e testes funcionam sem credenciais ou rede externa; prontidão plug-and-play para a integração institucional.
 - **Negativas:** Exige manter o mapeamento entre grupos do IdP institucional e papéis da aplicação quando o adaptador Microsoft for conectado.
+
+## Estado verificado na fase 15
+
+MicrosoftAuthAdapter é scaffold que recebe claims já decodificados. JWT/OIDC, MSAL, login Entra e SharePoint não foram integrados neste checkout. A interface é authentication boundary / adapter ready for integration. Usuários históricos podem ter email nulo e permanecem inativos; identificadores locais derivados dos nomes não são contas institucionais confirmadas.

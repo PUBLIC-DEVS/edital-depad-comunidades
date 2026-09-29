@@ -13,7 +13,7 @@ O sistema foi concebido para o ambiente de trabalho de analistas, revisores e ge
    - *Alta Densidade:* Tabelas operacionais de triagem, filas de distribuição e listagem de processos para maximizar o número de registros visíveis sem rolagem desnecessária.
    - *Densidade Confortável:* Espaço de trabalho da análise documental, revisão e conferência de requisitos, privilegiando tipografia arejada, leitura fluida de justificativas e agrupamento visual em seções sanfonadas.
 3. **Feedback Não Intrusivo e em Tempo Real:** Utilização de HTMX para salvar rascunhos automaticamente e atualizar o painel lateral de conformidade sem recarregar a tela, com indicadores discretos de estado ("Salvando...", "Salvo automaticamente").
-4. **Navegabilidade por Teclado e Acessibilidade:** Conformidade com as diretrizes WCAG 2.1 nível AA, garantindo anéis de foco visíveis, navegação completa via `Tab`/`Shift+Tab`, rótulos semânticos e contrastes superiores a 4.5:1.
+4. **Navegabilidade por Teclado e Acessibilidade:** Objetivo de acessibilidade WCAG 2.1 AA, com foco visível, navegação por teclado, rótulos semânticos e contraste adequado. Conformidade integral exige auditoria de acessibilidade; não foi comprovada nesta fase.
 
 ---
 
