@@ -145,7 +145,9 @@ class SubmissionAnomalyDetector:
             )
 
         # 6. Ausência de valor global
-        if not submission.valor_global or submission.valor_global <= 0:
+        if submission.edital.requires_financial_rules and (
+            not submission.valor_global or submission.valor_global <= 0
+        ):
             alerts.append(
                 AnomalyAlert(
                     code="MISSING_GLOBAL_VALUE",

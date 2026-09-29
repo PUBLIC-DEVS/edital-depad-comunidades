@@ -1,6 +1,7 @@
 """Semantic status assessment, without requirement codes or external schemas."""
 
 from apps.editais.models import Requirement
+from apps.editais.selectors import active_requirement_checks
 
 
 def definition_rows(evaluation):
@@ -18,7 +19,7 @@ def definition_rows(evaluation):
     for requirement in Requirement.objects.filter(
         edital=evaluation.submission.edital, active=True
     ).prefetch_related("checks"):
-        definitions = [c for c in requirement.checks.all() if c.active]
+        definitions = active_requirement_checks(requirement)
         if definitions:
             rows.extend((requirement, c, checks.get(c.pk)) for c in definitions)
         else:

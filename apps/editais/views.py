@@ -7,6 +7,7 @@ from django.views.decorators.http import require_POST
 from apps.accounts.models import User
 from apps.accounts.permissions import RolePermissionPolicy, require_role
 from apps.audit.models import AuditEvent
+from apps.editais.selectors import active_requirement_checks
 
 from .forms import (
     ClassificationPolicyForm,
@@ -312,6 +313,7 @@ def edital_analyst_preview(request, edital_id):
     )
     sections = {}
     for requirement in requirements:
+        requirement.visible_checks = active_requirement_checks(requirement)
         key = requirement.presentation_section.strip() or "Documentos e requisitos"
         sections.setdefault(key, []).append(requirement)
     return render(

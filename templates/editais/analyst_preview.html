@@ -15,17 +15,15 @@
                 <article class="rounded-lg border bg-white p-5">
                     <h3 class="font-semibold">{{ requirement.code }} · {{ requirement.name }}</h3>
                     {% if requirement.description %}<p class="mt-1 text-sm text-slate-600">{{ requirement.description }}</p>{% endif %}
-                    {% if requirement.checks.all %}
+                    {% if requirement.visible_checks %}
                         <div class="mt-4 grid gap-3">
-                            {% for check in requirement.checks.all %}
-                                {% if check.active %}
+                            {% for check in requirement.visible_checks %}
                                     <div class="rounded border bg-slate-50 p-4">
                                         <h4 class="font-medium">{{ check.name }}</h4>
                                         <p class="mt-1 text-xs text-slate-600">Resultados: {{ check.allowed_statuses|join:", " }} · Aceitos: {{ check.accepted_statuses|join:", "|default:"padrão do requisito" }}</p>
                                         <p class="mt-1 text-xs text-slate-600">Evidências: {{ check.evidence_fields|join:", "|default:"nenhuma configurada" }}</p>
                                         {% for rule in check.validation_rules.all %}{% if rule.active %}<p class="mt-2 text-xs text-blue-800">Validação: {{ rule.get_rule_type_display }} · {{ rule.get_severity_display }} · {{ rule.config }}</p>{% endif %}{% endfor %}
                                     </div>
-                                {% endif %}
                             {% endfor %}
                         </div>
                     {% else %}
