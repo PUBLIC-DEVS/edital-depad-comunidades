@@ -42,7 +42,7 @@ DOCUMENTS_2026 = (
             {
                 "code": "COMPROVACAO_AUTODECLARADA",
                 "name": "Documentação comprobatória quando experiência for autodeclarada",
-                "required": False,
+                "required": True,
                 "allowed": ["ATENDE", "NAO_ATENDE", "NAO_APLICAVEL"],
                 "accepted": ["ATENDE", "NAO_APLICAVEL"],
                 "failures": ["NAO_ATENDE"],

@@ -52,7 +52,7 @@ def test_2026_template_fingerprint_and_conditional_check(edital_2026):
     assert edital.requirements.filter(active=True).count() == 14
     assert sum(req.checks.filter(active=True).count() for req in edital.requirements.all()) == 23
     proof = edital.requirements.get(code="ANEXO_III").checks.get(code="COMPROVACAO_AUTODECLARADA")
-    assert not proof.required
+    assert proof.required
     assert "NAO_APLICAVEL" in proof.allowed_statuses
     assert "NAO_APLICAVEL" in proof.accepted_statuses
     validation = EditalConfigurationService.validate(edital)

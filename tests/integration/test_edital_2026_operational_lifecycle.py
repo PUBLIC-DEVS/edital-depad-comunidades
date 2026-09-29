@@ -136,9 +136,7 @@ def test_edital_2026_operational_lifecycle_without_workbook(client):
             definition = result.definition
             status = "ATENDE"
             if definition.code == "COMPROVACAO_AUTODECLARADA":
-                status = "NAO_APLICAVEL"
-            elif fail_one and definition.code == "FICHA_CADASTRAL":
-                status = "NAO_ATENDE"
+                status = "NAO_ATENDE" if fail_one else "NAO_APLICAVEL"
             payload[f"{result.input_prefix}status"] = status
             for field in definition.evidence_fields:
                 value = {
