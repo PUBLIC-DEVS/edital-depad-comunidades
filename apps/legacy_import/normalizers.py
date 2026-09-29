@@ -86,7 +86,22 @@ def decimal_value(value):
 
 
 def failed_codes(value):
-    return sorted(set(re.findall(r"4\.2\s*[-–]?\s*([IVX]+)", text(value).upper())))
+    return sorted({"4.2-" + c for c in re.findall(r"4\.2\s*[-–]?\s*([IVX]+)", text(value).upper())})
+
+
+def document_date(value):
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if not value:
+        return None
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(text(value), fmt).date()
+        except ValueError:
+            continue
+    raise ValueError("Unsupported document validity date")
 
 
 def json_value(value):

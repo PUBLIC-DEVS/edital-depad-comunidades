@@ -32,7 +32,7 @@ class MicrosoftAuthAdapter(AuthenticationAdapter):
         email = claims.get("email") or upn
 
         if not azure_oid or not email:
-            logger.warning("Claims Microsoft incompletos recebidos: %s", claims)
+            logger.warning("Claims Microsoft incompletos; perfil não sincronizado.")
             return None
 
         user, created = User.objects.get_or_create(

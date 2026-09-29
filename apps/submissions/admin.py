@@ -1,16 +1,18 @@
 from django.contrib import admin
 
+from apps.audit.admin_support import ReadOnlyOperationalAdmin
+
 from .models import Assignment, Submission
 
 
-class AssignmentInline(admin.TabularInline):
+class AssignmentInline(ReadOnlyOperationalAdmin, admin.TabularInline):
     model = Assignment
     extra = 0
     readonly_fields = ("assigned_at",)
 
 
 @admin.register(Submission)
-class SubmissionAdmin(admin.ModelAdmin):
+class SubmissionAdmin(ReadOnlyOperationalAdmin, admin.ModelAdmin):
     list_display = (
         "processo_sei",
         "institution",
@@ -26,7 +28,7 @@ class SubmissionAdmin(admin.ModelAdmin):
 
 
 @admin.register(Assignment)
-class AssignmentAdmin(admin.ModelAdmin):
+class AssignmentAdmin(ReadOnlyOperationalAdmin, admin.ModelAdmin):
     list_display = ("submission", "analyst", "assigned_by", "assigned_at", "status")
     list_filter = ("status", "analyst")
     search_fields = ("submission__processo_sei", "analyst__username")

@@ -4,6 +4,7 @@ import csv
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -74,12 +75,16 @@ def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
         snapshot_type = request.POST.get("snapshot_type", RankingSnapshot.SnapshotType.PRELIMINAR)
         description = request.POST.get("description", "").strip()
 
-        snapshot = RankingService.generate_snapshot(
-            edital=edital,
-            actor=request.user,
-            snapshot_type=snapshot_type,
-            description=description,
-        )
+        try:
+            snapshot = RankingService.generate_snapshot(
+                edital=edital,
+                actor=request.user,
+                snapshot_type=snapshot_type,
+                description=description,
+            )
+        except ValidationError as exc:
+            messages.error(request, str(exc))
+            return redirect(f"/classificacao/?edital={edital.id}")
 
         messages.success(
             request,
@@ -110,6 +115,11 @@ def ranking_snapshots_history_view(request: HttpRequest) -> HttpResponse:
 def ranking_export_csv_view(request: HttpRequest, snapshot_id: int) -> HttpResponse:
     """Exporta o snapshot oficial em formato CSV delimitado por ponto e vírgula."""
     snapshot = get_object_or_404(RankingSnapshot, id=snapshot_id)
+    if not snapshot.policy_metadata.get("eligible_statuses"):
+        return HttpResponse(
+            "Snapshot anterior ao hardening: conteúdo não validado para exportação oficial.",
+            status=409,
+        )
     entries = snapshot.entries.select_related(
         "submission",
         "submission__institution",

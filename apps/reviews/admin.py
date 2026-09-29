@@ -1,15 +1,17 @@
 from django.contrib import admin
 
+from apps.audit.admin_support import ReadOnlyOperationalAdmin
+
 from .models import Diligence, Review, ReviewItemDecision
 
 
-class ReviewItemDecisionInline(admin.TabularInline):
+class ReviewItemDecisionInline(ReadOnlyOperationalAdmin, admin.TabularInline):
     model = ReviewItemDecision
     extra = 0
 
 
 @admin.register(Review)
-class ReviewAdmin(admin.ModelAdmin):
+class ReviewAdmin(ReadOnlyOperationalAdmin, admin.ModelAdmin):
     list_display = (
         "submission",
         "reviewer",
@@ -24,7 +26,7 @@ class ReviewAdmin(admin.ModelAdmin):
 
 
 @admin.register(Diligence)
-class DiligenceAdmin(admin.ModelAdmin):
+class DiligenceAdmin(ReadOnlyOperationalAdmin, admin.ModelAdmin):
     list_display = ("submission", "requested_by", "deadline", "status", "result", "requested_at")
     list_filter = ("status", "result")
     search_fields = ("submission__processo_sei", "requested_by__username")

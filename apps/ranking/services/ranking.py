@@ -49,6 +49,12 @@ class RankingService:
             if edital.duplicate_scope == "ABSOLUTE"
             else [s for s in universe if s.workflow_status in eligible]
         )
+        if edital.tie_breaker_policy == "UNRESOLVED":
+            for members in DuplicateService.group_by_institution_cnpj(duplicate_universe).values():
+                if len({s.received_at for s in members}) != len(members):
+                    raise ValidationError(
+                        "OPEN BUSINESS QUESTION: empate absoluto entre duplicatas."
+                    )
         resolution = DuplicateService.resolve_duplicates(
             duplicate_universe,
             edital.duplicate_policy,

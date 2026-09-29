@@ -19,9 +19,11 @@ from apps.ranking.services.classification import ClassificationService
 from apps.reviews.models import Diligence, Review
 from apps.submissions.models import Assignment, Submission
 
+from .finance import configure_source_finance
 from .models import LegacyEntityLink, LegacyImportIssue, LegacyImportRun, LegacySourceRecord
 from .normalizers import (
     decimal_value,
+    document_date,
     json_value,
     normalize_review,
     normalize_status,
@@ -114,6 +116,7 @@ class LegacyImporter:
         )
         self.report.run_id = self.run_record.pk
         failed = False
+        unexpected_error = None
         try:
             with transaction.atomic():
                 timestamps = []
@@ -144,6 +147,16 @@ class LegacyImporter:
                     },
                 )
                 self.edital = edital
+                try:
+                    configure_source_finance(data, edital)
+                except ValidationError as exc:
+                    self.issue(
+                        {"sheet": "DISTRIBUIÇÃO", "row": 3, "processo_sei": ""},
+                        "FINANCIAL_RULE_CONFLICT",
+                        str(exc),
+                        "U/V",
+                    )
+                    raise
                 names = {}
                 for rec in [*data.analyses, *data.reviews, *data.ranking]:
                     name = text(rec["values"].get("institution"))
@@ -182,6 +195,14 @@ class LegacyImporter:
                     transaction.set_rollback(True)
         except ValidationError:
             failed = True
+        except Exception as exc:
+            failed = True
+            unexpected_error = exc
+            self.issue(
+                {"sheet": "", "row": None, "processo_sei": ""},
+                "IMPORT_EXCEPTION",
+                type(exc).__name__,
+            )
         self.run_record.edital = Edital.objects.filter(number=self.number, year=self.year).first()
         self.run_record.warning_count = sum(i["severity"] == "WARNING" for i in self.issues)
         self.run_record.error_count = sum(i["severity"] == "ERROR" for i in self.issues)
@@ -203,6 +224,8 @@ class LegacyImporter:
             f"{i['code']} {i['sheet']}:{i['row']}:{i['column']}" for i in self.issues
         ]
         if failed:
+            if unexpected_error is not None:
+                raise unexpected_error
             raise ValidationError(
                 f"Import run {self.run_record.pk} failed; structured issues retained"
             )
@@ -357,6 +380,35 @@ class LegacyImporter:
         evaluation, created = Evaluation.objects.get_or_create(
             submission=sub, defaults={"analyst": analyst}
         )
+        normalized = {}
+        dates = {}
+        # Validation is independent of creation: a second run reports the same source problems.
+        for columns, evidence in CHECKS.values():
+            for col in columns:
+                normalized[col] = normalize_status(v[col], col)
+                if normalized[col] is None:
+                    self.issue(
+                        rec,
+                        "UNKNOWN_CHECK_STATUS",
+                        "Unknown status retained as unevaluated",
+                        col,
+                        raw=v[col],
+                    )
+                    normalized[col] = CheckResult.Status.EM_BRANCO
+            source = evidence.get("valid_until")
+            if source:
+                try:
+                    dates[source] = document_date(v[source])
+                except ValueError:
+                    self.issue(
+                        rec,
+                        "INVALID_DOCUMENT_DATE",
+                        "Unparsed date retained in provenance",
+                        source,
+                        "WARNING",
+                        v[source],
+                    )
+                    dates[source] = None
         if created:
             for order, (code, (columns, evidence)) in enumerate(CHECKS.items(), 1):
                 req, _ = Requirement.objects.get_or_create(
@@ -378,34 +430,14 @@ class LegacyImporter:
                             "contributes_to_result": col != "AW",
                         },
                     )
-                    status = normalize_status(v[col], col)
-                    if status is None:
-                        self.issue(
-                            rec,
-                            "UNKNOWN_CHECK_STATUS",
-                            "Unknown status retained as unevaluated",
-                            col,
-                            raw=v[col],
-                        )
-                        status = CheckResult.Status.EM_BRANCO
+                    status = normalized[col]
                     attrs = {}
                     for attr, source in evidence.items():
                         val = v[source]
                         if attr == "minimum_equity":
                             continue
                         if attr == "valid_until":
-                            val = val.date() if hasattr(val, "date") else val
-                            if not hasattr(val, "year"):
-                                if val:
-                                    self.issue(
-                                        rec,
-                                        "INVALID_DOCUMENT_DATE",
-                                        "Unparsed date retained in provenance",
-                                        source,
-                                        "WARNING",
-                                        val,
-                                    )
-                                val = None
+                            val = dates[source]
                         else:
                             val = text(val)
                         attrs[attr] = val

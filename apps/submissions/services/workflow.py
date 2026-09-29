@@ -275,6 +275,11 @@ class WorkflowService:
         # A legal failure consequence must be explicitly supplied. Do not assume ineligibility.
         if unsatisfied_return_status is not None and unsatisfied_return_status not in origins:
             raise ValidationError("Consequência inválida para diligência não saneada.")
+        if unsatisfied_return_status and not (
+            requested_by.is_superuser
+            or requested_by.role in {User.Role.ADMINISTRADOR, User.Role.COORDENADOR}
+        ):
+            raise PermissionDenied("Somente coordenação pode definir consequência jurídica.")
         diligence = Diligence.objects.create(
             submission=submission,
             requested_by=requested_by,

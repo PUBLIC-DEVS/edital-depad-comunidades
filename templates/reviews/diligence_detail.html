@@ -47,13 +47,14 @@
         </div>
 
         <!-- Response & Conclusion Form if still open -->
-        {% if diligence.status != 'CONCLUDED' %}
+        {% if diligence.status == 'OPEN' or diligence.status == 'ANSWERED' %}
             <div class="border-t border-slate-100 pt-4 space-y-3">
                 <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Registro de Resposta e Julgamento do Saneamento
                 </h3>
                 <form method="post" action="{% url 'diligence-detail' diligence_id=diligence.id %}" class="space-y-4 text-xs">
                     {% csrf_token %}
+                    {{ form.non_field_errors }}
                     <div>
                         <label class="block font-semibold text-slate-700 mb-1">Teor da Resposta da Entidade / Nº Documento SEI:</label>
                         {{ form.response }}
@@ -69,6 +70,8 @@
                     </div>
                 </form>
             </div>
+        {% elif diligence.status == 'LEGACY_UNKNOWN' %}
+            <p class="text-xs text-slate-600">Registro histórico. Estado operacional, datas e prazo não estão disponíveis na fonte.</p>
         {% else %}
             <!-- Concluded Display -->
             <div class="border-t border-slate-100 pt-4 space-y-3 text-xs">

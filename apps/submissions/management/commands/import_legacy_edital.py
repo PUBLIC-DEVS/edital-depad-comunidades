@@ -9,9 +9,7 @@ from apps.submissions.services.legacy_importer import LegacyImporter
 
 
 class Command(BaseCommand):
-    help = (
-        "Importa o arquivo Excel legado (282 processos) de forma idempotente e com rastreabilidade."
-    )
+    help = "Importa o arquivo Excel legado de forma idempotente e com rastreabilidade."
 
     def add_arguments(self, parser):
         modes = parser.add_mutually_exclusive_group()
@@ -44,7 +42,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE(f"Iniciando importação do arquivo: {filepath}"))
         if dry_run:
             self.stdout.write(
-                self.style.WARNING("Modo DRY-RUN ativado: nenhuma alteração será gravada.")
+                self.style.WARNING(
+                    "Modo DRY-RUN: entidades operacionais não serão gravadas; run e issues serão registrados."
+                )
             )
 
         importer = LegacyImporter(
@@ -93,4 +93,6 @@ class Command(BaseCommand):
             if len(report.skipped_rows) > 10:
                 self.stdout.write(f" ... e mais {len(report.skipped_rows) - 10} linhas.")
 
-        self.stdout.write(self.style.SUCCESS("\nImportação concluída com sucesso!"))
+        self.stdout.write(
+            f"\nImportação finalizada; {len(report.warnings)} issues registradas. Isso não declara paridade."
+        )

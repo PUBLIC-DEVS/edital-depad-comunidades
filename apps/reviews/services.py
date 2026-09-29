@@ -73,8 +73,10 @@ class ReviewService:
             msg = "Justificativa obrigatória em caso de discordância do parecer do analista."
             raise ValidationError(msg)
 
-        check_result = CheckResult.objects.get(id=check_result_id)
-        if check_result.evaluation_id != review.evaluation_id:
+        check_result = CheckResult.objects.filter(
+            id=check_result_id, evaluation_id=review.evaluation_id
+        ).first()
+        if check_result is None:
             raise ValidationError("Checagem não pertence à avaliação desta revisão.")
 
         decision, created = ReviewItemDecision.objects.update_or_create(

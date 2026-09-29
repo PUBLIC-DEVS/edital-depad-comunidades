@@ -19,6 +19,8 @@ def _build_snapshot(snapshot):
 
 class ImmutableQuerySet(models.QuerySet):
     def bulk_create(self, objs, *args, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise PermissionDenied("Ranking não permite atualizar registros por conflito.")
         objs = list(objs)
         for obj in objs:
             if hasattr(obj, "snapshot_id") and obj.snapshot_id != _building.get():

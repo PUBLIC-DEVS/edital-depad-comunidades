@@ -13,7 +13,7 @@
             <a href="{% url 'ranking-history' %}" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-xs transition border border-slate-300">
                 Histórico de Snapshots
             </a>
-            {% if latest_snapshot %}
+            {% if latest_snapshot.policy_metadata.eligible_statuses %}
                 <a href="{% url 'ranking-export-csv' snapshot_id=latest_snapshot.id %}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded text-xs shadow-sm transition">
                     &darr; Exportar CSV Oficial
                 </a>
@@ -36,7 +36,11 @@
             </div>
             <div class="flex items-center space-x-2">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800">
-                    &check; Imutável e Auditado
+                    {% if latest_snapshot.policy_metadata.eligible_statuses %}
+                        &check; Snapshot protegido
+                    {% else %}
+                        Histórico anterior ao hardening: conteúdo não validado
+                    {% endif %}
                 </span>
             </div>
         </div>
@@ -106,15 +110,15 @@
                             </td>
                             <td class="px-4 py-3 font-semibold text-govblue-600">
                                 <a href="{% url 'submission-detail' submission_id=entry.submission.id %}" class="hover:underline">
-                                    {{ entry.submission.processo_sei }}
+                                    {{ entry.snapshot_data.processo_sei }}
                                 </a>
                             </td>
                             <td class="px-4 py-3">
-                                <div class="font-medium text-slate-900">{{ entry.submission.institution.name }}</div>
-                                <div class="text-[11px] text-slate-500 font-mono">{{ entry.submission.institution.formatted_cnpj }}</div>
+                                <div class="font-medium text-slate-900">{{ entry.snapshot_data.institution }}</div>
+                                <div class="text-[11px] text-slate-500 font-mono">{{ entry.snapshot_data.cnpj }}</div>
                             </td>
                             <td class="px-4 py-3">
-                                {{ entry.submission.municipality.name }}/{{ entry.submission.municipality.state }}
+                                {{ entry.snapshot_data.municipality }}/{{ entry.snapshot_data.state }}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap font-mono text-[11px]">
                                 {{ entry.received_at|date:"d/m/Y H:i:s" }}

@@ -3,6 +3,7 @@
 from django import forms
 
 from apps.reviews.models import Diligence, Review
+from apps.submissions.models import Submission
 
 
 class ReviewConcludeForm(forms.ModelForm):
@@ -33,10 +34,26 @@ class DiligenceCreateForm(forms.ModelForm):
     """Formulário para abertura de diligência no processo."""
 
     deadline = forms.DateField(required=True, widget=forms.DateInput(attrs={"type": "date"}))
+    unsatisfied_return_status = forms.ChoiceField(
+        required=False,
+        label="Estágio após diligência não saneada",
+        choices=[("", "Política ainda não definida")]
+        + [
+            (code, label)
+            for code, label in Submission.WorkflowStatus.choices
+            if code in {"UNDER_ANALYSIS", "PENDING_REVIEW", "ELIGIBLE_FOR_RANKING", "INELIGIBLE"}
+        ],
+        help_text="Decisão expressa do coordenador. Sem política, a conclusão não saneada será bloqueada.",
+    )
+
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if actor and not (actor.is_superuser or actor.role in {"COORDENADOR", "ADMINISTRADOR"}):
+            self.fields.pop("unsatisfied_return_status")
 
     class Meta:
         model = Diligence
-        fields = ["reason", "deadline"]
+        fields = ["reason", "deadline", "unsatisfied_return_status"]
         widgets = {
             "deadline": forms.DateInput(attrs={"type": "date", "class": "form-input"}),
             "reason": forms.Textarea(

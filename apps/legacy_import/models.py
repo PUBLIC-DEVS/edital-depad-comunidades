@@ -27,7 +27,7 @@ class LegacyImportIssue(models.Model):
 
 
 class LegacySourceRecord(models.Model):
-    """Immutable source observations, separate from operational entities.
+    """Source observations, separate from operational entities.
 
     Every run retains original cells and formulas; no historical operational date is inferred
     from this record's ingestion time. One row can document multiple derived entities.

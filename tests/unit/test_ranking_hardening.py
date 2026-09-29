@@ -76,6 +76,7 @@ def test_only_valid_entries_receive_consecutive_positions_and_audit(domain):
         "query_update",
         "query_delete",
         "entry_add",
+        "bulk_conflict_update",
     ],
 )
 def test_ranking_immutable_in_common_orm_paths(domain, operation):
@@ -98,6 +99,14 @@ def test_ranking_immutable_in_common_orm_paths(domain, operation):
             RankingSnapshot.objects.filter(pk=snapshot.pk).update(description="tampered")
         elif operation == "query_delete":
             RankingEntry.objects.filter(pk=entry.pk).delete()
+        elif operation == "bulk_conflict_update":
+            snapshot.description = "tampered"
+            RankingSnapshot.objects.bulk_create(
+                [snapshot],
+                update_conflicts=True,
+                update_fields=["description"],
+                unique_fields=["pk"],
+            )
         else:
             RankingEntry.objects.create(
                 snapshot=snapshot,

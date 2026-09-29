@@ -5,6 +5,7 @@ from hashlib import sha256
 from pathlib import Path
 
 import openpyxl
+from openpyxl.utils.cell import get_column_letter
 
 from . import schema
 from .normalizers import json_value, text
@@ -34,7 +35,7 @@ def parse_workbook(path):
     values = openpyxl.load_workbook(path, data_only=True, read_only=False)
     data = WorkbookData(path.name, digest, values.sheetnames, values.epoch)
 
-    def rows(sheet, mapping, start):
+    def rows(sheet, mapping, start, allow_unidentified=False):
         if sheet not in values:
             data.issues.append(
                 {
@@ -56,7 +57,7 @@ def parse_workbook(path):
             identity = ws[f"{mapping.get('cnpj', mapping['processo_sei'])}{row}"].value
             if not sei and identity is None:
                 continue
-            if not sei:
+            if not sei and not allow_unidentified:
                 data.issues.append(
                     {
                         "severity": "ERROR",
@@ -70,10 +71,13 @@ def parse_workbook(path):
                     }
                 )
                 continue
-            cells = {col: json_value(ws[f"{col}{row}"].value) for col in mapping.values()}
-            cached = {col: ws[f"{col}{row}"].value for col in mapping.values()}
+            columns = set(mapping.values())
+            if sheet in ("REVISÃO", "DILIGÊNCIA"):
+                columns.update(get_column_letter(c) for c in range(1, 86))
+            cells = {col: json_value(ws[f"{col}{row}"].value) for col in columns}
+            cached = {col: ws[f"{col}{row}"].value for col in columns}
             source_formulas = {}
-            for col in mapping.values():
+            for col in sorted(columns):
                 cell = fs[f"{col}{row}"]
                 if cell.data_type == "f" or hasattr(cell.value, "text"):
                     source_formulas[col] = json_value(cell.value)
@@ -114,9 +118,7 @@ def parse_workbook(path):
         data.reviews = rows("REVISÃO", schema.REVIEW, 4)
         data.diligences = rows("DILIGÊNCIA", schema.DILIGENCE, 4)
         if "ANÁLISE" in values:
-            data.consolidated = rows(
-                "ANÁLISE", {**schema.ANALYST_IDENTITY, **schema.ANALYST_RESULT}, 4
-            )
+            data.consolidated = rows("ANÁLISE", schema.CONSOLIDATED, 4, allow_unidentified=True)
         if "CLASSIFICAÇÃO" in values:
             for group, mapping in schema.RANKING.items():
                 for record in rows("CLASSIFICAÇÃO", mapping, 3):

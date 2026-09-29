@@ -216,22 +216,28 @@ def diligence_create_view(request: HttpRequest, submission_id: int) -> HttpRespo
     WorkflowService.enforce_diligence_actor(submission, request.user)
 
     if request.method == "POST":
-        form = DiligenceCreateForm(request.POST)
+        form = DiligenceCreateForm(request.POST, actor=request.user)
         if form.is_valid():
             reason = form.cleaned_data["reason"]
             deadline = form.cleaned_data["deadline"]
-            WorkflowService.open_diligence(
-                submission=submission,
-                requested_by=request.user,
-                reason=reason,
-                deadline=deadline,
-            )
-            messages.success(
-                request, f"Diligência aberta para o processo {submission.processo_sei}."
-            )
-            return redirect("diligence-list")
+            try:
+                WorkflowService.open_diligence(
+                    submission=submission,
+                    requested_by=request.user,
+                    reason=reason,
+                    deadline=deadline,
+                    unsatisfied_return_status=form.cleaned_data.get("unsatisfied_return_status")
+                    or None,
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(
+                    request, f"Diligência aberta para o processo {submission.processo_sei}."
+                )
+                return redirect("diligence-list")
     else:
-        form = DiligenceCreateForm()
+        form = DiligenceCreateForm(actor=request.user)
 
     return render(
         request,
@@ -253,16 +259,21 @@ def diligence_detail_view(request: HttpRequest, diligence_id: int) -> HttpRespon
     if request.method == "POST":
         form = DiligenceResponseForm(request.POST, instance=diligence)
         if form.is_valid():
-            WorkflowService.conclude_diligence(
-                diligence=diligence,
-                actor=request.user,
-                result=form.cleaned_data["result"],
-                response_text=form.cleaned_data["response"],
-            )
-            messages.success(
-                request, f"Diligência do processo {diligence.submission.processo_sei} concluída."
-            )
-            return redirect("diligence-list")
+            try:
+                WorkflowService.conclude_diligence(
+                    diligence=diligence,
+                    actor=request.user,
+                    result=form.cleaned_data["result"],
+                    response_text=form.cleaned_data["response"],
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(
+                    request,
+                    f"Diligência do processo {diligence.submission.processo_sei} concluída.",
+                )
+                return redirect("diligence-list")
     else:
         form = DiligenceResponseForm(instance=diligence)
 

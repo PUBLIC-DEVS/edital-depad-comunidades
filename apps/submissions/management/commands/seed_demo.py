@@ -538,7 +538,11 @@ class Command(BaseCommand):
 
             # Classifica todos
             for s in [sub1, sub2, sub3, sub4, sub5, sub6, sub7]:
-                ClassificationService.classify_and_update(s)
+                ClassificationService.classify_and_update(s, coord_user)
+                from apps.submissions.services.funding import FundingService
+
+                s.valor_global, s.patrimonio_minimo = FundingService.calculate_submission_values(s)
+                s.save(update_fields=["valor_global", "patrimonio_minimo", "updated_at"])
 
             # Official snapshot goes through the same service as production.
             from apps.ranking.services import RankingService

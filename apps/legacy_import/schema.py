@@ -61,6 +61,14 @@ DILIGENCE = {
     "initial_failed": "CE",
     "result": "CF",
 }
+CONSOLIDATED = {
+    **ANALYST_IDENTITY,
+    "result": "BX",
+    "failed": "BY",
+    "review_result": "BZ",
+    "review_failed": "CA",
+    "reviewer": "CB",
+}
 # Requirement -> real status columns, evidence columns (SEI, pages, CNPJ, validity, equity).
 CHECKS = {
     "4.2-III": (["E"], {"sei_number": "F", "pages": "G"}),
