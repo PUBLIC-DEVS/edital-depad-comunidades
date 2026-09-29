@@ -14,6 +14,14 @@ class TestBootstrapFoundation:
         assert data["status"] == "ok"
         assert data["database"] == "connected"
 
+    def test_security_middleware_requires_https_when_configured(self, client, settings):
+        settings.SECURE_SSL_REDIRECT = True
+        url = reverse("health-check")
+        insecure = client.get(url)
+        assert insecure.status_code == 301
+        assert insecure["Location"] == f"https://testserver{url}"
+        assert client.get(url, secure=True).status_code == 200
+
     def test_custom_user_creation(self):
         user = User.objects.create_user(
             username="analista1",

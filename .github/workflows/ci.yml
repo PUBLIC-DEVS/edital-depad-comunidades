@@ -64,5 +64,7 @@ jobs:
           DATABASE_URL: postgres://edital_user:edital_password@localhost:5432/edital_depad_test
           SECRET_KEY: ci-secret-key-not-for-production
           DEBUG: "False"
+          # Django's test client sends HTTP; test TLS redirects separately.
+          SECURE_SSL_REDIRECT: "False"
         run: |
           pytest -m "not legacy_real" --cov=apps --cov-report=term-missing
