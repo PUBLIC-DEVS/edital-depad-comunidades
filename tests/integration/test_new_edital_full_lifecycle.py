@@ -49,6 +49,7 @@ def test_new_edital_full_lifecycle(client):
             "closes_at": "2027-03-01T18:00",
             "rules_version": "1.0",
             "minimum_equity_percentage": "15.00",
+            "requires_financial_rules": "on",
             "duplicate_policy": "KEEP_EARLIEST_SUBMISSION",
             "duplicate_scope": "ELIGIBLE",
             "tie_breaker_policy": "UNRESOLVED",

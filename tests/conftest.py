@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import pytest
 from django.utils import timezone
 
@@ -6,6 +9,20 @@ from apps.editais.models import Edital, Requirement, RequirementCheck
 from apps.institutions.models import Institution, Municipality
 from apps.submissions.models import Assignment, Submission
 from tests.group_configuration import configure_example_groups
+
+
+def pytest_ignore_collect(collection_path: Path, config):
+    """Keep migration-only tests out when the optional legacy app is disabled."""
+    if os.getenv("ENABLE_LEGACY_IMPORT", "true").lower() != "false":
+        return None
+    legacy_only_modules = {
+        "test_legacy_import_safety.py",
+        "test_legacy_management_commands.py",
+        "test_real_legacy_workbook.py",
+        "test_parity_status.py",
+        "test_synthetic_legacy_importer.py",
+    }
+    return collection_path.name in legacy_only_modules
 
 
 @pytest.fixture

@@ -8,12 +8,13 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.editais.models import Edital, Requirement, RequirementCheck
-from apps.evaluations.models import CheckResult
+from apps.evaluations.models import CheckResult, Evaluation
 from apps.evaluations.services import EvaluationService
 from apps.institutions.models import Institution, Municipality
 from apps.reviews.models import Diligence, Review
 from apps.reviews.services import ReviewService
 from apps.submissions.models import Assignment, Submission
+from apps.submissions.services.workflow import WorkflowService
 
 
 @pytest.mark.django_db
@@ -195,3 +196,51 @@ class TestReviewsAndDiligenceIntegration:
             entity_type="Submission", entity_id=str(sub.id)
         ).exists()
         assert audit_exists is True
+
+    def test_diligence_related_check_result_is_scoped_to_submission(self, client, setup_data):
+        reviewer = setup_data["reviewer"]
+        submission = setup_data["sub"]
+        check_result = CheckResult.objects.get(evaluation=setup_data["eval_obj"])
+        client.force_login(reviewer)
+        deadline = (timezone.now().date() + datetime.timedelta(days=10)).strftime("%Y-%m-%d")
+        response = client.post(
+            reverse("diligence-create", kwargs={"submission_id": submission.pk}),
+            {
+                "reason": "Apresentar complemento do item documental revisado.",
+                "deadline": deadline,
+                "related_check_results": [check_result.pk],
+            },
+        )
+        assert response.status_code == 302
+        diligence = Diligence.objects.get(submission=submission)
+        assert list(diligence.related_check_results.values_list("pk", flat=True)) == [
+            check_result.pk
+        ]
+
+    def test_diligence_rejects_foreign_check_result_id(self, setup_data):
+        current = setup_data["sub"]
+        foreign_institution = Institution.objects.create(cnpj="11222333000181", name="Outra OSC")
+        foreign_submission = Submission.objects.create(
+            edital=current.edital,
+            institution=foreign_institution,
+            processo_sei="71000.FOREIGN/2024",
+            received_at=timezone.now(),
+            municipality=current.municipality,
+        )
+        foreign_evaluation = Evaluation.objects.create(
+            submission=foreign_submission, analyst=setup_data["analyst"]
+        )
+        foreign_result = CheckResult.objects.create(
+            evaluation=foreign_evaluation,
+            requirement_check=setup_data["check"],
+            status=CheckResult.Status.EM_BRANCO,
+        )
+        with pytest.raises(ValidationError, match="não pertence"):
+            WorkflowService.open_diligence(
+                submission=current,
+                requested_by=setup_data["reviewer"],
+                reason="Diligência limitada ao processo atual.",
+                deadline=timezone.now().date() + datetime.timedelta(days=10),
+                related_check_result_ids=[foreign_result.pk],
+            )
+        assert not Diligence.objects.filter(submission=current).exists()
