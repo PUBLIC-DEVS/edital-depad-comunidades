@@ -63,6 +63,7 @@ def test_unknown_review_and_repeated_diligences_preserved(tmp_path):
         code="UNKNOWN_REVIEW_RESULT", raw_value="Sem docts"
     ).exists()
     assert sub.diligences.count() == 2
+    assert set(sub.diligences.values_list("result", flat=True)) == {"LEGACY_UNKNOWN"}
     assert all(
         d.deadline is None
         and d.requested_at is None

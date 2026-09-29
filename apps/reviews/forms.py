@@ -69,6 +69,14 @@ class DiligenceCreateForm(forms.ModelForm):
 class DiligenceResponseForm(forms.ModelForm):
     """Formulário para registro da resposta e conclusão da diligência."""
 
+    result = forms.ChoiceField(
+        choices=[
+            (Diligence.Result.SANEADA, Diligence.Result.SANEADA.label),
+            (Diligence.Result.NAO_SANEADA, Diligence.Result.NAO_SANEADA.label),
+        ],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
     class Meta:
         model = Diligence
         fields = ["response", "result"]

@@ -137,6 +137,7 @@ class Diligence(models.Model):
         CANCELLED = "CANCELLED", "Cancelada"
 
     class Result(models.TextChoices):
+        LEGACY_UNKNOWN = "LEGACY_UNKNOWN", "Histórico: resultado operacional desconhecido"
         PENDENTE = "PENDENTE", "Pendente de Julgamento"
         SANEADA = "SANEADA", "Falha Saneada / Acolhida"
         NAO_SANEADA = "NAO_SANEADA", "Não Saneada / Mantida Inaptidão"

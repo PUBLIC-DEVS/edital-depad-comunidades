@@ -550,7 +550,7 @@ class LegacyImporter:
                 deadline=None,
                 status=Diligence.Status.LEGACY_UNKNOWN,
                 reason=text(rec["values"]["reason"]),
-                result=Diligence.Result.PENDENTE,
+                result=Diligence.Result.LEGACY_UNKNOWN,
             )
             LegacyEntityLink.objects.create(**key, entity_id=diligence.pk)
             self.report.diligences_created += 1
