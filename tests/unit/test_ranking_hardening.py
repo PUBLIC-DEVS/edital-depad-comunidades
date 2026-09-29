@@ -139,3 +139,11 @@ def test_absolute_tie_requires_configured_policy(domain):
     with pytest.raises(ValidationError, match="OPEN BUSINESS QUESTION"):
         RankingService.generate_snapshot(domain["edital"], domain["coord"])
     assert not RankingSnapshot.objects.exists()
+
+
+def test_missing_municipality_is_supported_by_ranking_lock(domain):
+    domain["sub"].municipality = None
+    domain["sub"].workflow_status = "ELIGIBLE_FOR_RANKING"
+    domain["sub"].save()
+    snapshot = RankingService.generate_snapshot(domain["edital"], domain["coord"])
+    assert snapshot.entries.get().target_group == "G3"

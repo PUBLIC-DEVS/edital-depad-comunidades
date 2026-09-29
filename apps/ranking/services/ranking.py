@@ -38,7 +38,7 @@ class RankingService:
         if not eligible or not eligible.issubset(allowed):
             raise ValidationError("Ranking oficial exige estágios elegíveis.")
         universe = list(
-            Submission.objects.select_for_update()
+            Submission.objects.select_for_update(of=("self",))
             .filter(edital=edital)
             .select_related("institution", "municipality", "edital")
         )
