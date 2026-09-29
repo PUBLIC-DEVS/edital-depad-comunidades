@@ -2,6 +2,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.audit.models import AuditEvent
 from apps.evaluations.models import Evaluation
 from apps.institutions.cnpj import normalize_cnpj
@@ -157,4 +158,63 @@ class ParticipationEligibilityService:
             ).select_related("institution", "edital")
             for submission in affected:
                 cls.apply_preanalysis_block(submission, actor)
+        return locked
+
+    @staticmethod
+    def is_preanalysis_block(submission):
+        if (
+            submission.workflow_status != "INELIGIBLE"
+            or Evaluation.objects.filter(submission=submission).exists()
+        ):
+            return False
+        event = (
+            AuditEvent.objects.filter(
+                entity_type="Submission", entity_id=str(submission.pk), action="WORKFLOW_TRANSITION"
+            )
+            .order_by("-pk")
+            .first()
+        )
+        return bool(
+            event and event.new_value == "INELIGIBLE" and event.metadata.get("restriction_ids")
+        )
+
+    @classmethod
+    def validate_release(cls, submission, actor, reason):
+        if not actor.is_superuser and actor.role not in {
+            User.Role.ADMINISTRADOR,
+            User.Role.COORDENADOR,
+        }:
+            raise PermissionDenied("Liberação restrita à Administração ou Coordenação.")
+        if not reason or not reason.strip():
+            raise ValidationError("Informe a justificativa da liberação.")
+        if not cls.is_preanalysis_block(submission):
+            raise ValidationError("Somente bloqueio pré-análise por restrição pode ser liberado.")
+        if cls.is_restricted(submission):
+            raise ValidationError("Ainda existe restrição ativa para esta candidatura.")
+        if submission.assignments.filter(status=Assignment.Status.ACTIVE).exists():
+            raise ValidationError(
+                "Bloqueio possui atribuição ativa incoerente; liberação rejeitada."
+            )
+
+    @classmethod
+    @transaction.atomic
+    def release_preanalysis_block(cls, submission, actor, reason):
+        locked = Submission.objects.select_for_update().get(pk=submission.pk)
+        cls.validate_release(locked, actor, reason)
+        WorkflowService.transition(
+            locked,
+            Submission.WorkflowStatus.RECEIVED,
+            actor,
+            reason=reason.strip(),
+            metadata={"preanalysis_release": True},
+        )
+        AuditEvent.objects.create(
+            actor=actor,
+            entity_type="Submission",
+            entity_id=str(locked.pk),
+            action="RELEASE_PREANALYSIS_BLOCK",
+            old_value="INELIGIBLE",
+            new_value="RECEIVED",
+            metadata={"reason": reason.strip()},
+        )
         return locked

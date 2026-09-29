@@ -71,6 +71,7 @@ class WorkflowService:
             Submission.WorkflowStatus.CLOSED,
         },
         Submission.WorkflowStatus.INELIGIBLE: {
+            Submission.WorkflowStatus.RECEIVED,  # Formal pre-analysis restriction release
             Submission.WorkflowStatus.PENDING_DILIGENCE,  # Fase recursal / esclarecimento
             Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,  # Provimento de recurso
             Submission.WorkflowStatus.CLOSED,
@@ -96,6 +97,12 @@ class WorkflowService:
         current_status = locked.workflow_status
         if actor is not None and actor.role == User.Role.CONSULTA and not actor.is_superuser:
             raise PermissionDenied("Consulta não pode alterar workflow.")
+        if current_status == "INELIGIBLE" and target_status == "RECEIVED":
+            from apps.submissions.services.eligibility import ParticipationEligibilityService
+
+            if not (metadata or {}).get("preanalysis_release"):
+                raise ValidationError("Use a liberação formal de bloqueio pré-análise.")
+            ParticipationEligibilityService.validate_release(locked, actor, reason)
         allowed = cls.ALLOWED_TRANSITIONS.get(current_status, set())
 
         if target_status not in allowed:
@@ -136,13 +143,18 @@ class WorkflowService:
     ) -> Assignment:
         """Atribui ou redistribui a submissão a um analista."""
         now = timezone.now()
-        Submission.objects.select_for_update().get(pk=submission.pk)
+        submission = Submission.objects.select_for_update().get(pk=submission.pk)
         if not (
             assigned_by.is_superuser
             or assigned_by.role
             in {User.Role.ADMINISTRADOR, User.Role.COORDENADOR, User.Role.DISTRIBUIDOR}
         ):
             raise PermissionDenied("Sem permissão de distribuição.")
+        if submission.workflow_status not in {
+            Submission.WorkflowStatus.RECEIVED,
+            Submission.WorkflowStatus.ASSIGNED,
+        }:
+            raise ValidationError("Processo não está em estágio permitido para distribuição.")
         if analyst.role != User.Role.ANALISTA:
             raise ValidationError("Responsável deve ser analista.")
         from apps.submissions.services.eligibility import ParticipationEligibilityService

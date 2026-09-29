@@ -22,7 +22,7 @@ from apps.accounts.permissions import (
 )
 from apps.audit.models import AuditEvent
 from apps.editais.models import Edital, TargetGroup
-from apps.institutions.models import Institution, Municipality
+from apps.institutions.models import Municipality
 from apps.ranking.services import ClassificationService
 from apps.submissions.forms import (
     BulkAssignmentForm,
@@ -35,6 +35,7 @@ from apps.submissions.models import Assignment, ParticipationRestriction, Submis
 from apps.submissions.services.distribution import DistributionService
 from apps.submissions.services.eligibility import ParticipationEligibilityService
 from apps.submissions.services.identity import SubmissionIdentityService
+from apps.submissions.services.intake import SubmissionIntakeService
 from apps.submissions.services.validation import SubmissionAnomalyDetector
 from apps.submissions.services.workflow import WorkflowService
 
@@ -144,18 +145,8 @@ def submission_create_view(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = SubmissionIntakeForm(request.POST)
         if form.is_valid():
-            submission = form.save()
-            AuditEvent.objects.create(
-                actor=request.user,
-                entity_type="Submission",
-                entity_id=str(submission.pk),
-                action="CREATE",
-            )
-            # Enquadramento automático preliminar
-            ClassificationService.classify_and_update(submission, request.user)
-            restrictions = ParticipationEligibilityService.apply_preanalysis_block(
-                submission, request.user
-            )
+            intake = SubmissionIntakeService.create_submission(form, request.user)
+            submission, restrictions = intake.submission, intake.restrictions
             if restrictions:
                 messages.error(
                     request,
@@ -183,7 +174,12 @@ def submission_detail_view(request: HttpRequest, submission_id: int) -> HttpResp
 
     assignment_form = None
     restricted = ParticipationEligibilityService.is_restricted(submission)
-    if RolePermissionPolicy.can_distribute_submissions(request.user) and not restricted:
+    if (
+        RolePermissionPolicy.can_distribute_submissions(request.user)
+        and not restricted
+        and submission.workflow_status in {"RECEIVED", "ASSIGNED"}
+        and not hasattr(submission, "evaluation")
+    ):
         assignment_form = SingleAssignmentForm()
 
     context = {
@@ -193,6 +189,11 @@ def submission_detail_view(request: HttpRequest, submission_id: int) -> HttpResp
         "assignment_form": assignment_form,
         "can_distribute": RolePermissionPolicy.can_distribute_submissions(request.user),
         "restricted": restricted,
+        "can_release_restriction": (
+            request.user.is_superuser or request.user.role in {"ADMINISTRADOR", "COORDENADOR"}
+        )
+        and ParticipationEligibilityService.is_preanalysis_block(submission)
+        and not restricted,
         "can_edit": RolePermissionPolicy.can_distribute_submissions(request.user)
         and not hasattr(submission, "evaluation")
         and submission.edital.status == "ACTIVE",
@@ -548,25 +549,9 @@ def submission_import_csv_view(request):
                                         for field, values in form.errors.items()
                                     )
                                 )
-                            institution_preexists = Institution.objects.filter(
-                                cnpj=form.cleaned_data["institution_cnpj"]
-                            ).exists()
-                            sub = form.save()
-                            if not institution_preexists:
-                                AuditEvent.objects.create(
-                                    actor=request.user,
-                                    entity_type="Institution",
-                                    entity_id=str(sub.institution_id),
-                                    action="CREATE_CSV",
-                                )
-                            AuditEvent.objects.create(
-                                actor=request.user,
-                                entity_type="Submission",
-                                entity_id=str(sub.pk),
-                                action="CREATE_CSV",
-                                metadata={"edital_id": edital.pk, "source_row": row_number},
+                            SubmissionIntakeService.create_submission(
+                                form, request.user, source="CSV", source_row=row_number
                             )
-                            ClassificationService.classify_and_update(sub, request.user)
                 except (CsvRowError, ValidationError) as exc:
                     errors.append(str(exc))
                 else:
@@ -581,3 +566,25 @@ def submission_import_csv_view(request):
             "editais": Edital.objects.filter(status=Edital.Status.ACTIVE),
         },
     )
+
+
+@login_required
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@require_POST
+def submission_restriction_release_view(request, submission_id):
+    submission = enforce_submission_access(request, submission_id)
+    reason = request.POST.get("reason", "")
+    if request.POST.get("confirm") != "on":
+        messages.error(request, "Confirme a liberação formal do processo.")
+    else:
+        try:
+            ParticipationEligibilityService.release_preanalysis_block(
+                submission, request.user, reason
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(
+                request, "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
+            )
+        else:
+            messages.success(request, "Processo liberado para nova distribuição, com auditoria.")
+    return redirect("submission-detail", submission_id=submission_id)

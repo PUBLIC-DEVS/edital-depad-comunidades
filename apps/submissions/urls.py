@@ -18,6 +18,11 @@ urlpatterns = [
         views.submission_cnpj_correction_view,
         name="submission-cnpj-correction",
     ),
+    path(
+        "<int:submission_id>/liberar-restricao/",
+        views.submission_restriction_release_view,
+        name="submission-restriction-release",
+    ),
     path("<int:submission_id>/", views.submission_detail_view, name="submission-detail"),
     path("<int:submission_id>/editar/", views.submission_edit_view, name="submission-edit"),
     path("<int:submission_id>/atribuir/", views.submission_assign_view, name="submission-assign"),
