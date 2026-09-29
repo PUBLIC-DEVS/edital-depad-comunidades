@@ -300,6 +300,8 @@ class RequirementValidationRuleForm(StyledModelForm):
 
     def clean(self):
         data = super().clean()
+        if not data.get("active"):
+            return data
         if data.get("rule_type") == RequirementValidationRule.RuleType.CNPJ_MINIMUM_AGE:
             if not data.get("years"):
                 self.add_error("years", "Informe a idade mínima.")

@@ -476,6 +476,13 @@ class RequirementValidationRule(ConfigurationModel):
 
     def clean(self):
         super().clean()
+        if not self.active:
+            return
+        from .validation_dependencies import missing_evidence_messages
+
+        missing = missing_evidence_messages(self)
+        if missing:
+            raise ValidationError({"requirement_check": missing})
         config = self.config if isinstance(self.config, dict) else {}
         if self.rule_type == self.RuleType.CNPJ_MINIMUM_AGE:
             years = config.get("years")
