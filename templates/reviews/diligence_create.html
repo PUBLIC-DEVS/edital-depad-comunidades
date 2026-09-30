@@ -1,24 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}Abertura de Diligência — {{ submission.processo_sei }}{% endblock %}
+{% block title %}Abertura de Diligência — {{ submission.processo_sei }} — DEPAD/MDS{% endblock %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto space-y-6">
     <div class="flex items-center space-x-2 text-xs text-slate-500 pb-3 border-b border-slate-200">
-        <a href="{% url 'submission-detail' submission_id=submission.id %}" class="hover:text-govblue-600">&larr; Voltar para Processo</a>
+        <a href="{% url 'submission-detail' submission_id=submission.id %}" class="text-govblue-600 hover:text-govblue-800">&larr; Voltar para Processo</a>
         <span>/</span>
         <span class="font-bold text-slate-700">Abertura de Diligência</span>
     </div>
 
-    <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-6">
+    <div class="depad-card space-y-6">
         <div>
-            <h1 class="text-lg font-bold text-slate-800">Abertura de Diligência Saneadora</h1>
-            <p class="text-xs text-slate-500">
-                Processo: <strong>{{ submission.processo_sei }}</strong> — {{ submission.institution.name }}
+            <span class="depad-badge depad-badge-warning mb-2">Saneamento Processual</span>
+            <h1 class="text-xl font-bold text-slate-800 mt-1">Abertura de Diligência Saneadora</h1>
+            <p class="text-xs text-slate-500 mt-1">
+                Processo: <strong class="font-mono text-slate-700">{{ submission.processo_sei }}</strong> — {{ submission.institution.name }}
             </p>
         </div>
 
-        <form method="post" action="{% url 'diligence-create' submission_id=submission.id %}" class="space-y-4 text-xs">
+        <form method="post" action="{% url 'diligence-create' submission_id=submission.id %}" class="space-y-5 text-xs">
             {% csrf_token %}
             {{ form.non_field_errors }}
             <div>
@@ -31,9 +32,9 @@
 
             <div>
                 {{ form.related_check_results.label_tag }}
-                <div class="mt-2 grid gap-2">{{ form.related_check_results }}</div>
+                <div class="mt-2 grid gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">{{ form.related_check_results }}</div>
                 {{ form.related_check_results.errors }}
-                <p class="text-[11px] text-slate-500">Itens disponíveis pertencem somente à avaliação deste processo.</p>
+                <p class="text-[11px] text-slate-500 mt-1">Itens disponíveis pertencem somente à avaliação deste processo.</p>
             </div>
 
             <div>
@@ -45,14 +46,14 @@
                 {{ form.unsatisfied_return_status.label_tag }}
                 {{ form.unsatisfied_return_status }}
                 {{ form.unsatisfied_return_status.errors }}
-                <p>{{ form.unsatisfied_return_status.help_text }}</p>
+                <p class="text-[11px] text-slate-500 mt-1">{{ form.unsatisfied_return_status.help_text }}</p>
             </div>
 
             <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100">
-                <a href="{% url 'submission-detail' submission_id=submission.id %}" class="px-4 py-2 border border-slate-300 rounded text-slate-700 hover:bg-slate-50 transition">
+                <a href="{% url 'submission-detail' submission_id=submission.id %}" class="depad-button depad-button-secondary">
                     Cancelar
                 </a>
-                <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded shadow transition">
+                <button type="submit" class="depad-button depad-button-warning">
                     Confirmar e Abrir Diligência
                 </button>
             </div>

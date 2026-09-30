@@ -1,47 +1,89 @@
 {% extends "base.html" %}
 
-{% block title %}Processos e Distribuição — DEPED/MDS{% endblock %}
+{% block title %}Processos e Distribuição — DEPAD / MDS{% endblock %}
 
 {% block content %}
-<form method="get" class="mb-4"><label for="edital-filter">Edital</label><select id="edital-filter" name="edital" class="form-select"><option value="">Todos autorizados</option>{% for e in editais %}<option value="{{ e.pk }}" {% if edital_filter == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.number }}/{{ e.year }}</option>{% endfor %}</select><button class="btn-secondary">Filtrar</button></form>
 <div class="space-y-6">
     <!-- Header with actions -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
         <div>
             <h1 class="text-2xl font-bold text-slate-800">Processos e Distribuição</h1>
-            <p class="text-sm text-slate-500">Gestão integrada da fila de inscrições do edital</p>
+            <p class="text-sm text-slate-500">Gestão integrada da fila de inscrições e distribuição balanceada</p>
         </div>
-        <div class="flex items-center space-x-3">
-            <a href="{% url 'submission-anomalies' %}" class="inline-flex items-center px-3 py-1.5 border border-amber-300 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded transition shadow-sm">
-                Fila de Exceções & Alertas
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="{% url 'submission-anomalies' %}" class="btn-secondary text-xs">
+                Fila de Exceções &amp; Alertas
             </a>
             {% if can_distribute %}
-                <a href="{% url 'submission-import-csv' %}{% if edital_filter %}?edital={{ edital_filter }}{% endif %}" class="btn-secondary">Importar CSV</a>
-                <a href="{% url 'submission-create' %}{% if edital_filter %}?edital={{ edital_filter }}{% endif %}" class="inline-flex items-center px-3 py-1.5 bg-govblue-600 hover:bg-govblue-700 text-white text-xs font-semibold rounded transition shadow-sm">
+                <a href="{% url 'submission-import-csv' %}{% if edital_filter %}?edital={{ edital_filter }}{% endif %}" class="btn-secondary text-xs">
+                    &uarr; Importar CSV
+                </a>
+                <a href="{% url 'submission-create' %}{% if edital_filter %}?edital={{ edital_filter }}{% endif %}" class="btn-primary text-xs">
                     + Cadastrar Processo
                 </a>
             {% endif %}
         </div>
     </div>
 
-    {% if can_distribute %}<section class="card p-4"><h2 class="font-semibold mb-3">Carga dos analistas</h2><div class="grid md:grid-cols-3 gap-3">{% for item in workloads %}<div class="border rounded p-3"><strong>{{ item.full_name }}</strong><p class="text-xs text-slate-600">{{ item.active_count }} em distribuição/análise · {{ item.pending_count }} pendentes · {{ item.completed_count }} concluídos</p></div>{% empty %}<p>Cadastre analistas para distribuir processos.</p>{% endfor %}</div></section>{% endif %}
+    <!-- Filtro de Edital Global -->
+    <form method="get" class="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <label for="edital-filter" class="text-xs font-semibold text-slate-700 whitespace-nowrap">Edital Ativo:</label>
+        <select id="edital-filter" name="edital" class="form-select text-xs flex-1">
+            <option value="">Todos os editais autorizados</option>
+            {% for e in editais %}
+                <option value="{{ e.pk }}" {% if edital_filter == e.pk|stringformat:"s" %}selected{% endif %}>
+                    {{ e.number }}/{{ e.year }} — {{ e.name }}
+                </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn-secondary text-xs">Filtrar</button>
+    </form>
+
+    <!-- Carga dos Analistas -->
+    {% if can_distribute %}
+        <section class="card p-5">
+            <h2 class="font-bold text-slate-800 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-slate-100">
+                Distribuição e Carga de Trabalho dos Analistas
+            </h2>
+            <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {% for item in workloads %}
+                    <div class="border border-slate-200 rounded-lg p-3 bg-slate-50/50 hover:bg-slate-50 transition">
+                        <strong class="text-xs text-slate-800 font-semibold block">{{ item.full_name }}</strong>
+                        <div class="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                            <span class="px-2 py-0.5 bg-blue-100/70 text-[#0248AB] font-medium rounded">
+                                {{ item.active_count }} em análise
+                            </span>
+                            <span class="px-2 py-0.5 bg-amber-100/70 text-amber-900 font-medium rounded">
+                                {{ item.pending_count }} pendentes
+                            </span>
+                            <span class="px-2 py-0.5 bg-emerald-100/70 text-emerald-900 font-medium rounded">
+                                {{ item.completed_count }} concluídos
+                            </span>
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-xs text-slate-400">Cadastre analistas para acompanhar e distribuir processos.</p>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
 
     <!-- Filters and Search Bar -->
-    <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+    <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-xs">
         <form method="get" action="{% url 'submission-list' %}"
               hx-get="{% url 'submission-list' %}"
               hx-target="#submissions-table-container"
               hx-trigger="keyup changed delay:400ms from:#search-input, change from:select"
               class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div class="lg:col-span-2">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar processo / OSC / CNPJ</label>
+                <label class="form-label">Buscar processo / OSC / CNPJ</label>
                 <input type="text" name="q" id="search-input" value="{{ search_query }}"
                        placeholder="Digite o SEI, OSC ou CNPJ..."
-                       class="w-full px-3 py-1.5 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                       class="form-input text-xs">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Status Workflow</label>
-                <select name="status" class="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none">
+                <label class="form-label">Status Workflow</label>
+                <select name="status" class="form-select text-xs">
                     <option value="">Todos os status</option>
                     {% for code, label in workflow_statuses %}
                         <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
@@ -49,8 +91,8 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Grupo</label>
-                <select name="group" class="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none">
+                <label class="form-label">Grupo</label>
+                <select name="group" class="form-select text-xs">
                     <option value="">Todos os grupos</option>
                     {% for code, label in target_groups %}
                         <option value="{{ code }}" {% if group_filter == code %}selected{% endif %}>{{ label }}</option>
@@ -59,11 +101,13 @@
             </div>
             {% if can_distribute %}
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Analista Designado</label>
-                    <select name="analyst" class="w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none">
+                    <label class="form-label">Analista Designado</label>
+                    <select name="analyst" class="form-select text-xs">
                         <option value="">Todos os analistas</option>
                         {% for a in analysts %}
-                            <option value="{{ a.id }}" {% if analyst_filter == a.id|stringformat:"s" %}selected{% endif %}>{{ a.get_full_name|default:a.username }}</option>
+                            <option value="{{ a.id }}" {% if analyst_filter == a.id|stringformat:"s" %}selected{% endif %}>
+                                {{ a.get_full_name|default:a.username }}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
@@ -73,10 +117,10 @@
 
     <!-- Bulk Action Toolbar (when user is distributor/coordinator) -->
     {% if can_distribute %}
-        <div x-data="{ selectedIds: [], analystId: '', reason: '' }" class="bg-blue-50 border border-blue-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div x-data="{ selectedIds: [], analystId: '', reason: '' }" class="bg-blue-50/70 border border-blue-200 rounded-lg p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div class="flex items-center space-x-2">
-                <span class="font-semibold text-blue-900">Ações em Lote:</span>
-                <span class="text-blue-700" x-text="selectedIds.length + ' processo(s) selecionado(s)'"></span>
+                <span class="font-bold text-[#171B55]">Ações em Lote:</span>
+                <span class="text-[#0B57C5] font-semibold" x-text="selectedIds.length + ' processo(s) selecionado(s)'"></span>
             </div>
             <div class="flex items-center space-x-2">
                 <button type="button"
@@ -85,7 +129,7 @@
                             htmx.ajax('GET', '{% url 'submission-suggest-distribution' %}?ids=' + selectedIds.join(','), '#suggestion-modal-content');
                             $refs.suggestionModal.showModal();
                         "
-                        class="px-2.5 py-1 bg-white border border-blue-300 text-blue-800 rounded hover:bg-blue-100 transition">
+                        class="btn-secondary text-xs">
                     Sugerir Balanceamento
                 </button>
 
@@ -96,20 +140,20 @@
                       ">
                     {% csrf_token %}
                     <input type="hidden" name="selected_ids" x-ref="bulkIdsInput">
-                    <select name="analyst" required class="px-2 py-1 border border-slate-300 rounded bg-white text-xs">
+                    <select name="analyst" required class="form-select text-xs py-1">
                         <option value="">Atribuir a...</option>
                         {% for a in analysts %}
                             <option value="{{ a.id }}">{{ a.get_full_name|default:a.username }}</option>
                         {% endfor %}
                     </select>
-                    <button type="submit" class="px-3 py-1 bg-govblue-600 hover:bg-govblue-700 text-white rounded font-medium transition">
+                    <button type="submit" class="btn-primary text-xs py-1">
                         Atribuir em Lote
                     </button>
                 </form>
             </div>
 
             <!-- Balanced suggestion modal dialog -->
-            <dialog x-ref="suggestionModal" class="p-6 rounded-lg shadow-xl border border-slate-200 max-w-lg w-full backdrop:bg-slate-900/50">
+            <dialog x-ref="suggestionModal" class="p-6 rounded-xl shadow-xl border border-slate-200 max-w-lg w-full backdrop:bg-slate-900/50">
                 <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
                     <h3 class="font-bold text-sm text-slate-800">Sugestão de Distribuição Balanceada</h3>
                     <button type="button" @click="$refs.suggestionModal.close()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
@@ -118,7 +162,7 @@
                     Carregando sugestão balanceada...
                 </div>
                 <div class="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                    <button type="button" @click="$refs.suggestionModal.close()" class="px-3 py-1.5 text-xs bg-slate-200 text-slate-700 rounded hover:bg-slate-300">
+                    <button type="button" @click="$refs.suggestionModal.close()" class="btn-secondary text-xs">
                         Fechar
                     </button>
                 </div>

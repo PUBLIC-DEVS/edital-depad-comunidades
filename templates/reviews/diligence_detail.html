@@ -1,27 +1,27 @@
 {% extends "base.html" %}
 
-{% block title %}Diligência: {{ diligence.submission.processo_sei }} — DEPED/MDS{% endblock %}
+{% block title %}Diligência: {{ diligence.submission.processo_sei }} — DEPAD/MDS{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto space-y-6">
     <div class="flex items-center space-x-2 text-xs text-slate-500 pb-3 border-b border-slate-200">
-        <a href="{% url 'diligence-list' %}" class="hover:text-govblue-600">&larr; Voltar para Fila de Diligências</a>
+        <a href="{% url 'diligence-list' %}" class="text-govblue-600 hover:text-govblue-800">&larr; Voltar para Fila de Diligências</a>
         <span>/</span>
-        <span class="font-bold text-slate-700">Diligência {{ diligence.id }}</span>
+        <span class="font-bold text-slate-700">Diligência #{{ diligence.id }}</span>
     </div>
 
     <!-- Diligence Details Card -->
-    <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm space-y-4">
-        <div class="flex justify-between items-start border-b border-slate-100 pb-3">
+    <div class="depad-card space-y-5">
+        <div class="flex justify-between items-start border-b border-slate-100 pb-4">
             <div>
-                <span class="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Subfluxo de Diligência</span>
-                <h1 class="text-lg font-bold text-slate-900 mt-0.5">{{ diligence.submission.processo_sei }}</h1>
-                <p class="text-xs text-slate-600">{{ diligence.submission.institution.name }} ({{ diligence.submission.institution.formatted_cnpj }})</p>
+                <span class="depad-badge depad-badge-warning mb-1">Subfluxo de Diligência</span>
+                <h1 class="text-xl font-bold text-slate-900 mt-1 font-mono">{{ diligence.submission.processo_sei }}</h1>
+                <p class="text-xs text-slate-600 mt-0.5">{{ diligence.submission.institution.name }} ({{ diligence.submission.institution.formatted_cnpj }})</p>
             </div>
-            <span class="px-2.5 py-0.5 rounded text-xs font-bold
-                {% if diligence.status == 'OPEN' %}bg-amber-100 text-amber-800
-                {% elif diligence.status == 'CONCLUDED' %}bg-green-100 text-green-800
-                {% else %}bg-slate-100 text-slate-700{% endif %}">
+            <span class="depad-badge
+                {% if diligence.status == 'OPEN' %}depad-badge-warning
+                {% elif diligence.status == 'CONCLUDED' %}depad-badge-success
+                {% else %}depad-badge-neutral{% endif %}">
                 {{ diligence.get_status_display }}
             </span>
         </div>
@@ -33,19 +33,28 @@
             </div>
             <div>
                 <span class="text-slate-500 block">Data de Abertura:</span>
-                <span class="text-slate-800">{{ diligence.requested_at|date:"d/m/Y H:i" }}</span>
+                <span class="text-slate-800 font-mono">{{ diligence.requested_at|date:"d/m/Y H:i" }}</span>
             </div>
             <div>
                 <span class="text-slate-500 block">Prazo Limite:</span>
-                <span class="font-bold text-red-700">{{ diligence.deadline|date:"d/m/Y" }}</span>
+                <span class="font-bold text-red-700 font-mono">{{ diligence.deadline|date:"d/m/Y" }}</span>
             </div>
         </div>
 
-        <div class="bg-slate-50 p-4 rounded border border-slate-200 text-xs space-y-1">
+        <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 text-xs space-y-1">
             <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Motivo da Diligência:</span>
-            <p class="text-slate-800 whitespace-pre-line">{{ diligence.reason }}</p>
+            <p class="text-slate-800 whitespace-pre-line leading-relaxed">{{ diligence.reason }}</p>
         </div>
-        {% if diligence.related_check_results.exists %}<section class="rounded border border-blue-200 bg-blue-50 p-4 text-xs"><h2 class="font-bold">Itens documentais relacionados</h2><ul class="mt-2 list-disc pl-5">{% for result in diligence.related_check_results.all %}<li>{{ result.definition.requirement.code }} · {{ result.definition.name }} — {{ result.get_status_display }}</li>{% endfor %}</ul></section>{% endif %}
+        {% if diligence.related_check_results.exists %}
+            <section class="rounded-lg border border-blue-200 bg-blue-50/70 p-4 text-xs">
+                <h2 class="font-bold text-blue-900">Itens documentais relacionados</h2>
+                <ul class="mt-2 list-disc pl-5 space-y-1 text-blue-800">
+                    {% for result in diligence.related_check_results.all %}
+                        <li>{{ result.definition.requirement.code }} · {{ result.definition.name }} — <span class="font-semibold">{{ result.get_status_display }}</span></li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
 
         <!-- Response & Conclusion Form if still open -->
         {% if diligence.status == 'OPEN' or diligence.status == 'ANSWERED' %}
@@ -64,25 +73,25 @@
                         <label class="block font-semibold text-slate-700 mb-1">Resultado do Julgamento da Diligência:</label>
                         {{ form.result }}
                     </div>
-                    <div class="flex justify-end">
-                        <button type="submit" class="px-5 py-2 bg-govblue-600 hover:bg-govblue-700 text-white font-bold rounded shadow transition">
+                    <div class="flex justify-end pt-2">
+                        <button type="submit" class="depad-button depad-button-primary">
                             Finalizar Julgamento da Diligência
                         </button>
                     </div>
                 </form>
             </div>
         {% elif diligence.status == 'LEGACY_UNKNOWN' %}
-            <p class="text-xs text-slate-600">Registro histórico. Estado operacional, datas e prazo não estão disponíveis na fonte.</p>
+            <p class="text-xs text-slate-600 bg-slate-50 p-3 rounded border border-slate-200">Registro histórico. Estado operacional, datas e prazo não estão disponíveis na fonte.</p>
         {% else %}
             <!-- Concluded Display -->
             <div class="border-t border-slate-100 pt-4 space-y-3 text-xs">
-                <div class="bg-green-50 border border-green-200 p-3 rounded">
-                    <span class="font-bold text-green-900 block text-[11px] uppercase">Diligência Concluída:</span>
-                    <p class="text-green-800 mt-1">Resultado: <strong>{{ diligence.get_result_display }}</strong></p>
+                <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-lg">
+                    <span class="font-bold text-emerald-900 block text-[11px] uppercase tracking-wide">Diligência Concluída</span>
+                    <p class="text-emerald-800 mt-1">Resultado: <strong>{{ diligence.get_result_display }}</strong></p>
                     {% if diligence.response %}
                         <p class="text-slate-700 mt-2"><strong>Resposta Registrada:</strong> {{ diligence.response }}</p>
                     {% endif %}
-                    <p class="text-[10px] text-slate-400 mt-1">Concluída em {{ diligence.concluded_at|date:"d/m/Y H:i" }}</p>
+                    <p class="text-[10px] text-slate-400 mt-2 font-mono">Concluída em {{ diligence.concluded_at|date:"d/m/Y H:i" }}</p>
                 </div>
             </div>
         {% endif %}

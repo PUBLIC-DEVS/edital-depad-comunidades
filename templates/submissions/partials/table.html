@@ -1,11 +1,12 @@
-<div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+<div class="table-wrapper">
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 text-left text-xs">
-            <thead class="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+        <table class="min-w-full text-left text-xs">
+            <thead>
                 <tr>
                     {% if can_distribute %}
                         <th class="px-4 py-3 w-8">
                             <input type="checkbox"
+                                   aria-label="Selecionar todos os processos da página"
                                    @change="
                                        if ($event.target.checked) {
                                            selectedIds = Array.from(document.querySelectorAll('.submission-checkbox')).map(cb => cb.value);
@@ -13,7 +14,7 @@
                                            selectedIds = [];
                                        }
                                    "
-                                   class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                   class="rounded border-slate-300">
                         </th>
                     {% endif %}
                     <th class="px-4 py-3">Processo SEI</th>
@@ -27,15 +28,16 @@
                     <th class="px-4 py-3 text-right">Ações</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 bg-white text-slate-700">
+            <tbody>
                 {% for sub in page_obj.object_list %}
-                    <tr class="hover:bg-slate-50 transition">
+                    <tr class="hover:bg-slate-50/80 transition">
                         {% if can_distribute %}
                             <td class="px-4 py-3">
                               {% if sub.workflow_status == 'INELIGIBLE' %}
-                                <span class="text-red-800 font-semibold">Bloqueado</span>
+                                <span class="text-xs font-semibold text-red-800" title="Processo inapto não disponível para distribuição">Bloqueado</span>
                               {% else %}
                                 <input type="checkbox" value="{{ sub.id }}"
+                                       aria-label="Selecionar processo {{ sub.processo_sei }}"
                                        :checked="selectedIds.includes('{{ sub.id }}')"
                                        @change="
                                            if ($event.target.checked) {
@@ -44,12 +46,12 @@
                                                selectedIds = selectedIds.filter(id => id !== '{{ sub.id }}');
                                            }
                                        "
-                                       class="submission-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                       class="submission-checkbox rounded border-slate-300">
                               {% endif %}
                             </td>
                         {% endif %}
-                        <td class="px-4 py-3 font-semibold text-govblue-600">
-                            <a href="{% url 'submission-detail' submission_id=sub.id %}" class="hover:underline">
+                        <td class="px-4 py-3 font-semibold text-[#0248AB]">
+                            <a href="{% url 'submission-detail' submission_id=sub.id %}" class="hover:underline font-mono">
                                 {{ sub.processo_sei }}
                             </a>
                         </td>
@@ -57,15 +59,15 @@
                             <div class="font-medium text-slate-900">{{ sub.institution.name }}</div>
                             <div class="text-[11px] text-slate-500 font-mono">{{ sub.institution.formatted_cnpj }}</div>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="px-4 py-3 text-slate-700">
                             {{ sub.municipality.name }}/{{ sub.municipality.state }}
                         </td>
-                        <td class="px-4 py-3 whitespace-nowrap">
+                        <td class="px-4 py-3 whitespace-nowrap text-slate-600">
                             {{ sub.received_at|date:"d/m/Y H:i" }}
                         </td>
                         <td class="px-4 py-3">
                             <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-semibold
-                                {% if sub.target_group_definition %}bg-blue-100 text-govblue-800{% else %}bg-slate-100 text-slate-700{% endif %}">
+                                {% if sub.target_group_definition %}bg-blue-50 text-[#0248AB] border border-blue-200{% else %}bg-slate-100 text-slate-700{% endif %}">
                                 {{ sub.target_group }}
                             </span>
                         </td>
@@ -76,6 +78,10 @@
                                 {% elif sub.workflow_status == 'INELIGIBLE' %}badge-inapta
                                 {% elif sub.workflow_status == 'PENDING_REVIEW' %}badge-naoenviado
                                 {% else %}badge-naoaplicavel{% endif %}">
+                                {% if sub.workflow_status == 'ELIGIBLE_FOR_RANKING' %}&check;
+                                {% elif sub.workflow_status == 'INELIGIBLE' %}&times;
+                                {% elif sub.workflow_status == 'UNDER_ANALYSIS' %}&#8226;
+                                {% endif %}
                                 {{ sub.get_workflow_status_display }}
                             </span>
                         </td>
@@ -90,18 +96,20 @@
                             {% if sub.alerts %}
                                 <div class="space-y-1" aria-label="Alertas de triagem">
                                   {% for alert in sub.alerts %}
-                                    <span class="block text-[10px] font-semibold {% if alert.severity == 'danger' %}text-red-800{% elif alert.code == 'DUPLICATE_CNPJ' %}text-amber-800{% else %}text-slate-700{% endif %}">
-                                      {% if alert.severity == 'danger' %}✕{% elif alert.severity == 'warning' %}⚠{% else %}ℹ{% endif %}
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded {% if alert.severity == 'danger' %}bg-red-50 text-red-900 border border-red-200{% elif alert.code == 'DUPLICATE_CNPJ' %}bg-amber-50 text-amber-900 border border-amber-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                                      {% if alert.severity == 'danger' %}&times;{% elif alert.severity == 'warning' %}&#9888;{% else %}&#8505;{% endif %}
                                       {% if alert.code == 'ACTIVE_CONTRACT_RESTRICTION' %}CONTRATO VIGENTE{% elif alert.code == 'DUPLICATE_CNPJ' %}DUPLICIDADE{% elif alert.code == 'NO_TARGET_GROUP' %}SEM GRUPO{% else %}{{ alert.code }}{% endif %}
                                     </span>
                                   {% endfor %}
                                 </div>
                             {% else %}
-                                <span class="text-emerald-700 font-semibold">✓ PRONTO</span>
+                                <span class="text-emerald-700 font-semibold text-xs inline-flex items-center gap-1">
+                                    &check; PRONTO
+                                </span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-right whitespace-nowrap">
-                            <a href="{% url 'submission-detail' submission_id=sub.id %}" class="text-govblue-600 hover:text-govblue-800 font-semibold">
+                            <a href="{% url 'submission-detail' submission_id=sub.id %}" class="btn-secondary btn-sm font-semibold">
                                 Ver &rarr;
                             </a>
                         </td>
@@ -128,7 +136,7 @@
                     <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
                        hx-get="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
                        hx-target="#submissions-table-container"
-                       class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100">
+                       class="btn-secondary btn-sm">
                         Anterior
                     </a>
                 {% endif %}
@@ -136,7 +144,7 @@
                     <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
                        hx-get="?page={{ page_obj.next_page_number }}&q={{ search_query }}&status={{ status_filter }}&group={{ group_filter }}&analyst={{ analyst_filter }}&uf={{ uf_filter }}"
                        hx-target="#submissions-table-container"
-                       class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100">
+                       class="btn-secondary btn-sm">
                         Próxima
                     </a>
                 {% endif %}

@@ -1,25 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}Revisão do Processo {{ submission.processo_sei }} — DEPED/MDS{% endblock %}
+{% block title %}Revisão do Processo {{ submission.processo_sei }} — DEPAD / MDS{% endblock %}
 
 {% block content %}
-{% if can_claim %}
-<form method="post" action="{% url 'review-claim' review_id=review.id %}">{% csrf_token %}<button type="submit">Assumir revisão</button></form>
-{% endif %}
 <div class="space-y-6">
+    <!-- Top Action for Claiming Review -->
+    {% if can_claim %}
+        <div class="card p-4 bg-blue-50/70 border-blue-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <strong class="text-xs text-[#171B55] block">Revisão Não Atribuída</strong>
+                <p class="text-xs text-slate-600 mt-0.5">Assuma este processo para registrar parecer sobre eventuais divergências técnicas.</p>
+            </div>
+            <form method="post" action="{% url 'review-claim' review_id=review.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-primary text-xs font-bold">
+                    Assumir Revisão
+                </button>
+            </form>
+        </div>
+    {% endif %}
+
     <!-- Breadcrumb & Status Bar -->
-    <div class="flex justify-between items-center pb-3 border-b border-slate-200">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-3">
         <div class="flex items-center space-x-2 text-xs text-slate-500">
-            <a href="{% url 'review-list' %}" class="hover:text-govblue-600">&larr; Voltar para Fila de Revisão</a>
+            <a href="{% url 'review-list' %}" class="text-[#0248AB] hover:underline font-medium">&larr; Voltar para Fila de Revisão</a>
             <span>/</span>
-            <span class="font-bold text-slate-700">Revisão: {{ submission.processo_sei }}</span>
+            <span class="font-bold text-slate-700 font-mono">Revisão: {{ submission.processo_sei }}</span>
         </div>
         <div class="flex items-center space-x-2">
-            <span class="px-2.5 py-0.5 rounded text-xs font-bold {% if review.status == 'COMPLETED' %}bg-green-100 text-green-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+            <span class="badge {% if review.status == 'COMPLETED' %}badge-atende{% else %}badge-naoenviado{% endif %}">
                 {{ review.get_status_display }}
             </span>
             {% if review.preliminary_result != 'PENDING_DECISION' %}
-                <span class="px-2.5 py-0.5 rounded text-xs font-bold {% if review.preliminary_result == 'PRE_HABILITADO' %}bg-emerald-100 text-emerald-800{% else %}bg-red-100 text-red-800{% endif %}">
+                <span class="badge {% if review.preliminary_result == 'PRE_HABILITADO' %}badge-atende{% else %}badge-naoatende{% endif %}">
                     {{ review.get_preliminary_result_display }}
                 </span>
             {% endif %}
@@ -27,35 +40,36 @@
     </div>
 
     <!-- Review Header Overview -->
-    <div class="bg-white p-6 rounded-lg border border-slate-200 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+    <div class="card p-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs border-l-4 border-l-[#0248AB]">
         <div>
-            <span class="text-slate-500 block">Instituição:</span>
-            <span class="font-semibold text-slate-800">{{ submission.institution.name }}</span>
+            <span class="text-slate-500 block text-[11px]">Instituição:</span>
+            <strong class="text-slate-900 text-xs">{{ submission.institution.name }}</strong>
         </div>
         <div>
-            <span class="text-slate-500 block">CNPJ:</span>
-            <span class="font-mono text-slate-800">{{ submission.institution.formatted_cnpj }}</span>
+            <span class="text-slate-500 block text-[11px]">CNPJ da Candidatura:</span>
+            <strong class="font-mono text-slate-900 text-xs">{{ submission.institution.formatted_cnpj }}</strong>
         </div>
         <div>
-            <span class="text-slate-500 block">Analista Responsável:</span>
+            <span class="text-slate-500 block text-[11px]">Analista Responsável:</span>
             <span class="font-medium text-slate-800">{{ evaluation.analyst.get_full_name|default:evaluation.analyst.username }}</span>
         </div>
         <div>
-            <span class="text-slate-500 block">Data da Conclusão Original:</span>
-            <span class="font-medium text-slate-800">{{ evaluation.completed_at|date:"d/m/Y H:i:s"|default:"-" }}</span>
+            <span class="text-slate-500 block text-[11px]">Data da Conclusão Original:</span>
+            <span class="font-medium text-slate-800 font-mono">{{ evaluation.completed_at|date:"d/m/Y H:i:s"|default:"-" }}</span>
         </div>
         <div>
-            <span class="text-slate-500 block">Parecer do Analista:</span>
+            <span class="text-slate-500 block text-[11px]">Parecer do Analista:</span>
             <span class="badge-status
                 {% if evaluation.result == 'APTA' %}badge-apta
                 {% elif evaluation.result == 'INAPTA' %}badge-inapta
                 {% else %}badge-emanalise{% endif %}">
+                {% if evaluation.result == 'APTA' %}&check;{% elif evaluation.result == 'INAPTA' %}&times;{% endif %}
                 {{ evaluation.get_result_display }}
             </span>
         </div>
         <div>
-            <span class="text-slate-500 block">Requisitos Reprovados no Parecer:</span>
-            <span class="font-bold text-red-700">
+            <span class="text-slate-500 block text-[11px]">Requisitos Reprovados no Parecer:</span>
+            <span class="font-bold text-[#B4232A]">
                 {% if evaluation.failed_requirement_codes %}
                     {{ evaluation.failed_requirement_codes|join:", " }}
                 {% else %}
@@ -64,30 +78,30 @@
             </span>
         </div>
         <div class="sm:col-span-2">
-            <span class="text-slate-500 block">Notas Gerais do Analista:</span>
-            <span class="text-slate-700 italic">{{ evaluation.general_notes|default:"Sem anotações adicionais." }}</span>
+            <span class="text-slate-500 block text-[11px]">Notas Gerais do Analista:</span>
+            <span class="text-slate-700 italic text-[11px]">{{ evaluation.general_notes|default:"Sem anotações adicionais." }}</span>
         </div>
     </div>
 
     <!-- Main Content & Decision Area -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <!-- Left: Read-Only Original Analysis + Item Decisions -->
         <div class="lg:col-span-2 space-y-6">
-            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Conferência de Itens e Decisões de Conformidade
             </h2>
 
             {% for section in req_sections %}
-                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden" x-data="{ open: true }">
-                    <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none"
+                <div class="card overflow-hidden" x-data="{ open: true }">
+                    <div class="bg-slate-50/80 p-4 border-b border-slate-200 flex justify-between items-center cursor-pointer select-none"
                          @click="open = !open">
                         <div class="flex items-center space-x-2">
-                            <span class="font-mono font-bold text-xs bg-govblue-700 text-white px-2 py-0.5 rounded">
+                            <span class="font-mono font-bold text-xs bg-[#E4E8F4] text-[#171B55] px-2 py-0.5 rounded">
                                 {{ section.requirement.code }}
                             </span>
                             <h3 class="text-xs font-bold text-slate-800">{{ section.requirement.name }}</h3>
                             {% if section.requirement.code in evaluation.failed_requirement_codes %}
-                                <span class="px-2 py-0.5 bg-red-100 text-red-800 font-bold text-[10px] rounded uppercase">
+                                <span class="badge badge-naoatende text-[10px]">
                                     Falha Apontada
                                 </span>
                             {% endif %}
@@ -114,23 +128,23 @@
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded text-xs">
-                                    {% if item.check.collect_sei_number %}<div><span class="text-slate-500 block">Documento SEI</span>{{ item.result.sei_number|default:"—" }}</div>{% endif %}
-                                    {% if item.check.collect_pages %}<div><span class="text-slate-500 block">Páginas</span>{{ item.result.pages|default:"—" }}</div>{% endif %}
-                                    {% if item.check.collect_document_cnpj %}<div><span class="text-slate-500 block">CNPJ do documento</span>{{ item.result.document_cnpj|default:"—" }}</div>{% endif %}
-                                    {% if item.check.collect_valid_until %}<div><span class="text-slate-500 block">Validade</span>{{ item.result.valid_until|date:"d/m/Y"|default:"—" }}</div>{% endif %}
-                                    {% if item.check.collect_numeric_value %}<div><span class="text-slate-500 block">Valor</span>{{ item.result.numeric_value|default_if_none:"—" }}</div>{% endif %}
-                                    {% if item.check.collect_notes and item.result.notes %}<div class="col-span-2"><span class="text-slate-500 block">Observações</span>{{ item.result.notes }}</div>{% endif %}
+                                <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs">
+                                    {% if item.check.collect_sei_number %}<div><span class="text-slate-500 block text-[11px]">Documento SEI</span>{{ item.result.sei_number|default:"—" }}</div>{% endif %}
+                                    {% if item.check.collect_pages %}<div><span class="text-slate-500 block text-[11px]">Páginas</span>{{ item.result.pages|default:"—" }}</div>{% endif %}
+                                    {% if item.check.collect_document_cnpj %}<div><span class="text-slate-500 block text-[11px]">CNPJ do documento</span>{{ item.result.document_cnpj|default:"—" }}</div>{% endif %}
+                                    {% if item.check.collect_valid_until %}<div><span class="text-slate-500 block text-[11px]">Validade</span>{{ item.result.valid_until|date:"d/m/Y"|default:"—" }}</div>{% endif %}
+                                    {% if item.check.collect_numeric_value %}<div><span class="text-slate-500 block text-[11px]">Valor</span>{{ item.result.numeric_value|default_if_none:"—" }}</div>{% endif %}
+                                    {% if item.check.collect_notes and item.result.notes %}<div class="col-span-2"><span class="text-slate-500 block text-[11px]">Observações</span>{{ item.result.notes }}</div>{% endif %}
                                 </div>
 
                                 <!-- Review Decision Box for this item -->
-                                <div class="bg-blue-50/60 p-3 rounded border border-blue-100 space-y-2">
+                                <div class="bg-blue-50/60 p-3 rounded-lg border border-blue-100 space-y-2">
                                     <div class="flex justify-between items-center">
-                                        <span class="font-bold text-[11px] text-blue-900 uppercase">Decisão do Revisor:</span>
+                                        <span class="font-bold text-[11px] text-[#171B55] uppercase">Decisão do Revisor:</span>
                                         {% if item.decision %}
-                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold
-                                                {% if item.decision.agrees_with_analyst %}bg-green-100 text-green-800
-                                                {% else %}bg-amber-100 text-amber-800{% endif %}">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold border
+                                                {% if item.decision.agrees_with_analyst %}bg-emerald-50 text-emerald-900 border-emerald-200
+                                                {% else %}bg-amber-50 text-amber-900 border-amber-200{% endif %}">
                                                 {% if item.decision.agrees_with_analyst %}&check; Concorda com Analista
                                                 {% else %}&#9888; Diverge (Novo: {{ item.decision.reviewer_status }}){% endif %}
                                             </span>
@@ -141,39 +155,41 @@
 
                                     {% if can_edit %}
                                         <form method="post" action="{% url 'review-item-decision' review_id=review.id check_result_id=item.result.id %}"
-                                              class="space-y-2 pt-1 border-t border-blue-100"
+                                              class="space-y-2 pt-2 border-t border-blue-100"
                                               x-data="{ agrees: {% if item.decision and not item.decision.agrees_with_analyst %}false{% else %}true{% endif %} }">
                                             {% csrf_token %}
                                             <div class="flex items-center space-x-4">
-                                                <label class="inline-flex items-center">
-                                                    <input type="radio" name="agrees_with_analyst" value="true" x-model="agrees" :value="true" class="text-blue-600">
-                                                    <span class="ml-1 text-slate-700 font-medium">Concordar</span>
+                                                <label class="inline-flex items-center cursor-pointer">
+                                                    <input type="radio" name="agrees_with_analyst" value="true" x-model="agrees" :value="true">
+                                                    <span class="ml-1.5 text-slate-700 font-medium">Concordar</span>
                                                 </label>
-                                                <label class="inline-flex items-center">
-                                                    <input type="radio" name="agrees_with_analyst" value="false" x-model="agrees" :value="false" class="text-blue-600">
-                                                    <span class="ml-1 text-slate-700 font-medium text-amber-900">Divergir</span>
+                                                <label class="inline-flex items-center cursor-pointer">
+                                                    <input type="radio" name="agrees_with_analyst" value="false" x-model="agrees" :value="false">
+                                                    <span class="ml-1.5 text-amber-900 font-medium">Divergir</span>
                                                 </label>
                                             </div>
 
                                             <div x-show="!agrees" class="space-y-2 pt-2">
                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                     <div>
-                                                        <label class="block text-[10px] font-semibold text-slate-600">Novo Parecer do Revisor:</label>
-                                                        <select name="reviewer_status" class="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white">
-                                                            {% for value, label in item.status_choices %}<option value="{{ value }}" {% if item.decision.reviewer_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                                                        <label class="form-label text-[10px]">Novo Parecer do Revisor:</label>
+                                                        <select name="reviewer_status" class="form-select text-xs">
+                                                            {% for value, label in item.status_choices %}
+                                                                <option value="{{ value }}" {% if item.decision.reviewer_status == value %}selected{% endif %}>{{ label }}</option>
+                                                            {% endfor %}
                                                         </select>
                                                     </div>
                                                     <div>
-                                                        <label class="block text-[10px] font-semibold text-slate-600">Justificativa da Divergência (Obrigatória):</label>
+                                                        <label class="form-label text-[10px]">Justificativa da Divergência (Obrigatória):</label>
                                                         <input type="text" name="justification" value="{{ item.decision.justification|default:'' }}"
                                                                placeholder="Fundamente tecnicamente a discordância..."
-                                                               class="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white">
+                                                               class="form-input text-xs">
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div class="flex justify-end">
-                                                <button type="submit" class="px-2.5 py-1 bg-govblue-600 hover:bg-govblue-700 text-white rounded text-[11px] font-semibold transition">
+                                            <div class="flex justify-end pt-1">
+                                                <button type="submit" class="btn-primary btn-sm text-[11px] font-semibold">
                                                     Gravar Decisão do Item
                                                 </button>
                                             </div>
@@ -192,9 +208,9 @@
         </div>
 
         <!-- Right: Conclude Review & Diligence Actions Panel -->
-        <div class="space-y-6">
+        <div class="space-y-6 sticky top-24">
             <!-- Conclude Review Box -->
-            <div class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4 sticky top-6">
+            <div class="card p-5 space-y-4 shadow-md">
                 <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
                     Parecer Conclusivo da Revisão
                 </h3>
@@ -203,21 +219,25 @@
                     <form method="post" action="{% url 'review-conclude' review_id=review.id %}" class="space-y-4 text-xs">
                         {% csrf_token %}
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Decisão Preliminar:</label>
+                            <label class="form-label">Decisão Preliminar:</label>
                             {{ conclude_form.preliminary_result }}
                         </div>
                         <div>
-                            <label class="block font-semibold text-slate-700 mb-1">Fundamentação Técnica:</label>
+                            <label class="form-label">Fundamentação Técnica:</label>
                             {{ conclude_form.decision_notes }}
-                            {% if unresolved_checks %}<p role="alert" class="text-amber-800 text-xs">Faltam decisões sobre {{ unresolved_checks|length }} item(ns) impeditivo(s). Registre-as antes de concluir.</p>{% endif %}
+                            {% if unresolved_checks %}
+                                <p role="alert" class="text-amber-800 text-xs mt-1.5 p-2 bg-amber-50 rounded border border-amber-200">
+                                    &#9888; Faltam decisões sobre {{ unresolved_checks|length }} item(ns) impeditivo(s). Registre-as antes de concluir.
+                                </p>
+                            {% endif %}
                         </div>
-                        <button type="submit" class="w-full bg-govblue-600 hover:bg-govblue-700 text-white font-bold py-2.5 rounded shadow transition">
+                        <button type="submit" class="w-full btn-primary text-xs py-2.5 font-bold">
                             Finalizar e Emitir Parecer de Revisão
                         </button>
                     </form>
                 {% else %}
-                    <div class="space-y-2 text-xs">
-                        <div class="p-3 bg-slate-50 border border-slate-200 rounded">
+                    <div class="space-y-2.5 text-xs">
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                             <span class="text-slate-500 block text-[11px]">Resultado Homologado:</span>
                             <span class="font-bold text-sm text-slate-900">{{ review.get_preliminary_result_display }}</span>
                         </div>
@@ -233,7 +253,7 @@
                 <!-- Diligence Shortcut -->
                 <div class="pt-4 border-t border-slate-100 space-y-2">
                     <span class="text-[11px] font-semibold text-slate-500 block uppercase">Subfluxo de Contraditório</span>
-                    <a href="{% url 'diligence-create' submission_id=submission.id %}" class="w-full inline-flex justify-center items-center px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded font-semibold text-xs transition">
+                    <a href="{% url 'diligence-create' submission_id=submission.id %}" class="w-full btn-secondary text-xs text-amber-900 border-amber-300 hover:bg-amber-50">
                         + Abrir Diligência no Processo
                     </a>
                 </div>

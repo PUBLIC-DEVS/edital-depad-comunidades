@@ -1,5 +1,60 @@
 {% extends "base.html" %}
-{% block content %}<a href="{% url 'submission-list' %}" class="text-blue-700">← Processos</a><div class="max-w-3xl"><h1 class="text-2xl font-bold my-4">Importar processos por CSV</h1><p class="mb-4 text-slate-600">Importação de inscrições de um edital novo, sem planilha histórica. Todas as linhas devem ser válidas; se uma falhar, nenhuma será gravada. O município precisa estar cadastrado com código IBGE.</p>
-{% if errors %}<div class="bg-red-50 text-red-800 p-4 mb-4" role="alert">{% for error in errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
-<form method="post" enctype="multipart/form-data" class="card p-6 space-y-5">{% csrf_token %}<div><label for="csv-edital" class="block font-semibold">Edital ativo</label><select id="csv-edital" name="edital" class="form-select" required><option value="">Selecione</option>{% for item in editais %}<option value="{{ item.pk }}" {% if edital.pk == item.pk %}selected{% endif %}>{{ item.number }}/{{ item.year }} · {{ item.name }}</option>{% endfor %}</select></div><div><label for="csv-file" class="block font-semibold">CSV UTF-8</label><input type="file" accept=".csv,text/csv" id="csv-file" name="file" class="form-input" required></div><button class="btn-primary">Importar e validar</button></form>
-<h2 class="font-bold mt-6 mb-2">Colunas obrigatórias</h2><p class="text-sm font-mono break-words bg-white border p-4">processo_sei,recebido_em,cnpj,instituicao,ibge,vagas_femininas,vagas_masculinas,vagas_maes_nutrizes,vagas_solicitadas,capacidade_total</p><p class="text-sm mt-3">recebido_em: AAAA-MM-DDTHH:MM no fuso local. Para classificação manual, acrescente grupo_codigo com um código ativo do edital. Colunas opcionais de contato: contato_email, contato_telefone e endereco.</p></div>{% endblock %}
+
+{% block title %}Importar Processos por CSV — DEPAD/MDS{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <div class="flex items-center space-x-2 text-xs text-slate-500 pb-3 border-b border-slate-200">
+        <a href="{% url 'submission-list' %}" class="text-govblue-600 hover:text-govblue-800">&larr; Voltar para Processos</a>
+        <span>/</span>
+        <span class="font-bold text-slate-700">Importação por CSV</span>
+    </div>
+
+    <div>
+        <h1 class="text-2xl font-bold text-slate-800">Importar processos por CSV</h1>
+        <p class="text-sm text-slate-500 mt-1">Importação de inscrições de um edital novo, sem planilha histórica. Todas as linhas devem ser válidas; se uma falhar, nenhuma será gravada. O município precisa estar cadastrado com código IBGE.</p>
+    </div>
+
+    {% if errors %}
+        <div class="bg-red-50 text-red-800 border-l-4 border-red-500 p-4 rounded-r-lg text-xs space-y-1" role="alert">
+            {% for error in errors %}
+                <p>{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="depad-card">
+        <form method="post" enctype="multipart/form-data" class="space-y-5 text-xs">
+            {% csrf_token %}
+            <div>
+                <label for="csv-edital" class="block font-semibold text-slate-700 mb-1">Edital ativo</label>
+                <select id="csv-edital" name="edital" class="depad-form-select" required>
+                    <option value="">Selecione um edital...</option>
+                    {% for item in editais %}
+                        <option value="{{ item.pk }}" {% if edital.pk == item.pk %}selected{% endif %}>{{ item.number }}/{{ item.year }} · {{ item.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="csv-file" class="block font-semibold text-slate-700 mb-1">Arquivo CSV (UTF-8)</label>
+                <input type="file" accept=".csv,text/csv" id="csv-file" name="file" class="depad-form-input" required>
+            </div>
+            <div class="pt-2 flex justify-end">
+                <button type="submit" class="depad-button depad-button-primary">Importar e Validar</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="depad-card space-y-3">
+        <h2 class="font-bold text-slate-800 text-sm">Colunas Obrigatórias no Cabeçalho</h2>
+        <div class="text-xs font-mono break-words bg-slate-50 border border-slate-200 p-3 rounded-lg text-slate-700 select-all">
+            processo_sei,recebido_em,cnpj,instituicao,ibge,vagas_femininas,vagas_masculinas,vagas_maes_nutrizes,vagas_solicitadas,capacidade_total
+        </div>
+        <div class="text-xs text-slate-500 space-y-1">
+            <p><strong>recebido_em:</strong> Formato <code class="font-mono text-slate-700">AAAA-MM-DDTHH:MM</code> no fuso horário local.</p>
+            <p>Para classificação manual, acrescente a coluna opcional <code class="font-mono text-slate-700">grupo_codigo</code> com um código ativo do edital.</p>
+            <p>Colunas opcionais de contato: <code class="font-mono text-slate-700">contato_email</code>, <code class="font-mono text-slate-700">contato_telefone</code> e <code class="font-mono text-slate-700">endereco</code>.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

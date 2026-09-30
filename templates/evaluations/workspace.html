@@ -1,32 +1,175 @@
 {% extends "base.html" %}
-{% block title %}Análise {{ submission.processo_sei }}{% endblock %}
+
+{% block title %}Análise Técnica — SEI {{ submission.processo_sei }} — DEPAD / MDS{% endblock %}
+
 {% block content %}
 <div class="space-y-6">
- <header class="bg-white border rounded-lg p-4 sticky top-0 z-20 shadow-sm"><span class="text-xs uppercase text-slate-500">Análise · Edital {{ submission.edital.number }}/{{ submission.edital.year }}</span><h1 class="text-xl font-bold mt-1">Processo SEI {{ submission.processo_sei }}</h1><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3 text-xs"><div><strong>Instituição:</strong> {{ submission.institution.name }}</div><div><strong>CNPJ da candidatura / declarado no Anexo I:</strong> {{ submission.institution.formatted_cnpj }}</div><div><strong>Município / UF:</strong> {{ submission.municipality|default:"Não informado" }}</div><div><strong>Grupo:</strong> {{ submission.target_group }}</div><div><strong>Analista:</strong> {{ evaluation.analyst.get_full_name|default:evaluation.analyst.username }}</div><div><strong>Status:</strong> {{ submission.get_workflow_status_display }}</div><div><strong>Recebimento:</strong> {{ submission.received_at|date:"d/m/Y H:i" }}</div></div></header>
- {% if validation_errors %}<div role="alert" class="bg-red-50 text-red-800 border rounded p-4">{% for error in validation_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
- <div class="grid lg:grid-cols-3 gap-6">
-  <div class="lg:col-span-2"><form id="evaluation-form" method="post" action="{% url 'evaluation-save-draft' evaluation.pk %}" hx-post="{% url 'evaluation-save-draft' evaluation.pk %}" hx-target="#summary-panel-container" hx-swap="innerHTML" class="space-y-5">
-  {% csrf_token %}
-  {% for macro in macro_sections %}
-   <section class="space-y-3"><h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">{{ macro.title }}</h2>
-   {% for section in macro.requirements %}
-   <details open class="bg-white border rounded-lg">
-    <summary class="p-4 font-semibold cursor-pointer bg-slate-50 rounded-t-lg"><span class="font-mono text-govblue-700">{{ section.requirement.code }}</span> · {{ section.requirement.name }}{% if section.requirement.mandatory %}<span class="text-xs bg-red-50 text-red-700 px-2 py-1 rounded ml-2">Obrigatório</span>{% else %}<span class="text-xs text-slate-500 ml-2">Facultativo</span>{% endif %}</summary>
-    <div class="p-4 space-y-5">{% if section.requirement.description %}<p class="text-sm text-slate-500">{{ section.requirement.description }}</p>{% endif %}
-    {% for item in section.checks %}<fieldset class="border rounded p-4"><legend class="px-2 font-semibold text-sm">{% if item.result.requirement_check_id %}{{ item.check.name }}{% else %}Resultado do requisito{% endif %}</legend>
-      {% if item.check.description and item.result.requirement_check_id %}<p class="text-xs text-slate-500 mb-3">{{ item.check.description }}</p>{% endif %}
-      {{ item.form.non_field_errors }}
-      <div class="grid sm:grid-cols-2 gap-4">{% for field in item.form %}<div{% if field.name == 'notes' %} class="sm:col-span-2"{% endif %}><label class="block text-xs font-semibold mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<p role="alert" class="text-red-700 text-sm">{{ field.errors }}</p>{% endif %}</div>{% endfor %}</div>
-      {% if item.validations %}<ul class="mt-3 space-y-1 text-xs" aria-label="Validações automáticas">{% for outcome in item.validations %}<li class="{% if outcome.status == 'PASS' %}text-emerald-800{% elif outcome.status == 'FAIL' %}text-red-800{% else %}text-amber-800{% endif %}"><strong>{% if outcome.status == 'PASS' %}✓{% elif outcome.status == 'FAIL' %}✕{% else %}!{% endif %} {{ outcome.rule.get_severity_display }}:</strong> {{ outcome.message }}{% if outcome.actual and outcome.expected %}<span>(informado: {{ outcome.actual }}; esperado: {{ outcome.expected }})</span>{% endif %}</li>{% endfor %}</ul>{% endif %}
-    </fieldset>{% endfor %}
+    <!-- Header do Processo em Análise -->
+    <header class="card p-5 sticky top-2 z-20 shadow-md border-l-4 border-l-[#0248AB]">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Análise Técnica · Edital {{ submission.edital.number }}/{{ submission.edital.year }}
+                </span>
+                <h1 class="text-xl font-extrabold text-slate-900 mt-0.5 font-mono">
+                    Processo SEI {{ submission.processo_sei }}
+                </h1>
+            </div>
+            <div>
+                <span class="badge-status
+                    {% if submission.workflow_status == 'UNDER_ANALYSIS' %}badge-emanalise
+                    {% elif submission.workflow_status == 'ELIGIBLE_FOR_RANKING' %}badge-apta
+                    {% elif submission.workflow_status == 'INELIGIBLE' %}badge-inapta
+                    {% elif submission.workflow_status == 'PENDING_REVIEW' %}badge-naoenviado
+                    {% else %}badge-naoaplicavel{% endif %}">
+                    {{ submission.get_workflow_status_display }}
+                </span>
+            </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-3 border-t border-slate-100 text-xs">
+            <div>
+                <span class="text-slate-500 block text-[11px]">Instituição:</span>
+                <strong class="text-slate-800">{{ submission.institution.name }}</strong>
+            </div>
+            <div>
+                <span class="text-slate-500 block text-[11px]">CNPJ da candidatura / Anexo I:</span>
+                <strong class="font-mono text-slate-800">{{ submission.institution.formatted_cnpj }}</strong>
+            </div>
+            <div>
+                <span class="text-slate-500 block text-[11px]">Município / UF:</span>
+                <strong class="text-slate-800">{{ submission.municipality|default:"Não informado" }}</strong>
+            </div>
+            <div>
+                <span class="text-slate-500 block text-[11px]">Grupo / Público:</span>
+                <strong class="text-slate-800">{{ submission.target_group }}</strong>
+            </div>
+            <div>
+                <span class="text-slate-500 block text-[11px]">Analista Responsável:</span>
+                <strong class="text-slate-800">{{ evaluation.analyst.get_full_name|default:evaluation.analyst.username }}</strong>
+            </div>
+            <div>
+                <span class="text-slate-500 block text-[11px]">Data de Recebimento:</span>
+                <span class="text-slate-700">{{ submission.received_at|date:"d/m/Y H:i" }}</span>
+            </div>
+        </div>
+    </header>
+
+    {% if validation_errors %}
+        <div role="alert" class="p-4 text-xs bg-red-50 text-red-900 border border-red-200 rounded-lg space-y-1">
+            <span class="font-bold block text-sm">Pendências impeditivas identificadas:</span>
+            {% for error in validation_errors %}
+                <p>&bull; {{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="grid lg:grid-cols-3 gap-6 items-start">
+        <!-- Coluna Principal com Requisitos e Checks -->
+        <div class="lg:col-span-2 space-y-5">
+            <form id="evaluation-form" method="post"
+                  action="{% url 'evaluation-save-draft' evaluation.pk %}"
+                  hx-post="{% url 'evaluation-save-draft' evaluation.pk %}"
+                  hx-target="#summary-panel-container"
+                  hx-swap="innerHTML"
+                  class="space-y-5">
+                {% csrf_token %}
+
+                {% for macro in macro_sections %}
+                    <section class="space-y-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-600 px-1">
+                            {{ macro.title }}
+                        </h2>
+
+                        {% for section in macro.requirements %}
+                            <details open class="card overflow-hidden">
+                                <summary class="p-4 font-semibold cursor-pointer bg-slate-50/80 hover:bg-slate-100/80 transition flex items-center justify-between border-b border-slate-200">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-xs bg-[#E4E8F4] text-[#171B55] font-bold px-2 py-0.5 rounded">
+                                            {{ section.requirement.code }}
+                                        </span>
+                                        <span class="text-slate-800 text-sm">{{ section.requirement.name }}</span>
+                                    </div>
+                                    <div>
+                                        {% if section.requirement.mandatory %}
+                                            <span class="badge badge-naoatende text-[11px]">Obrigatório</span>
+                                        {% else %}
+                                            <span class="badge badge-naoaplicavel text-[11px]">Facultativo</span>
+                                        {% endif %}
+                                    </div>
+                                </summary>
+
+                                <div class="p-5 space-y-5">
+                                    {% if section.requirement.description %}
+                                        <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-150">
+                                            {{ section.requirement.description }}
+                                        </p>
+                                    {% endif %}
+
+                                    {% for item in section.checks %}
+                                        <fieldset class="border border-slate-200 rounded-lg p-4 bg-white space-y-3">
+                                            <legend class="px-2 font-bold text-xs text-slate-700 uppercase tracking-wider">
+                                                {% if item.result.requirement_check_id %}
+                                                    {{ item.check.name }}
+                                                {% else %}
+                                                    Resultado do requisito
+                                                {% endif %}
+                                            </legend>
+
+                                            {% if item.check.description and item.result.requirement_check_id %}
+                                                <p class="text-xs text-slate-500">{{ item.check.description }}</p>
+                                            {% endif %}
+
+                                            {{ item.form.non_field_errors }}
+
+                                            <div class="grid sm:grid-cols-2 gap-4">
+                                                {% for field in item.form %}
+                                                    <div{% if field.name == 'notes' %} class="sm:col-span-2"{% endif %}>
+                                                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                        {{ field }}
+                                                        {% if field.errors %}
+                                                            <div role="alert" class="text-red-700 text-xs mt-1">{{ field.errors }}</div>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+
+                                            {% if item.validations %}
+                                                <ul class="mt-3 pt-3 border-t border-slate-100 space-y-1 text-xs" aria-label="Validações automáticas">
+                                                    {% for outcome in item.validations %}
+                                                        <li class="flex items-start gap-1.5 {% if outcome.status == 'PASS' %}text-emerald-800{% elif outcome.status == 'FAIL' %}text-red-800{% else %}text-amber-800{% endif %}">
+                                                            <strong class="font-bold">
+                                                                {% if outcome.status == 'PASS' %}&check;{% elif outcome.status == 'FAIL' %}&times;{% else %}!{% endif %}
+                                                                {{ outcome.rule.get_severity_display }}:
+                                                            </strong>
+                                                            <span>{{ outcome.message }}</span>
+                                                            {% if outcome.actual and outcome.expected %}
+                                                                <span class="text-slate-500 font-mono">(inf: {{ outcome.actual }}; esp: {{ outcome.expected }})</span>
+                                                            {% endif %}
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% endif %}
+                                        </fieldset>
+                                    {% endfor %}
+                                </div>
+                            </details>
+                        {% endfor %}
+                    </section>
+                {% endfor %}
+
+                <!-- Considerações Gerais -->
+                <div class="card p-5">
+                    <label class="form-label font-bold text-sm mb-2" for="general_notes">Considerações Gerais da Análise</label>
+                    <textarea id="general_notes" name="general_notes" class="form-input text-xs" rows="3" {% if not can_edit %}disabled{% endif %}>{{ evaluation.general_notes }}</textarea>
+                </div>
+            </form>
+        </div>
+
+        <!-- Coluna Lateral: Resumo em Tempo Real -->
+        <aside id="summary-panel-container" class="sticky top-24">
+            {% include "evaluations/partials/summary_panel.html" %}
+        </aside>
     </div>
-   </details>
-   {% endfor %}
-   </section>
-  {% endfor %}
-  <div class="bg-white border rounded-lg p-5"><label class="font-semibold text-sm block mb-2" for="general_notes">Considerações gerais</label><textarea id="general_notes" name="general_notes" class="form-input" rows="3" {% if not can_edit %}disabled{% endif %}>{{ evaluation.general_notes }}</textarea></div>
-  </form></div>
-  <aside id="summary-panel-container">{% include "evaluations/partials/summary_panel.html" %}</aside>
- </div>
 </div>
 {% endblock %}
