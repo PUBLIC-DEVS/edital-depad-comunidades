@@ -6,7 +6,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.audit.models import AuditEvent
 from apps.editais.models import Edital, Requirement, RequirementCheck
 from apps.evaluations.models import CheckResult, Evaluation
 from apps.evaluations.services import EvaluationService
@@ -65,6 +64,10 @@ class TestReviewsAndDiligenceIntegration:
         EvaluationService.conclude_evaluation(eval_obj, actor=analyst)
         sub.refresh_from_db()
         review = ReviewService.claim_review(Review.objects.get(submission=sub), reviewer)
+
+        from tests.operational_helpers import publish_fixture
+
+        publish_fixture(edital)
 
         return {
             "analyst": analyst,
@@ -153,69 +156,36 @@ class TestReviewsAndDiligenceIntegration:
         sub.refresh_from_db()
         assert sub.workflow_status == Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING
 
-    def test_diligence_workflow_and_views(self, client, setup_data):
-        reviewer = setup_data["reviewer"]
+    def test_diligence_workflow_and_views_disabled(self, client, setup_data):
         sub = setup_data["sub"]
-        client.force_login(reviewer)
-
-        # Abre diligência via view
-        url_create = reverse("diligence-create", kwargs={"submission_id": sub.id})
-        deadline_str = (timezone.now().date() + datetime.timedelta(days=10)).strftime("%Y-%m-%d")
-        res_create = client.post(
-            url_create,
-            {"reason": "Apresentar certidão municipal atualizada.", "deadline": deadline_str},
+        client.force_login(setup_data["reviewer"])
+        assert client.get(reverse("diligence-list")).status_code == 404
+        assert (
+            client.post(
+                reverse("diligence-create", args=[sub.pk]),
+                {"reason": "Complemento", "deadline": "2026-12-01"},
+            ).status_code
+            == 404
         )
-        assert res_create.status_code == 302
-
         sub.refresh_from_db()
-        assert sub.workflow_status == Submission.WorkflowStatus.PENDING_DILIGENCE
+        assert sub.workflow_status == "PENDING_REVIEW"
+        assert not Diligence.objects.exists()
 
-        diligence = Diligence.objects.get(submission=sub)
-        assert diligence.status == Diligence.Status.OPEN
-
-        # Julga e conclui diligência
-        url_detail = reverse("diligence-detail", kwargs={"diligence_id": diligence.id})
-        res_conclude = client.post(
-            url_detail,
-            {
-                "response": "Certidão apresentada no doc SEI 7788.",
-                "result": Diligence.Result.SANEADA,
-            },
+    def test_diligence_related_check_result_cannot_start_request(self, client, setup_data):
+        client.force_login(setup_data["reviewer"])
+        result = setup_data["eval_obj"].check_results.get()
+        assert (
+            client.post(
+                reverse("diligence-create", args=[setup_data["sub"].pk]),
+                {
+                    "related_check_results": [result.pk],
+                    "reason": "Conferir",
+                    "deadline": "2026-12-01",
+                },
+            ).status_code
+            == 404
         )
-        assert res_conclude.status_code == 302
-
-        diligence.refresh_from_db()
-        assert diligence.status == Diligence.Status.CONCLUDED
-        assert diligence.result == Diligence.Result.SANEADA
-
-        sub.refresh_from_db()
-        assert sub.workflow_status == Submission.WorkflowStatus.PENDING_REVIEW
-
-        # Verifica evento de auditoria gerado
-        audit_exists = AuditEvent.objects.filter(
-            entity_type="Submission", entity_id=str(sub.id)
-        ).exists()
-        assert audit_exists is True
-
-    def test_diligence_related_check_result_is_scoped_to_submission(self, client, setup_data):
-        reviewer = setup_data["reviewer"]
-        submission = setup_data["sub"]
-        check_result = CheckResult.objects.get(evaluation=setup_data["eval_obj"])
-        client.force_login(reviewer)
-        deadline = (timezone.now().date() + datetime.timedelta(days=10)).strftime("%Y-%m-%d")
-        response = client.post(
-            reverse("diligence-create", kwargs={"submission_id": submission.pk}),
-            {
-                "reason": "Apresentar complemento do item documental revisado.",
-                "deadline": deadline,
-                "related_check_results": [check_result.pk],
-            },
-        )
-        assert response.status_code == 302
-        diligence = Diligence.objects.get(submission=submission)
-        assert list(diligence.related_check_results.values_list("pk", flat=True)) == [
-            check_result.pk
-        ]
+        assert not Diligence.objects.exists()
 
     def test_diligence_rejects_foreign_check_result_id(self, setup_data):
         current = setup_data["sub"]
@@ -235,7 +205,7 @@ class TestReviewsAndDiligenceIntegration:
             requirement_check=setup_data["check"],
             status=CheckResult.Status.EM_BRANCO,
         )
-        with pytest.raises(ValidationError, match="não pertence"):
+        with pytest.raises(ValidationError, match="desativad"):
             WorkflowService.open_diligence(
                 submission=current,
                 requested_by=setup_data["reviewer"],

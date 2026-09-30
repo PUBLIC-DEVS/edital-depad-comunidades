@@ -106,21 +106,33 @@ def test_diligence_origin_and_explicit_consequence(domain, origin, result):
     sub = domain["sub"]
     sub.workflow_status = origin
     sub.save()
-    d = WorkflowService.open_diligence(
-        sub, domain["coord"], "test", timezone.now().date(), unsatisfied_return_status="INELIGIBLE"
-    )
-    WorkflowService.conclude_diligence(d, domain["coord"], result, "response")
+    before = AuditEvent.objects.count()
+    with pytest.raises(ValidationError, match="desativad"):
+        WorkflowService.open_diligence(
+            sub,
+            domain["coord"],
+            "test",
+            timezone.now().date(),
+            unsatisfied_return_status="INELIGIBLE",
+        )
     sub.refresh_from_db()
-    assert sub.workflow_status == (origin if result == "SANEADA" else "INELIGIBLE")
-    assert AuditEvent.objects.filter(entity_type="Diligence", action="ANSWER_DILIGENCE").exists()
+    assert sub.workflow_status == origin
+    assert not Diligence.objects.exists()
+    assert AuditEvent.objects.count() == before
 
 
-def test_unsatisfied_diligence_has_no_invented_legal_consequence(domain):
-    sub = domain["sub"]
-    sub.workflow_status = "UNDER_ANALYSIS"
-    sub.save()
-    diligence = WorkflowService.open_diligence(sub, domain["coord"], "test", timezone.now().date())
-    with pytest.raises(ValidationError, match="OPEN BUSINESS QUESTION"):
-        WorkflowService.conclude_diligence(diligence, domain["coord"], "NAO_SANEADA")
+def test_historical_diligence_remains_readable_when_feature_is_disabled(domain):
+    # Historical import may create schema records; no new operational request is allowed.
+    diligence = Diligence.objects.create(
+        submission=domain["sub"],
+        reason="Histórico",
+        status="LEGACY_UNKNOWN",
+        result="LEGACY_UNKNOWN",
+    )
+    with pytest.raises(ValidationError, match="desativad"):
+        WorkflowService.open_diligence(
+            domain["sub"], domain["coord"], "test", timezone.now().date()
+        )
     diligence.refresh_from_db()
-    assert diligence.status == Diligence.Status.OPEN
+    assert diligence.status == Diligence.Status.LEGACY_UNKNOWN
+    assert diligence.reason == "Histórico"

@@ -1,5 +1,3 @@
-import datetime
-
 import pytest
 from django.utils import timezone
 
@@ -106,35 +104,14 @@ class TestWorkflowService:
         assert asgn2.status == Assignment.Status.ACTIVE
         assert sub.assigned_analyst == user2
 
-    def test_diligence_lifecycle(self, setup_data):
-        sub = setup_data["sub"]
-        coord = setup_data["coord"]
+    def test_diligence_lifecycle_disabled(self, setup_data):
+        from django.core.exceptions import ValidationError
 
-        # Move para UNDER_ANALYSIS
+        sub, coord = setup_data["sub"], setup_data["coord"]
         WorkflowService.transition(sub, Submission.WorkflowStatus.ASSIGNED, coord)
         WorkflowService.transition(sub, Submission.WorkflowStatus.UNDER_ANALYSIS, coord)
-
-        # Abre diligência
-        deadline = timezone.now().date() + datetime.timedelta(days=7)
-        diligence = WorkflowService.open_diligence(
-            sub,
-            requested_by=coord,
-            reason="Falta certidão FGTS",
-            deadline=deadline,
-        )
+        with pytest.raises(ValidationError, match="desativad"):
+            WorkflowService.open_diligence(sub, coord, "Falta certidão", timezone.now().date())
         sub.refresh_from_db()
-        assert sub.workflow_status == Submission.WorkflowStatus.PENDING_DILIGENCE
-        assert diligence.status == Diligence.Status.OPEN
-
-        # Conclui saneada
-        WorkflowService.conclude_diligence(
-            diligence=diligence,
-            actor=coord,
-            result=Diligence.Result.SANEADA,
-            response_text="Certidão anexada no doc SEI 54321.",
-        )
-        sub.refresh_from_db()
-        diligence.refresh_from_db()
-        assert diligence.status == Diligence.Status.CONCLUDED
-        assert diligence.result == Diligence.Result.SANEADA
-        assert sub.workflow_status == Submission.WorkflowStatus.UNDER_ANALYSIS
+        assert sub.workflow_status == "UNDER_ANALYSIS"
+        assert not Diligence.objects.exists()

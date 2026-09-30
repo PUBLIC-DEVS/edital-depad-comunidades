@@ -3,13 +3,14 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.accounts.models import User
 from apps.accounts.permissions import RolePermissionPolicy, require_role
+from apps.editais.operational import operational_edital_required
 from apps.evaluations.assessment import blocking_results, definition_rows
 from apps.evaluations.models import CheckResult
 from apps.reviews.forms import DiligenceCreateForm, DiligenceResponseForm, ReviewConcludeForm
@@ -21,13 +22,14 @@ from apps.submissions.services.workflow import WorkflowService
 
 @login_required
 @require_role(User.Role.REVISOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@operational_edital_required
 def review_list_view(request: HttpRequest) -> HttpResponse:
     """Fila de revisão de processos com parecer emitido pelo analista."""
-    status_filter = request.GET.get("status", "").strip()
+    status_filter = request.GET.get("status", "PENDING").strip()
     search = request.GET.get("q", "").strip()
 
     qs = (
-        Review.objects.all()
+        Review.objects.filter(submission__edital=request.operational_edital)
         .select_related(
             "submission",
             "submission__institution",
@@ -35,7 +37,13 @@ def review_list_view(request: HttpRequest) -> HttpResponse:
             "evaluation__analyst",
             "reviewer",
         )
-        .order_by("-created_at")
+        .annotate(
+            failed_count=Count(
+                "evaluation__check_results",
+                filter=Q(evaluation__check_results__status="NAO_ATENDE"),
+            )
+        )
+        .order_by("created_at")
     )
 
     if request.user.role == User.Role.REVISOR and not request.user.is_superuser:
@@ -82,18 +90,27 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
         raise PermissionDenied("Revisão atribuída a outro responsável.")
     decisions_map = {d.check_result_id: d for d in review.item_decisions.all()}
     sections = {}
-    for req, definition, result in definition_rows(evaluation):
-        section = sections.setdefault(req.pk, {"requirement": req, "checks": []})
+    rows = definition_rows(evaluation)
+    for req, definition, result in rows:
+        section = sections.setdefault(
+            req.pk, {"requirement": req, "number": len(sections) + 1, "checks": []}
+        )
         if result:
             section["checks"].append(
                 {
                     "check": definition,
                     "result": result,
                     "decision": decisions_map.get(result.pk),
+                    "number": f"{section['number']}.{len(section['checks']) + 1}",
+                    "effective_status": decisions_map[result.pk].reviewer_status
+                    if result.pk in decisions_map
+                    and not decisions_map[result.pk].agrees_with_analyst
+                    else result.status,
                     "status_choices": [
                         (v, label)
                         for v, label in CheckResult.Status.choices
                         if v in definition.allowed_statuses
+                        and v not in {"NAO_ENVIADO", "EM_BRANCO"}
                     ],
                 }
             )
@@ -114,6 +131,7 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
         "can_edit": can_edit,
         "can_claim": review.status == Review.Status.PENDING and review.reviewer_id is None,
         "unresolved_checks": unresolved_checks,
+        "assessment": ReviewService.effective_assessment(review, rows=rows),
     }
     return render(request, "reviews/detail.html", context)
 
@@ -146,16 +164,14 @@ def review_item_decision_view(
         return redirect("review-detail", review_id=review.id)
 
     if request.method == "POST":
-        agrees = request.POST.get("agrees_with_analyst") == "true"
         status_revisor = request.POST.get("reviewer_status", "").strip()
         justification = request.POST.get("justification", "").strip()
 
         try:
-            decision = ReviewService.record_item_decision(
+            decision = ReviewService.record_effective_status(
                 review=review,
                 check_result_id=check_result_id,
-                agrees_with_analyst=agrees,
-                reviewer_status=status_revisor,
+                status=status_revisor,
                 justification=justification,
                 actor=request.user,
             )
@@ -182,7 +198,6 @@ def review_conclude_view(request: HttpRequest, review_id: int) -> HttpResponse:
             try:
                 ReviewService.conclude_review(
                     review=review,
-                    preliminary_result=form.cleaned_data["preliminary_result"],
                     decision_notes=form.cleaned_data["decision_notes"],
                     actor=request.user,
                 )
@@ -192,7 +207,7 @@ def review_conclude_view(request: HttpRequest, review_id: int) -> HttpResponse:
                 messages.success(request, "Revisão concluída com sucesso.")
                 return redirect("review-list")
         else:
-            messages.error(request, "Informe um resultado e parecer válidos.")
+            messages.error(request, "Corrija a observação da revisão.")
     return redirect("review-detail", review_id=review.id)
 
 

@@ -37,6 +37,9 @@ pytestmark = pytest.mark.django_db
     ],
 )
 def test_global_views_server_side_permissions(client, domain, role, allowed, endpoint):
+    from tests.operational_helpers import publish_fixture
+
+    publish_fixture(domain["edital"])
     snapshot = RankingService.generate_snapshot(domain["edital"], domain["coord"])
     args = (
         [snapshot.pk]
@@ -79,22 +82,15 @@ def test_review_post_ownership_and_roles(client, domain, role):
 def test_diligence_idor(client, domain, role):
     rev = review(domain)
     client.force_login(domain[role])
-    response = client.post(
-        reverse("diligence-create", args=[domain["sub"].pk]),
-        {"reason": "test", "deadline": "2026-12-01"},
-    )
-    assert response.status_code == 403
-    assert not domain["sub"].diligences.exists()
-    diligence = WorkflowService.open_diligence(
-        domain["sub"], domain["coord"], "test", __import__("datetime").date(2026, 12, 1)
-    )
     assert (
         client.post(
-            reverse("diligence-detail", args=[diligence.pk]),
-            {"result": "SANEADA", "response": "test"},
+            reverse("diligence-create", args=[domain["sub"].pk]),
+            {"reason": "test", "deadline": "2026-12-01"},
         ).status_code
-        == 403
+        == 404
     )
+    assert not domain["sub"].diligences.exists()
+    assert client.post(reverse("diligence-detail", args=[999])).status_code == 404
     rev.refresh_from_db()
     assert rev.status == "PENDING"
 

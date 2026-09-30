@@ -10,17 +10,11 @@ from apps.submissions.models import Submission
 class ReviewConcludeForm(forms.ModelForm):
     """Formulário para emissão do parecer conclusivo da revisão."""
 
-    def clean_preliminary_result(self):
-        value = self.cleaned_data["preliminary_result"]
-        if value == Review.PreliminaryResult.PENDING_DECISION:
-            raise forms.ValidationError("Escolha um resultado conclusivo.")
-        return value
-
     class Meta:
         model = Review
-        fields = ["preliminary_result", "decision_notes"]
+        fields = ["decision_notes"]
+        labels = {"decision_notes": "Observação final da revisão"}
         widgets = {
-            "preliminary_result": forms.Select(attrs={"class": "form-select"}),
             "decision_notes": forms.Textarea(
                 attrs={
                     "rows": 4,

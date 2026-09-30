@@ -25,24 +25,25 @@ def test_operational_admin_cannot_bypass_audited_services(domain, model):
     assert not model_admin.has_add_permission(request)
 
 
-def test_diligence_without_failure_policy_shows_validation_error(client, domain):
+def test_diligence_without_failure_policy_is_disabled(client, domain):
+    import pytest
+    from django.core.exceptions import ValidationError
+
     domain["sub"].workflow_status = "UNDER_ANALYSIS"
     domain["sub"].save()
-    diligence = WorkflowService.open_diligence(
-        domain["sub"], domain["coord"], "test", timezone.now().date()
-    )
+    with pytest.raises(ValidationError, match="desativad"):
+        WorkflowService.open_diligence(
+            domain["sub"], domain["coord"], "test", timezone.now().date()
+        )
     client.force_login(domain["coord"])
-    response = client.post(
-        reverse("diligence-detail", args=[diligence.pk]),
-        {"result": "NAO_SANEADA", "response": "test"},
-    )
-    assert response.status_code == 200
-    assert response.context["form"].non_field_errors()
-    diligence.refresh_from_db()
-    assert diligence.status == "OPEN"
+    assert client.post(reverse("diligence-create", args=[domain["sub"].pk])).status_code == 404
+    assert not Diligence.objects.exists()
 
 
 def test_unverified_old_snapshot_not_exported_as_official(client, domain):
+    from tests.operational_helpers import publish_fixture
+
+    publish_fixture(domain["edital"])
     snapshot = RankingSnapshot.objects.create(
         edital=domain["edital"],
         generated_by=domain["coord"],

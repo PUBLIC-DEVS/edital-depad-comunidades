@@ -1,4 +1,6 @@
-"""Serviços de domínio para o fluxo de revisão e diligências processuais."""
+"""Auditable reviewer decisions over an immutable original evaluation."""
+
+import json
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -51,6 +53,33 @@ class ReviewService:
 
     @classmethod
     @transaction.atomic
+    def record_effective_status(cls, review, check_result_id, status, justification, actor):
+        check = (
+            CheckResult.objects.select_related("requirement", "requirement_check")
+            .filter(pk=check_result_id, evaluation_id=review.evaluation_id)
+            .first()
+        )
+        if check is None:
+            raise ValidationError("Checagem não pertence à avaliação desta revisão.")
+        if status not in {"ATENDE", "NAO_ATENDE", "NAO_APLICAVEL"}:
+            raise ValidationError("Escolha Atende, Não atende ou Não se aplica quando permitido.")
+        return cls.record_item_decision(
+            review, check_result_id, status == check.status, status, justification, actor
+        )
+
+    @staticmethod
+    def effective_assessment(review, rows=None):
+        from apps.evaluations.services import EvaluationService
+
+        overrides = {
+            d.check_result_id: d.reviewer_status
+            for d in review.item_decisions.all()
+            if not d.agrees_with_analyst
+        }
+        return EvaluationService.calculate_assessment(review.evaluation, overrides, rows=rows)
+
+    @classmethod
+    @transaction.atomic
     def record_item_decision(
         cls,
         review: Review,
@@ -84,6 +113,11 @@ class ReviewService:
         ):
             raise ValidationError("Status não permitido para este item.")
 
+        previous = (
+            ReviewItemDecision.objects.filter(review=review, check_result=check_result)
+            .values("agrees_with_analyst", "reviewer_status", "justification")
+            .first()
+        )
         decision, created = ReviewItemDecision.objects.update_or_create(
             review=review,
             check_result=check_result,
@@ -99,13 +133,21 @@ class ReviewService:
             entity_type="ReviewItemDecision",
             entity_id=str(decision.id),
             action="RECORD_DECISION",
-            field="agrees_with_analyst",
-            old_value="" if created else "UPDATED",
-            new_value="CONCORDA" if agrees_with_analyst else f"DIVERGE ({reviewer_status})",
+            field="effective_decision",
+            old_value="" if created else json.dumps(previous, ensure_ascii=False),
+            new_value=json.dumps(
+                {
+                    "agrees_with_analyst": agrees_with_analyst,
+                    "reviewer_status": decision.reviewer_status,
+                    "justification": justification,
+                },
+                ensure_ascii=False,
+            ),
             metadata={
                 "review_id": review.id,
                 "check_code": check_result.definition.code,
-                "justification": justification[:100],
+                "original_status": check_result.status,
+                "effective_status": check_result.status if agrees_with_analyst else reviewer_status,
             },
         )
         return decision
@@ -115,9 +157,9 @@ class ReviewService:
     def conclude_review(
         cls,
         review: Review,
-        preliminary_result: str,
-        decision_notes: str,
-        actor: User,
+        preliminary_result: str | None = None,
+        decision_notes: str = "",
+        actor: User | None = None,
     ) -> Review:
         """Conclui a revisão e avança o workflow da submissão para elegibilidade ou inaptidão.
 
@@ -126,7 +168,7 @@ class ReviewService:
         """
         review = Review.objects.select_for_update().select_related("submission").get(pk=review.pk)
         cls.enforce_edit(review, actor)
-        if preliminary_result not in (
+        if preliminary_result is not None and preliminary_result not in (
             Review.PreliminaryResult.PRE_HABILITADO,
             Review.PreliminaryResult.PRE_INABILITADO,
         ):
@@ -146,13 +188,18 @@ class ReviewService:
             if not decision.agrees_with_analyst
         }
         assessment = EvaluationService.calculate_assessment(review.evaluation, overrides)
-        expected = (
-            "APTA" if preliminary_result == Review.PreliminaryResult.PRE_HABILITADO else "INAPTA"
+        calculated_result = (
+            Review.PreliminaryResult.PRE_HABILITADO
+            if assessment.result == "APTA"
+            else Review.PreliminaryResult.PRE_INABILITADO
         )
-        if not assessment.is_complete or assessment.result != expected:
+        if not assessment.is_complete or (
+            preliminary_result is not None and preliminary_result != calculated_result
+        ):
             raise ValidationError(
                 "Resultado da revisão incoerente com as decisões dos itens. Corrija as decisões antes de concluir."
             )
+        preliminary_result = calculated_result
         review.status = Review.Status.COMPLETED
         review.preliminary_result = preliminary_result
         review.decision_notes = decision_notes
