@@ -6,6 +6,8 @@ A planilha histórica continua disponível apenas para migração e regressão. 
 
 Para a configuração funcional do Edital 2026, consulte o [mapeamento da base](docs/EDITAL_2026_BASE_MAPPING.md), as [decisões ainda abertas](docs/EDITAL_2026_OPEN_DECISIONS.md) e o [relatório desta adaptação](docs/EDITAL_2026_ADAPTATION_REPORT.md). O HTTP integration lifecycle configura pelas views/forms os 14 blocos e 23 checks sem abrir o XLSX.
 
+Para a arquitetura visual, componentes reutilizáveis, tokens de cores e regras estritas de neutralidade institucional, consulte o [Guia de Estilo de Interface (UI Style Guide)](docs/UI_STYLE_GUIDE.md).
+
 ## Ambiente local
 
 Python 3.12+ e Django 5.2 LTS. O patch verificado é 5.2.17; a dependência fica na linha 5.2. PostgreSQL é o banco configurado na CI; SQLite atende desenvolvimento e testes locais.
