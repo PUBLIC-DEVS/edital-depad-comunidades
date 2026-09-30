@@ -7,9 +7,9 @@ configurável: modelos, migrations, snapshots, importação histórica e auditor
 foram preservados. Classificação G1/G2/G3, fórmula de ranking, financeira,
 duplicidade, restrições e correção de CNPJ não foram reimplementadas.
 
-Base: `79d5fc199f8b98f12e114511b4f17d2af5b70602`, branch
-`feature/edital-2026-simplified-flow`. A branch consolidada e `main` não recebem
-estas alterações. Nenhuma migration é necessária.
+Base histórica da simplificação: `79d5fc199f8b98f12e114511b4f17d2af5b70602`.
+A simplificação foi incorporada por fast-forward à branch atual
+`feature/edital-2026`. `main` permanece intocada. Nenhuma migration é necessária.
 
 O inventário anterior à implementação examinou `config/urls.py`, `config/views.py`,
 as rotas/templates/selectors/services de editais, processos, avaliações, revisões,
@@ -235,19 +235,18 @@ Capturas 1440×900 e 375×812 são temporárias e não entram no Git. Também fo
 exercitados autosave, conclusão pendente/apta, revisão de item aprovado/reprovado,
 resultado derivado, estado vazio, navegação de Consulta e acesso proibido.
 
-## Atenção à base de demonstração
+## Homologação reproduzível
 
-A base Docker encontrada contém **DEMO-CRUD/2027, 2 blocos/3 itens de análise** (2 checks e um requisito
-com decisão direta, compatível com a configuração anterior), não o
-edital-base 2026. Ela foi preservada. O sistema mostra a configuração ativa real;
-não transforma o demo em 14/23 nem escolhe outro edital por ano.
+A entrada para terceiros é [MANUAL_TEST_GUIDE.md](MANUAL_TEST_GUIDE.md).
+Clone `feature/edital-2026` e execute `./scripts/tester-bootstrap.sh`.
+O comando explícito `seed_homologation` prepara 14 blocos/23 checks em banco local,
+sem Excel e sem arquivos externos. Use `http://localhost:8000/` e contas `homolog.*`.
 
-Os **14 blocos/23 checks** foram confirmados nos testes controlados e no ambiente
-isolado do browser smoke. Para operação real com essa configuração, a coordenação
-deve preparar/publicar o edital adequado pela manutenção técnica, resolver as
-decisões documentadas em `EDITAL_2026_OPEN_DECISIONS.md` e assegurar exatamente
-um ACTIVE. Esta fase não inventa data jurídica, lista PRONASCI ou dados de produção.
-
+A demonstração simples `seed_demo` permanece independente e contém 2 blocos/3
+itens (2 checks e um requisito de decisão direta). O comando de homologação recusa
+outro edital ativo, sem transformar ou desativar o demo existente. A segunda
+execução preserva decisões, senhas e histórico. Datas/vínculos são sintéticos;
+não resolvem decisões jurídicas nem representam municípios PRONASCI oficiais.
 
 ## Resultado da validação final
 
@@ -260,13 +259,30 @@ um ACTIVE. Esta fase não inventa data jurídica, lista PRONASCI ou dados de pro
   apta sem Review indevido e revisão apta preservando a falha original confirmados
   também no banco. Navegação por teclado alcança o link de pular para o conteúdo.
 
-O ambiente manual temporário é `http://127.0.0.1:8001/`, container
-`edital_simplified_smoke`, com SQLite separado. A operação principal continua em
-`http://127.0.0.1:8000/` e seu PostgreSQL demonstrativo foi preservado.
-O container temporário usa a branch montada e dados descartáveis; não é ambiente
-de produção. Credenciais são fornecidas no relatório de entrega.
-
-
 O refinamento final da lista do analista foi validado com 42 testes focados e nova
 execução completa da suíte. A aba padrão mantém o trabalho pendente/em andamento;
 concluídas ficam disponíveis sem competir com a próxima ação.
+
+
+## Consolidação e preparação para terceiros
+
+A branch operacional atual é `feature/edital-2026`. A consolidação usa fast-forward,
+preserva os sete commits auditáveis da simplificação e não altera `main`.
+O fluxo atual de homologação é documentado em `MANUAL_TEST_GUIDE.md`.
+
+`seed_homologation` é explícito, transacional e restrito a DEBUG/autenticação local.
+Ele reutiliza `configure_edital_2026_base`, publicação auditada, distribuição,
+avaliação, revisão, classificação e ranking. Não altera algoritmos do domínio.
+Com outro ACTIVE, conta conflitante ou dataset incompleto, recusa execução sem
+sobrescrever dados. A segunda execução preserva inclusive senha alterada, rascunho,
+decisões de revisão e todos os registros anteriores.
+
+Os oito processos sintéticos distribuem-se em G1/G2/G3 com estrutura 14/23:
+recebido, parcial 17/23, novo 0/23, revisão com 3 falhas, 3 aptos classificados e
+1 inapto final. O gráfico temporal usa datas sintéticas de exemplo claramente
+identificadas pelo edital de homologação; não é interpretação de dados reais.
+
+O bootstrap verifica Docker/Compose, constrói os serviços, espera PostgreSQL,
+aplica migrations, executa seed/check e verifica HTTP do web. Não altera Git nem
+apaga volumes. A ausência de shellcheck no ambiente é suprida por revisão manual
+e validação `bash -n`; nenhuma instalação no host é necessária.

@@ -8,6 +8,25 @@ Para a configuração funcional do Edital 2026, consulte o [mapeamento da base](
 
 Para a arquitetura visual, componentes reutilizáveis, tokens de cores e regras estritas de neutralidade institucional, consulte o [Guia de Estilo de Interface (UI Style Guide)](docs/UI_STYLE_GUIDE.md).
 
+## Teste local / homologação
+
+Com Git e Docker Desktop em execução:
+
+```bash
+git clone --branch feature/edital-2026 \
+  https://github.com/PUBLIC-DEVS/edital-depad-comunidades.git
+cd edital-depad-comunidades
+./scripts/tester-bootstrap.sh
+```
+
+Abrir **http://localhost:8000/**. O bootstrap prepara um banco sintético com 14
+blocos/23 critérios, seis perfis, análises, revisão e classificação. É idempotente,
+preserva decisões e recusa outro edital ativo; não apaga volumes.
+
+Senha inicial local: `Homolog.Edital#2026`. Usuários `homolog.*` e roteiro em
+[MANUAL_TEST_GUIDE.md](docs/MANUAL_TEST_GUIDE.md). **LOCAL DEVELOPMENT ONLY**;
+o seed nunca é executado automaticamente na inicialização.
+
 ## Ambiente local
 
 Python 3.12+ e Django 5.2 LTS. O patch verificado é 5.2.17; a dependência fica na linha 5.2. PostgreSQL é o banco configurado na CI; SQLite atende desenvolvimento e testes locais.
@@ -18,11 +37,11 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
 python manage.py migrate
-python manage.py seed_demo
+python manage.py seed_homologation
 python manage.py runserver
 ```
 
-`seed_demo` constrói um edital com quatro grupos, regras financeiras e processos fictícios, sem `import_legacy_edital`. O comando informa os logins; a senha de demonstração local pode ser definida por `DEMO_PASSWORD`. Não execute o seed em produção. Para testar o produto sem carregar o app legado, use `ENABLE_LEGACY_IMPORT=false` antes de `migrate`, `seed_demo` e `runserver`. Uma instalação apenas do núcleo pode usar `pip install -e .`; o extra `.[legacy]` instala `openpyxl` quando a migração histórica for necessária.
+`seed_demo` permanece disponível para a demonstração simples e constrói um edital com quatro grupos, regras financeiras e processos fictícios, sem `import_legacy_edital`. O comando informa os logins; a senha de demonstração local pode ser definida por `DEMO_PASSWORD`. Não execute o seed em produção. Para testar o produto sem carregar o app legado, use `ENABLE_LEGACY_IMPORT=false` antes de `migrate`, `seed_homologation` e `runserver`. Uma instalação apenas do núcleo pode usar `pip install -e .`; o extra `.[legacy]` instala `openpyxl` quando a migração histórica for necessária.
 
 Com Docker (caminho oficial recomendado; consulte o [Guia de Desenvolvimento Local](docs/LOCAL_DEVELOPMENT.md)):
 
@@ -30,7 +49,7 @@ Com Docker (caminho oficial recomendado; consulte o [Guia de Desenvolvimento Loc
 ./scripts/dev-check.sh
 docker compose up --build -d
 docker compose exec web python manage.py migrate
-docker compose exec web python manage.py seed_demo
+docker compose exec web python manage.py seed_homologation
 ```
 
 Aplicação: `http://localhost:8000/`; health check: `/health/`.
