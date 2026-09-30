@@ -1,6 +1,6 @@
 # edital-depad-comunidades
 
-Plataforma Django para criar e executar **novos editais configuráveis**: cadastro de grupos, requisitos, subcritérios, evidências, finanças, programas/municípios, publicação versionada, processos, distribuição, análise, revisão, diligência, ranking e métricas. Toda essa operação funciona sem Excel. Veja [o relatório da Fase 16](docs/CRUD_PRODUCTIZATION_REPORT.md) e [a fronteira do legado](docs/legacy-boundary.md).
+Sistema Django para operar **um único edital ativo**: processos/distribuição, análise documental, revisão auditável, classificação e indicadores. A interface é centrada em ATENDE/NÃO ATENDE; diligências estão desativadas. O domínio genérico, snapshots e histórico permanecem preservados. Consulte [o fluxo operacional simplificado](docs/SIMPLIFIED_OPERATIONAL_FLOW.md), [o relatório histórico da Fase 16](docs/CRUD_PRODUCTIZATION_REPORT.md) e [a fronteira do legado](docs/legacy-boundary.md).
 
 A planilha histórica continua disponível apenas para migração e regressão. O golden master real permanece `FAIL` nas diferenças já documentadas; testes verdes do comparador não transformam isso em paridade aprovada. Consulte [o relatório de hardening](docs/POST_AUDIT_HARDENING_REPORT.md), [a comparação real](docs/REAL_LEGACY_PARITY.md) e [o resumo sanitizado](artifacts/legacy-real-summary.json).
 
@@ -35,25 +35,13 @@ docker compose exec web python manage.py seed_demo
 
 Aplicação: `http://localhost:8000/`; health check: `/health/`.
 
-## Criar um edital sem Excel
+## Operação do edital ativo
 
-Entre como `ADMINISTRADOR` e abra `/administracao/` → **Editais** → **Novo edital**. Preencha número, ano, abertura/encerramento e versão. Na visão geral, cadastre grupos/públicos, requisitos, subcritérios e evidências, política de classificação, regras financeiras e vínculos de programas/municípios; crie analista e revisor em **Usuários e perfis**. O checklist exibe o que falta antes de **Publicar edital**. A publicação grava um snapshot imutável das regras. Para outra edição, use **Duplicar edital**; apenas a configuração é copiada.
+A aplicação exige exatamente um edital `ACTIVE`. Administrador/Coordenador entram na home de acompanhamento; Distribuidor em Processos; Analista em Minhas Análises; Revisor em Revisão. Consulta tem acesso somente de leitura. A configuração de editais e o CRUD de programas não aparecem na operação, e suas URLs antigas estão retiradas.
 
-O CRUD permite ajustar nomes e códigos de requisitos, ordem, obrigatoriedade, checks, status aceitos, evidências, validadores tipados, grupos, regra financeira, referência do programa e política de classificação. Use **Pré-visualizar formulário do analista** antes de publicar. As restrições contratuais são fontes configuráveis e auditadas; a duplicidade de novos editais começa como alerta `WARN_ONLY`. Uma divergência de CNPJ aparece na análise e só pode ser corrigida pela ação explícita de Administração/Coordenação, com justificativa e confirmação, antes da avaliação ou durante análise em rascunho. A operação reassocia somente a candidatura e preserva documentos; decisões concluídas e correções para CNPJ restrito durante análise não são alteradas por essa ação. A validação automática de datas requer a data oficial de referência definida pela coordenação.
+O distribuidor cria/importa e atribui processos. O analista responde aos checks configurados e conclui: APTA segue para classificação; INAPTA segue para revisão. O revisor pode alterar qualquer check com justificativa quando divergir, preservando o parecer original. O resultado final é calculado pelos itens efetivos. Diligências não podem ser iniciadas. Os detalhes, fórmulas de indicadores e validações estão em [SIMPLIFIED_OPERATIONAL_FLOW.md](docs/SIMPLIFIED_OPERATIONAL_FLOW.md).
 
-Para criar uma edição rascunho a partir da configuração 2026 de desenvolvimento, cadastre primeiro um usuário administrador e informe datas operacionais explícitas:
-
-```bash
-python manage.py seed_edital_2026_base \
-  --admin admin \
-  --number 2026-BASE \
-  --opens-at 2026-01-01T09:00:00-03:00 \
-  --closes-at 2026-12-31T18:00:00-03:00
-```
-
-O comando não escolhe uma data de referência jurídica nem inventa a lista de municípios PRONASCI. Preencha esses dados e resolva as decisões abertas na interface antes da publicação. O seed é auxiliar; o teste principal cria a mesma configuração via telas HTTP.
-
-O distribuidor usa `/processos/novo/` ou `/processos/importar-csv/` e atribui processos individuais/em lote. O analista atribuído inicia por POST, salva a análise dinâmica e conclui. `APTA` segue para ranking sem revisão automática; `INAPTA` vai a revisão não atribuída. O revisor assume a revisão, registra decisões de todos os itens impeditivos e conclui um parecer coerente. Uma diligência saneada retorna ao estágio de origem. Coordenador/Admin geram ranking; métricas exibem separadamente análise inicial e resultado consolidado. Consulte [o roteiro e as permissões](docs/CRUD_PRODUCTIZATION_REPORT.md).
+Configuração/publicação continuam disponíveis internamente para manutenção técnica. Os procedimentos anteriores estão preservados no [relatório histórico de produto](docs/CRUD_PRODUCTIZATION_REPORT.md). O seed de desenvolvimento `seed_edital_2026_base` continua criando um rascunho, sem inventar referência jurídica ou municípios PRONASCI. Consulte as [decisões abertas](docs/EDITAL_2026_OPEN_DECISIONS.md) antes da publicação. A base `seed_demo` tem configuração própria e não equivale à base 2026 de 14 blocos/23 checks.
 
 O ranking oficial admite somente elegíveis, suprime duplicatas das posições quando a política configurada determina supressão e preserva exclusões auditáveis. Com `WARN_ONLY`, candidaturas duplicadas são mantidas e sinalizadas. Empates absolutos permanecem bloqueados enquanto a política estiver `UNRESOLVED`. Snapshots, entradas e exclusões são protegidos nas rotas/ORM comuns. Uma avaliação iniciada bloqueia redistribuição até haver operação formal de transferência. Desativar restrição não reabre processos: Administração/Coordenação deve usar **Liberar bloqueio pré-análise**, após todas as fontes cessarem, para retornar à recepção sem atribuição automática.
 

@@ -121,3 +121,25 @@ Ao criar ou estender telas no sistema:
 2. **Preserve a Neutralidade Institucional:** Não adicione logomarcas nem imagens promocionais. Mantenha os rodapés institucionais limpos e informativos.
 3. **Mantenha a Densidade Operacional:** Nas telas de listagem, use `.depad-table` e texto `text-xs`. Não utilize fontes grandes em tabelas analíticas.
 4. **Respeite o Desacoplamento do Backend:** Alterações visuais devem ser feitas estritamente nos templates HTML e arquivos CSS estáticos. Não altere modelos de dados, serializadores ou regras de negócio para fins de formatação de tela.
+
+
+## 8. Refinamento do fluxo de um edital
+
+Esta seção atualiza a operação descrita nas seções históricas acima. O cabeçalho
+usa **Sistema de Gestão e Análise de Edital**, no singular. A navegação varia por
+papel conforme [o fluxo operacional](SIMPLIFIED_OPERATIONAL_FLOW.md); diligência
+não é exibida, e o âmbar representa atenção/revisão pendente.
+
+- `.operational-table`: leitura próxima à planilha, filtros compactos, colunas
+  secundárias em detalhes expansíveis no mobile.
+- `.document-block`, `.check-form`: documentos e checks numerados pela configuração,
+  sem cartões aninhados para cada campo. Evidências em `<details>` nativo.
+- `.status-option`: radio acessível com texto/ícone, borda e superfície selecionada;
+  verde ATENDE, vermelho NÃO ATENDE e neutro NÃO SE APLICA. Cor não é o único sinal.
+- `.analysis-summary`: progresso com `role=progressbar`, contagens e feedback de
+  salvamento; erros são alertas e campos inválidos usam `aria-invalid`.
+- `.chart-panel`, `.chart-row`: barras CSS acompanhadas de valores e legendas;
+  linha SVG com alternativa tabular. Nenhuma imagem promocional ou gráfico decorativo.
+
+Preservam-se Brand Indigo, Action Blue, Accent Red, superfícies neutras e foco
+visível. A validação responsiva inclui 375, 768, 1024, 1280 e 1440 px.
