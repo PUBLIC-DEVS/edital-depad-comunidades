@@ -1,13 +1,13 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: edital_postgres
+    container_name: ${DEPAD_DB_CONTAINER:-edital_postgres}
     environment:
       POSTGRES_DB: edital_db
       POSTGRES_USER: edital_user
       POSTGRES_PASSWORD: edital_pass
     ports:
-      - "5432:5432"
+      - "${DEPAD_DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,12 +18,12 @@ services:
 
   web:
     build: .
-    container_name: edital_web
+    container_name: ${DEPAD_WEB_CONTAINER:-edital_web}
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      - "${DEPAD_WEB_PORT:-8000}:8000"
     environment:
       - DEBUG=True
       - SECRET_KEY=django-insecure-dev-key-change-in-prod-minimum-50-chars
