@@ -12,6 +12,9 @@ from apps.reviews.models import Review
 from apps.submissions.models import Assignment, ParticipationRestriction, Submission
 from tests.phase17_helpers import configure_2026_through_http, post_ok
 
+# Test-only routes exercise retained configuration; operational retirement has separate coverage.
+pytestmark = pytest.mark.urls("tests.technical_urls")
+
 
 @pytest.mark.django_db
 def test_edital_2026_operational_lifecycle_without_workbook(client):
@@ -215,16 +218,11 @@ def test_edital_2026_operational_lifecycle_without_workbook(client):
     }
     metrics = client.get(reverse("reporting:dashboard"), {"edital": edital.pk})
     assert metrics.status_code == 200
-    assert metrics.context["summary"]["initial_results"] == {
-        "APTA": 1,
-        "INAPTA": 1,
-        "EM_ANALISE": 0,
-    }
-    consolidated = metrics.context["summary"]["consolidated_results"]
-    assert consolidated["CLASSIFICADO"] == 2
-    assert consolidated["INABILITADO"] == 1
-    assert consolidated["RECEBIDO"] == 1
-    assert sum(consolidated.values()) == 4
+    summary = metrics.context["summary"]
+    assert summary["apt_count"] == 2
+    assert summary["inapt_count"] == 1
+    assert summary["unassigned_count"] == 1
+    assert summary["total_received"] == 4
     assert (
         AuditEvent.objects.filter(
             entity_type="CheckResult", action="FIELD_CHANGE", field="status"

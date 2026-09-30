@@ -7,6 +7,9 @@ from django.urls import reverse
 from apps.editais.models import RequirementValidationRule
 from apps.editais.services import EditalConfigurationService
 
+# Test-only routes exercise retained configuration; operational retirement has separate coverage.
+pytestmark = pytest.mark.urls("tests.technical_urls")
+
 RULES = [
     ("DATE_NOT_EXPIRED", "collect_valid_until", {"reference_date": "EDITAL_REFERENCE_DATE"}),
     ("CNPJ_MATCH_CANONICAL", "collect_document_cnpj", {}),

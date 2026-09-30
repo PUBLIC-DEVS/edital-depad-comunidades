@@ -151,7 +151,7 @@ def test_review_requires_all_blockers_and_consistent_outcome(domain):
 
 
 @pytest.mark.django_db
-def test_metrics_initial_and_consolidated_are_exclusive(domain):
+def test_operational_metrics_use_effective_workflow_outcome(domain):
     evaluation = EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
     EvaluationService.save_draft(
         evaluation,
@@ -170,13 +170,16 @@ def test_metrics_initial_and_consolidated_are_exclusive(domain):
         review, "PRE_HABILITADO", "Revisão procedente", domain["reviewer"]
     )
     summary = DashboardMetricsService.get_summary_metrics(domain["edital"])
-    assert summary["initial_results"] == {"APTA": 0, "INAPTA": 1, "EM_ANALISE": 0}
-    assert summary["consolidated_results"]["HABILITADO"] == 1
-    assert summary["consolidated_results"]["INABILITADO"] == 0
-    assert sum(summary["consolidated_results"].values()) == 1
+    assert summary["apt_count"] == 1
+    assert summary["inapt_count"] == 0
+    assert summary["pending_review"] == 0
+    assert summary["total_received"] == 1
+    evaluation.refresh_from_db()
+    assert evaluation.result == "INAPTA"  # preserved original, never counted as final inapt
 
 
 @pytest.mark.django_db
+@pytest.mark.urls("tests.technical_urls")
 def test_funding_rule_crud_and_published_protection(domain, client):
     edital = domain["edital"]
     client.force_login(domain["admin"])

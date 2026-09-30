@@ -163,6 +163,10 @@ class TestReportingDashboardAndValidation:
             justification="Documento foi anexado nas fls 35.",
         )
 
+        from tests.operational_helpers import publish_fixture
+
+        publish_fixture(edital)
+
         return {
             "coord": coord,
             "analyst": analyst,
@@ -244,8 +248,9 @@ class TestReportingDashboardAndValidation:
         # 1. Dashboard
         resp = client.get("/metricas/")
         assert resp.status_code == 200
-        assert "Resultado da análise inicial" in resp.content.decode("utf-8")
-        assert "4.2-XVI" in resp.content.decode("utf-8")
+        assert "Situação atual dos processos" in resp.content.decode("utf-8")
+        assert data["check1"].code in resp.content.decode("utf-8")
+        assert resp.context["top_failures"][0]["failure_count"] == 2
 
         # 2. Painel de Validações
         resp_val = client.get("/metricas/validacoes/")

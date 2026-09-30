@@ -18,6 +18,9 @@ from apps.submissions.models import Submission
 from apps.submissions.services.duplicates import DuplicateService
 from apps.submissions.services.identity import SubmissionIdentityService
 
+# Test-only routes exercise retained configuration; operational retirement has separate coverage.
+pytestmark = pytest.mark.urls("tests.technical_urls")
+
 
 @pytest.fixture
 def edital_2026(db):

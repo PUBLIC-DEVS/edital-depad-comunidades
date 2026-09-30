@@ -30,6 +30,9 @@ def test_csv_export_routes_neutralize_user_values(client, domain):
     sub = domain["sub"]
     sub.workflow_status = "ELIGIBLE_FOR_RANKING"
     sub.save()
+    from tests.operational_helpers import publish_fixture
+
+    publish_fixture(domain["edital"])
     snapshot = RankingService.generate_snapshot(domain["edital"], domain["coord"])
     client.force_login(domain["coord"])
     response = client.get(reverse("ranking-export-csv", args=[snapshot.pk]))

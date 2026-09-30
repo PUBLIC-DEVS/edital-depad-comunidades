@@ -371,6 +371,26 @@ def test_workspace_23_checks_uses_bounded_queries(client, domain):
     assert "Diligência" not in html
 
 
+def test_timeline_uses_weeks_for_long_period_and_hides_demo_data(operational):
+    from apps.reporting.services.metrics import DashboardMetricsService
+
+    base = operational["sub"]
+    for index in range(1, 5):
+        Submission.objects.create(
+            edital=base.edital,
+            institution=base.institution,
+            received_at=base.received_at - timezone.timedelta(days=index * 30),
+            processo_sei=f"TIMELINE-{index}",
+        )
+    summary = DashboardMetricsService.get_summary_metrics()
+    assert summary["timeline_unit"] == "semana"
+    assert summary["show_timeline"] is True
+    assert sum(point["count"] for point in summary["timeline"]) == 5
+    base.processo_sei = "DEMO-SYNTHETIC"
+    base.save()
+    assert DashboardMetricsService.get_summary_metrics()["show_timeline"] is False
+
+
 def test_review_justification_and_previous_decision_audit(domain):
     evaluation = EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
     check = evaluation.check_results.get()

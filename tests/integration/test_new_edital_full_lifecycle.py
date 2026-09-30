@@ -14,6 +14,9 @@ from apps.ranking.models import RankingSnapshot
 from apps.reviews.models import Diligence, Review
 from apps.submissions.models import Submission
 
+# Test-only routes exercise retained configuration; operational retirement has separate coverage.
+pytestmark = pytest.mark.urls("tests.technical_urls")
+
 
 @pytest.mark.django_db
 def test_new_edital_full_lifecycle(client):
@@ -63,9 +66,8 @@ def test_new_edital_full_lifecycle(client):
     )
     municipality = Municipality.objects.get(ibge_code="3106200")
     post(
-        "catalog-create",
-        ["programas"],
-        {"code": "TERRITORIOS", "name": "Territórios prioritários", "active": "on"},
+        "program-create",
+        data={"code": "TERRITORIOS", "name": "Territórios prioritários", "active": "on"},
     )
     program = Program.objects.get(code="TERRITORIOS")
     post(
@@ -219,19 +221,9 @@ def test_new_edital_full_lifecycle(client):
     )
     review.refresh_from_db()
     assert review.status == "PENDING"
-    post(
-        "diligence-create",
-        [subs[1].pk],
-        {"reason": "Conferir assinatura", "deadline": "2027-02-01"},
-    )
-    diligence = Diligence.objects.get(submission=subs[1])
-    post(
-        "diligence-detail",
-        [diligence.pk],
-        {"response": "Comprovante recebido", "result": "SANEADA"},
-    )
-    subs[1].refresh_from_db()
-    assert subs[1].workflow_status == "PENDING_REVIEW"
+    # EXPECTED_PRODUCT_CHANGE: no documentary clarification subflow can be started.
+    assert client.post(reverse("diligence-create", args=[subs[1].pk])).status_code == 404
+    assert not Diligence.objects.exists()
     failed = review.evaluation.check_results.get(status="NAO_ATENDE")
     post(
         "review-item-decision",
@@ -239,7 +231,7 @@ def test_new_edital_full_lifecycle(client):
         {
             "agrees_with_analyst": "false",
             "reviewer_status": "ATENDE",
-            "justification": "Assinatura comprovada na diligência",
+            "justification": "Assinatura conferida na revisão",
         },
     )
     post(
@@ -265,9 +257,9 @@ def test_new_edital_full_lifecycle(client):
     response = client.get(reverse("reporting:dashboard"), {"edital": edital.pk})
     assert response.status_code == 200
     summary = response.context["summary"]
-    assert summary["initial_results"] == {"APTA": 1, "INAPTA": 1, "EM_ANALISE": 0}
-    assert summary["consolidated_results"]["CLASSIFICADO"] == 2
-    assert sum(summary["consolidated_results"].values()) == 2
+    assert summary["apt_count"] == 2
+    assert summary["inapt_count"] == 0
+    assert summary["total_received"] == 2
     assert (
         AuditEvent.objects.filter(
             entity_type="CheckResult", action="FIELD_CHANGE", field="status"

@@ -9,6 +9,9 @@ from apps.evaluations.models import CheckResult, Evaluation
 from apps.evaluations.services import EvaluationService
 from apps.submissions.services.validation import SubmissionAnomalyDetector
 
+# Test-only routes exercise retained configuration; operational retirement has separate coverage.
+pytestmark = pytest.mark.urls("tests.technical_urls")
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(

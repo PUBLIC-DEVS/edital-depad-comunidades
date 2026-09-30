@@ -134,6 +134,9 @@ class TestSubmissionsIntakeAndDistribution:
             assert s.assigned_analyst == analyst1
 
     def test_submission_views_with_client(self, client, setup_data):
+        from tests.operational_helpers import publish_fixture
+
+        publish_fixture(setup_data["edital"])
         client.force_login(setup_data["distrib"])
         # Lista
         response = client.get(reverse("submission-list"))
