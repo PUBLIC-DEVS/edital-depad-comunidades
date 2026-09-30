@@ -11,21 +11,17 @@ from apps.accounts.models import User
 from apps.accounts.permissions import RolePermissionPolicy, require_role
 from apps.csv_utils import SafeCsvWriter
 from apps.editais.models import Edital
+from apps.editais.operational import operational_edital_required
 from apps.ranking.models import RankingSnapshot
 from apps.ranking.services import RankingService
 
 
 @login_required
 @require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
+@operational_edital_required
 def ranking_view(request: HttpRequest) -> HttpResponse:
     """Exibe o ranking oficial com filtros por edital, grupo e histórico de snapshots."""
-    edital_id = request.GET.get("edital")
-    if edital_id:
-        if not edital_id.isdecimal():
-            raise Http404
-        edital = get_object_or_404(Edital, id=int(edital_id))
-    else:
-        edital = Edital.objects.order_by("-year", "-number").first()
+    edital = request.operational_edital
 
     group_filter = request.GET.get("group", "").strip()
     snapshot_id = request.GET.get("snapshot_id")
@@ -60,7 +56,6 @@ def ranking_view(request: HttpRequest) -> HttpResponse:
 
     context = {
         "edital": edital,
-        "editais": Edital.objects.all().order_by("-year", "-number"),
         "latest_snapshot": latest_snapshot,
         "entries": entries,
         "group_filter": group_filter,
@@ -78,13 +73,11 @@ def ranking_view(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
 @require_POST
+@operational_edital_required
 def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
     """Gera um novo snapshot imutável de ranking para o edital selecionado."""
     if request.method == "POST":
-        edital_id = request.POST.get("edital_id")
-        if not edital_id or not edital_id.isdecimal():
-            raise Http404
-        edital = get_object_or_404(Edital, id=int(edital_id))
+        edital = request.operational_edital
         snapshot_type = request.POST.get("snapshot_type", RankingSnapshot.SnapshotType.PRELIMINAR)
         description = request.POST.get("description", "").strip()
 
@@ -113,10 +106,11 @@ def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
+@operational_edital_required
 def ranking_snapshots_history_view(request: HttpRequest) -> HttpResponse:
     """Exibe o histórico auditável de snapshots de classificação gerados."""
     snapshots = (
-        RankingSnapshot.objects.all()
+        RankingSnapshot.objects.filter(edital=request.operational_edital)
         .select_related("edital", "generated_by")
         .order_by("-created_at")
     )
@@ -129,9 +123,10 @@ def ranking_snapshots_history_view(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
+@operational_edital_required
 def ranking_export_csv_view(request: HttpRequest, snapshot_id: int) -> HttpResponse:
     """Exporta o snapshot oficial em formato CSV delimitado por ponto e vírgula."""
-    snapshot = get_object_or_404(RankingSnapshot, id=snapshot_id)
+    snapshot = get_object_or_404(RankingSnapshot, id=snapshot_id, edital=request.operational_edital)
     if not snapshot.policy_metadata.get("eligible_statuses"):
         return HttpResponse(
             "Snapshot anterior ao hardening: conteúdo não validado para exportação oficial.",

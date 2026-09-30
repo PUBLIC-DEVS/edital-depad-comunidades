@@ -1,0 +1,9 @@
+<form method="get" class="process-filters" aria-label="Filtrar inscrições">
+  <div><label class="form-label" for="search-input">SEI, CNPJ ou instituição</label><input class="form-input" id="search-input" name="q" value="{{ search_query }}" placeholder="Buscar inscrição"></div>
+  <div><label class="form-label" for="status-filter">Status</label><select class="form-select" id="status-filter" name="status"><option value="">Todos</option>{% for code,label in workflow_statuses %}<option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div><label class="form-label" for="analyst-filter">Analista</label><select class="form-select" id="analyst-filter" name="analyst"><option value="">Todos</option>{% for a in analysts %}<option value="{{ a.pk }}" {% if analyst_filter == a.pk|stringformat:"s" %}selected{% endif %}>{{ a.get_full_name|default:a.username }}</option>{% endfor %}</select></div>
+  <div><label class="form-label" for="group-filter">Grupo</label><select class="form-select" name="group" id="group-filter"><option value="">Todos</option>{% for code,label in target_groups %}<option value="{{ code }}" {% if group_filter == code %}selected{% endif %}>{{ code }}</option>{% endfor %}</select></div>
+  <div><label class="form-label" for="municipality-filter">Município</label><input class="form-input" id="municipality-filter" name="municipality" value="{{ municipality_filter }}"></div>
+  <div><label class="form-label" for="uf-filter">UF</label><input class="form-input" id="uf-filter" name="uf" maxlength="2" value="{{ uf_filter }}"></div>
+  <button class="btn-secondary self-end" type="submit">Filtrar</button>
+</form>

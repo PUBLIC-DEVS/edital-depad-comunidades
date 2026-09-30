@@ -8,6 +8,7 @@ from apps.accounts.models import User
 from apps.accounts.permissions import RolePermissionPolicy, ScopedQuerySetSelector, require_role
 from apps.audit.models import AuditEvent
 from apps.editais.models import Program
+from apps.editais.operational import retired_configuration
 from apps.institutions.models import Institution, Municipality
 
 from .forms import InstitutionForm, MunicipalityForm, ProgramForm, UserForm
@@ -57,6 +58,8 @@ def index(request):
 
 @login_required
 def catalog_list(request, catalog):
+    if catalog == "programas":
+        return retired_configuration(request)
     model, _, title = catalog_definition(catalog)
     catalog_access(request.user, catalog)
     objects = (
@@ -90,6 +93,8 @@ def catalog_list(request, catalog):
 @login_required
 @transaction.atomic
 def catalog_form(request, catalog, object_id=None):
+    if catalog == "programas":
+        return retired_configuration(request)
     model, form_type, title = catalog_definition(catalog)
     catalog_access(request.user, catalog, write=True)
     instance = (

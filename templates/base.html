@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Sistema de Gestão e Análise de Editais — DEPAD / MDS{% endblock %}</title>
+    <title>{% block title %}Sistema de Gestão e Análise de Edital — DEPAD / MDS{% endblock %}</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -80,10 +80,10 @@
                     </div>
                     <span class="hidden sm:inline text-blue-300/60 font-light" aria-hidden="true">|</span>
                     <a href="{% url 'dashboard' %}" class="hidden sm:inline text-sm sm:text-base font-semibold text-white hover:text-blue-100 transition truncate">
-                        Sistema de Gestão e Análise de Editais
+                        Sistema de Gestão e Análise de Edital
                     </a>
                     <a href="{% url 'dashboard' %}" class="sm:hidden text-xs text-blue-200 hover:text-white truncate">
-                        Editais
+                        Edital
                     </a>
                 </div>
                 <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
@@ -112,26 +112,18 @@
             <nav class="bg-[#222873] border-t border-white/10" aria-label="Navegação Principal">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="flex space-x-1 sm:space-x-2 text-xs font-medium py-1.5 overflow-x-auto">
-                        <a href="{% url 'dashboard' %}" class="text-white hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Início</a>
-                        <a href="/processos/" class="text-blue-100 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Processos</a>
-                        <a href="{% url 'catalog-list' 'instituicoes' %}" class="text-blue-100 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Instituições</a>
-                        {% if user.is_analyst %}
-                            <a href="/minhas-analises/" class="text-blue-100 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Minhas Análises</a>
-                        {% endif %}
-                        {% if user.is_reviewer or user.is_coordinator %}
-                            <a href="/revisoes/" class="text-blue-100 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Fila de Revisão</a>
-                            <a href="/diligencias/" class="text-blue-100 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Diligências</a>
-                        {% endif %}
                         {% if user.is_superuser or user.role == 'ADMINISTRADOR' or user.role == 'COORDENADOR' or user.role == 'CONSULTA' %}
-                            <a href="/classificacao/" class="text-blue-100 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Classificação &amp; Ranking</a>
-                            <a href="/metricas/" class="text-blue-100 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Métricas</a>
-                        {% endif %}
-                        {% if user.role == 'ADMINISTRADOR' or user.role == 'COORDENADOR' %}
-                            <div class="ml-auto flex items-center space-x-1">
-                                <a href="/administracao/" class="text-amber-300 hover:text-amber-100 hover:bg-white/10 px-2.5 py-1.5 rounded transition font-semibold">Administração</a>
-                                <a href="{% url 'edital-list' %}" class="text-amber-200 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Configurar editais</a>
-                                <a href="{% url 'program-list' %}" class="text-amber-200 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded transition">Programas</a>
-                            </div>
+                          <a href="{% url 'dashboard' %}" class="nav-link" {% if request.path == '/' %}aria-current="page"{% endif %}>Início</a>
+                          <a href="{% url 'submission-list' %}" class="nav-link" {% if '/processos/' in request.path %}aria-current="page"{% endif %}>Processos</a>
+                          {% if user.is_superuser or user.role != 'CONSULTA' %}<a href="{% url 'review-list' %}" class="nav-link" {% if '/revisoes/' in request.path %}aria-current="page"{% endif %}>Revisão</a>{% endif %}
+                          <a href="{% url 'ranking-index' %}" class="nav-link" {% if '/classificacao/' in request.path %}aria-current="page"{% endif %}>Classificação</a>
+                          {% if user.is_superuser or user.role != 'CONSULTA' %}<a href="{% url 'administration-index' %}" class="nav-link" {% if '/administracao/' in request.path %}aria-current="page"{% endif %}>Administração</a>{% endif %}
+                        {% elif user.role == 'ANALISTA' %}
+                          <a href="{% url 'my-evaluations' %}" class="nav-link" aria-current="page">Minhas Análises</a>
+                        {% elif user.role == 'REVISOR' %}
+                          <a href="{% url 'review-list' %}" class="nav-link" aria-current="page">Revisão</a>
+                        {% elif user.role == 'DISTRIBUIDOR' %}
+                          <a href="{% url 'submission-list' %}" class="nav-link" aria-current="page">Processos</a>
                         {% endif %}
                     </div>
                 </div>

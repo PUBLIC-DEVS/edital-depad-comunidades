@@ -12,7 +12,7 @@
 
     <div>
         <h1 class="text-2xl font-bold text-slate-800">Importar processos por CSV</h1>
-        <p class="text-sm text-slate-500 mt-1">Importação de inscrições de um edital novo, sem planilha histórica. Todas as linhas devem ser válidas; se uma falhar, nenhuma será gravada. O município precisa estar cadastrado com código IBGE.</p>
+        <p class="text-sm text-slate-500 mt-1">Importação de inscrições do edital operacional, sem planilha histórica. Todas as linhas devem ser válidas; se uma falhar, nenhuma será gravada. O município precisa estar cadastrado com código IBGE.</p>
     </div>
 
     {% if errors %}
@@ -26,15 +26,7 @@
     <div class="depad-card">
         <form method="post" enctype="multipart/form-data" class="space-y-5 text-xs">
             {% csrf_token %}
-            <div>
-                <label for="csv-edital" class="block font-semibold text-slate-700 mb-1">Edital ativo</label>
-                <select id="csv-edital" name="edital" class="depad-form-select" required>
-                    <option value="">Selecione um edital...</option>
-                    {% for item in editais %}
-                        <option value="{{ item.pk }}" {% if edital.pk == item.pk %}selected{% endif %}>{{ item.number }}/{{ item.year }} · {{ item.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+            <p class="font-semibold">Edital {{ edital.number }}/{{ edital.year }} · {{ edital.name }}</p>
             <div>
                 <label for="csv-file" class="block font-semibold text-slate-700 mb-1">Arquivo CSV (UTF-8)</label>
                 <input type="file" accept=".csv,text/csv" id="csv-file" name="file" class="depad-form-input" required>

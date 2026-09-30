@@ -92,6 +92,8 @@ class WorkflowService:
         metadata: dict[str, Any] | None = None,
     ) -> Submission:
         """Executa a transição de estado da submissão com validação estrita e auditoria."""
+        if target_status == Submission.WorkflowStatus.PENDING_DILIGENCE:
+            raise ValidationError("Diligência desativada nesta operação.")
         current_status = submission.workflow_status
         locked = Submission.objects.select_for_update().get(pk=submission.pk)
         current_status = locked.workflow_status
@@ -238,20 +240,6 @@ class WorkflowService:
             )
             return
 
-        from apps.evaluations.services import EvaluationService
-
-        if any(
-            cr.requirement.failure_behavior == "MARK_INELIGIBLE"
-            for cr in EvaluationService.blocking_check_results(evaluation)
-        ):
-            cls.transition(
-                submission,
-                Submission.WorkflowStatus.INELIGIBLE,
-                actor,
-                reason="Item impeditivo configurado para inabilitação direta.",
-            )
-            return
-
         # Only inapt evaluations require a review task.
         cls.transition(
             submission=submission,
@@ -292,6 +280,7 @@ class WorkflowService:
         related_check_result_ids: list[int] | None = None,
     ) -> Diligence:
         """Abre uma diligência e move o processo para PENDING_DILIGENCE."""
+        raise ValidationError("Diligência desativada nesta operação.")
         submission = Submission.objects.select_for_update().get(pk=submission.pk)
         cls.enforce_diligence_actor(submission, requested_by)
         if deadline is None:

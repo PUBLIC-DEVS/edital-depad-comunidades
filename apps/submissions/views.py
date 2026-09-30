@@ -6,9 +6,7 @@ import io
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -21,7 +19,8 @@ from apps.accounts.permissions import (
     require_role,
 )
 from apps.audit.models import AuditEvent
-from apps.editais.models import Edital, TargetGroup
+from apps.editais.models import Edital
+from apps.editais.operational import operational_edital_required
 from apps.institutions.models import Municipality
 from apps.ranking.services import ClassificationService
 from apps.submissions.forms import (
@@ -31,7 +30,8 @@ from apps.submissions.forms import (
     SubmissionCnpjCorrectionForm,
     SubmissionIntakeForm,
 )
-from apps.submissions.models import Assignment, ParticipationRestriction, Submission
+from apps.submissions.models import ParticipationRestriction, Submission
+from apps.submissions.selectors import operational_process_context
 from apps.submissions.services.distribution import DistributionService
 from apps.submissions.services.eligibility import ParticipationEligibilityService
 from apps.submissions.services.identity import SubmissionIdentityService
@@ -41,109 +41,25 @@ from apps.submissions.services.workflow import WorkflowService
 
 
 @login_required
+@require_role(
+    User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA
+)
+@operational_edital_required
 def submission_list_view(request: HttpRequest) -> HttpResponse:
-    """Fila principal de processos e distribuição com filtros, busca e suporte a HTMX."""
-    base_qs = (
-        ScopedQuerySetSelector.for_submissions(request.user)
-        .select_related("institution", "municipality", "edital")
-        .prefetch_related("assignments__analyst")
-    )
-
-    edital_filter = request.GET.get("edital", "")
-    if edital_filter:
-        base_qs = (
-            base_qs.filter(edital_id=int(edital_filter))
-            if edital_filter.isdecimal()
-            else base_qs.none()
-        )
-
-    # Filtros
-    search_query = request.GET.get("q", "").strip()
-    if search_query:
-        base_qs = base_qs.filter(
-            Q(processo_sei__icontains=search_query)
-            | Q(institution__name__icontains=search_query)
-            | Q(institution__cnpj__icontains=search_query)
-            | Q(municipality__name__icontains=search_query)
-        )
-
-    status_filter = request.GET.get("status", "").strip()
-    if status_filter:
-        base_qs = base_qs.filter(workflow_status=status_filter)
-
-    group_filter = request.GET.get("group", "").strip()
-    if group_filter:
-        base_qs = base_qs.filter(target_group=group_filter)
-
-    analyst_filter = request.GET.get("analyst", "").strip()
-    if analyst_filter and RolePermissionPolicy.can_view_all_submissions(request.user):
-        base_qs = (
-            base_qs.filter(
-                assignments__analyst_id=int(analyst_filter),
-                assignments__status=Assignment.Status.ACTIVE,
-            )
-            if analyst_filter.isdecimal()
-            else base_qs.none()
-        )
-
-    uf_filter = request.GET.get("uf", "").strip()
-    if uf_filter:
-        base_qs = base_qs.filter(municipality__state=uf_filter.upper())
-
-    # Paginação
-    paginator = Paginator(base_qs, 25)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
-
-    # Anexa alertas de validação para os itens da página atual
-    for sub in page_obj.object_list:
-        sub.alerts = SubmissionAnomalyDetector.check_submission(sub)
-
-    visible_editais = Edital.objects.filter(
-        submissions__in=ScopedQuerySetSelector.for_submissions(request.user)
-    ).distinct()
-    group_editais = (
-        visible_editais.filter(pk=int(edital_filter))
-        if edital_filter.isdecimal()
-        else visible_editais
-    )
-    available_groups = (
-        TargetGroup.objects.filter(edital__in=group_editais)
-        .distinct()
-        .order_by("edital__year", "order", "code")
-    )
-    context = {
-        "page_obj": page_obj,
-        "search_query": search_query,
-        "status_filter": status_filter,
-        "group_filter": group_filter,
-        "analyst_filter": analyst_filter,
-        "uf_filter": uf_filter,
-        "workflow_statuses": Submission.WorkflowStatus.choices,
-        "target_groups": [(g.code, str(g)) for g in available_groups],
-        "editais": visible_editais,
-        "edital_filter": edital_filter,
-        "analysts": User.objects.filter(role=User.Role.ANALISTA, is_active=True),
-        "can_distribute": RolePermissionPolicy.can_distribute_submissions(request.user),
-        "workloads": DistributionService.get_analysts_workload()
-        if RolePermissionPolicy.can_distribute_submissions(request.user)
-        else [],
-        "total_count": paginator.count,
-    }
-
+    context = operational_process_context(request)
     if request.headers.get("HX-Request") and not request.headers.get("HX-Boosted"):
         return render(request, "submissions/partials/table.html", context)
-
     return render(request, "submissions/list.html", context)
 
 
 @login_required
 @require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
 @transaction.atomic
+@operational_edital_required
 def submission_create_view(request: HttpRequest) -> HttpResponse:
     """Cadastro manual ou recepção de novo processo no edital."""
     if request.method == "POST":
-        form = SubmissionIntakeForm(request.POST)
+        form = SubmissionIntakeForm(request.POST, operational_edital=request.operational_edital)
         if form.is_valid():
             intake = SubmissionIntakeService.create_submission(form, request.user)
             submission, restrictions = intake.submission, intake.restrictions
@@ -158,7 +74,7 @@ def submission_create_view(request: HttpRequest) -> HttpResponse:
                 )
             return redirect("submission-detail", submission_id=submission.id)
     else:
-        form = SubmissionIntakeForm(initial={"edital": request.GET.get("edital")})
+        form = SubmissionIntakeForm(operational_edital=request.operational_edital)
 
     return render(request, "submissions/create.html", {"form": form})
 
@@ -440,15 +356,11 @@ def submission_edit_view(request, submission_id):
 
 @login_required
 @require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@operational_edital_required
 def submission_import_csv_view(request):
     """Import a UTF-8 CSV into a published edital; every row uses the ordinary intake form."""
-    edital = None
+    edital = request.operational_edital
     errors = []
-    edital_id = (
-        request.POST.get("edital") if request.method == "POST" else request.GET.get("edital")
-    )
-    if edital_id and edital_id.isdecimal():
-        edital = Edital.objects.filter(pk=int(edital_id), status=Edital.Status.ACTIVE).first()
     if request.method == "POST":
         upload = request.FILES.get("file")
         if not edital:
@@ -556,14 +468,13 @@ def submission_import_csv_view(request):
                     errors.append(str(exc))
                 else:
                     messages.success(request, f"{len(rows)} processos importados e enquadrados.")
-                    return redirect(f"/processos/?edital={edital.pk}")
+                    return redirect("submission-list")
     return render(
         request,
         "submissions/import_csv.html",
         {
             "errors": errors,
             "edital": edital,
-            "editais": Edital.objects.filter(status=Edital.Status.ACTIVE),
         },
     )
 

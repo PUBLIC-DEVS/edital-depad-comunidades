@@ -11,12 +11,6 @@
     </div>
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <a class="card p-6 hover:border-[#0B57C5] hover:shadow-md transition group border-l-4 border-l-[#0248AB]" href="{% url 'edital-list' %}">
-            <h2 class="font-bold text-slate-900 group-hover:text-[#0248AB] transition text-base">Editais e Parâmetros</h2>
-            <p class="text-xs text-slate-500 mt-2 leading-relaxed">Criar, parametrizar regras, duplicar, selar versões e publicar editais oficiais sem planilhas.</p>
-            <div class="mt-4 text-xs font-semibold text-[#0248AB] group-hover:underline">Acessar &rarr;</div>
-        </a>
-
         <a class="card p-6 hover:border-[#0B57C5] hover:shadow-md transition group" href="{% url 'catalog-list' 'instituicoes' %}">
             <h2 class="font-bold text-slate-900 group-hover:text-[#0248AB] transition text-base">Instituições (OSCs)</h2>
             <p class="text-xs text-slate-500 mt-2 leading-relaxed">Catálogo de entidades de apoio e acolhimento, verificação de CNPJ e histórico cadastral.</p>
@@ -35,11 +29,9 @@
             <div class="mt-4 text-xs font-semibold text-[#0248AB] group-hover:underline">Acessar &rarr;</div>
         </a>
 
-        <a class="card p-6 hover:border-[#0B57C5] hover:shadow-md transition group" href="{% url 'catalog-list' 'programas' %}">
-            <h2 class="font-bold text-slate-900 group-hover:text-[#0248AB] transition text-base">Programas Institucionais</h2>
-            <p class="text-xs text-slate-500 mt-2 leading-relaxed">Configuração de programas governamentais prioritários e parâmetros de priorização regional.</p>
-            <div class="mt-4 text-xs font-semibold text-[#0248AB] group-hover:underline">Acessar &rarr;</div>
-        </a>
+        <a class="card p-6" href="{% url 'restriction-list' %}"><h2 class="font-bold">Restrições</h2><p class="text-xs text-slate-500 mt-2">Impedimentos de participação e suas justificativas.</p></a>
+        <a class="card p-6" href="{% url 'submission-import-csv' %}"><h2 class="font-bold">Importações</h2><p class="text-xs text-slate-500 mt-2">Receber inscrições em CSV.</p></a>
+        <a class="card p-6" href="{% url 'reporting:validations' %}"><h2 class="font-bold">Conferência e auditoria</h2><p class="text-xs text-slate-500 mt-2">Consultar inconsistências e alterações registradas.</p></a>
     </div>
 </div>
 {% endblock %}

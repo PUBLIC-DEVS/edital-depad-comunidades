@@ -75,12 +75,19 @@ class SubmissionIntakeForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        operational_edital = kwargs.pop("operational_edital", None)
         super().__init__(*args, **kwargs)
         self.fields["edital"].queryset = Edital.objects.filter(status=Edital.Status.ACTIVE)
+        if operational_edital:
+            self.initial["edital"] = operational_edital.pk
+            self.fields["edital"].disabled = True
+            self.fields["edital"].widget = forms.HiddenInput()
         self.fields["target_group_definition"].label = "Grupo (somente para política manual)"
         self.fields["target_group_definition"].required = False
         edital_id = (
-            self.data.get("edital")
+            operational_edital.pk
+            if operational_edital
+            else self.data.get("edital")
             if self.is_bound
             else self.instance.edital_id or self.initial.get("edital")
         )

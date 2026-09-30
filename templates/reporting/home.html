@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Acompanhamento operacional — DEPAD / MDS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <header class="flex flex-wrap justify-between items-end gap-4">
+    <div><p class="eyebrow">Edital {{ edital.number }}/{{ edital.year }}</p><h1 class="text-2xl font-bold mt-1">{{ edital.name }}</h1><p class="text-sm text-slate-500 mt-1">Acompanhamento operacional das inscrições</p></div>
+    <a href="{% url 'reporting:dashboard' %}" class="btn-secondary text-sm">Ver indicadores →</a>
+  </header>
+  {% include "reporting/partials/kpis.html" %}
+  <section class="space-y-4" aria-labelledby="process-table-title">
+    <div class="flex items-center justify-between"><h2 id="process-table-title" class="text-lg font-semibold">Inscrições</h2><a class="text-sm font-semibold text-action-700" href="{% url 'submission-list' %}">Abrir Processos →</a></div>
+    {% include "submissions/partials/filters.html" %}
+    <div id="submissions-table-container">{% include "submissions/partials/table.html" %}</div>
+  </section>
+</div>
+{% endblock %}

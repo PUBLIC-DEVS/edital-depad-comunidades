@@ -19,135 +19,135 @@ class DashboardMetricsService:
 
     @classmethod
     def get_summary_metrics(cls, edital: Edital | None = None) -> dict[str, Any]:
-        """Calcula o resumo consolidado de processos por status, grupo, analista e UF."""
-        subs = Submission.objects.all()
-        if edital:
-            subs = subs.filter(edital=edital)
+        """Current workflow outcomes, scoped to one active edital by default."""
+        from django.db.models.functions import TruncDate
 
-        total_received = subs.count()
+        from apps.editais.operational import get_operational_edital
 
-        # Status do workflow
+        edital = edital if edital is not None else get_operational_edital()
+        subs = Submission.objects.filter(edital=edital)
         status_counts = dict(
             subs.values("workflow_status")
-            .annotate(count=Count("id"))
+            .annotate(count=Count("pk"))
             .values_list("workflow_status", "count")
         )
-
-        under_analysis = status_counts.get(Submission.WorkflowStatus.UNDER_ANALYSIS, 0)
-        pending_review = status_counts.get(Submission.WorkflowStatus.PENDING_REVIEW, 0)
-        pending_diligence = status_counts.get(Submission.WorkflowStatus.PENDING_DILIGENCE, 0)
-
-        concluded = (
-            status_counts.get(Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING, 0)
-            + status_counts.get(Submission.WorkflowStatus.INELIGIBLE, 0)
-            + status_counts.get(Submission.WorkflowStatus.RANKED, 0)
-            + status_counts.get(Submission.WorkflowStatus.CLOSED, 0)
+        total = sum(status_counts.values())
+        unassigned = (
+            subs.filter(workflow_status="RECEIVED").exclude(assignments__status="ACTIVE").count()
         )
-
-        # Distribuídos vs. não distribuídos
-        # Um processo é distribuído se tem atribuição ativa
-        distributed_count = subs.filter(assignments__status="ACTIVE").distinct().count()
-        unassigned_count = total_received - distributed_count
-
-        # Two mutually exclusive dimensions, never an OR across lifecycle phases.
-        initial_results = {"APTA": 0, "INAPTA": 0, "EM_ANALISE": 0}
-        initial_evaluations = Evaluation.objects.all()
-        if edital:
-            initial_evaluations = initial_evaluations.filter(submission__edital=edital)
-        for result in initial_evaluations.values_list("result", flat=True):
-            initial_results[result or "EM_ANALISE"] += 1
-        outcome_by_workflow = {
-            "RECEIVED": ("RECEBIDO", "Recebido"),
-            "ASSIGNED": ("DISTRIBUIDO", "Distribuído"),
-            "UNDER_ANALYSIS": ("EM_ANALISE", "Em análise"),
-            "PENDING_REVIEW": ("EM_REVISAO", "Em revisão"),
-            "PENDING_DILIGENCE": ("EM_DILIGENCIA", "Em diligência"),
-            "ELIGIBLE_FOR_RANKING": ("HABILITADO", "Habilitado"),
-            "INELIGIBLE": ("INABILITADO", "Inabilitado"),
-            "RANKED": ("CLASSIFICADO", "Classificado"),
-            "CLOSED": ("ENCERRADO", "Encerrado"),
-        }
-        consolidated_results = {
-            outcome: status_counts.get(status, 0)
-            for status, (outcome, _) in outcome_by_workflow.items()
-        }
-        consolidated_labels = dict(outcome_by_workflow.values())
-        group_counts = subs.values("edital__number", "edital__year", "target_group").annotate(
-            count=Count("id")
-        )
-        by_group = {}
-        if edital:
-            by_group.update({g.code: 0 for g in edital.target_groups.all()})
-            by_group["SEM_GRUPO"] = 0
-        for item in group_counts:
-            key = (
-                item["target_group"]
-                if edital
-                else f"{item['edital__number']}/{item['edital__year']} · {item['target_group']}"
-            )
-            by_group[key] = by_group.get(key, 0) + item["count"]
-
-        # Distribuição por analista
-        analysts = User.objects.filter(role=User.Role.ANALISTA, is_active=True).order_by(
-            "first_name", "username"
-        )
-        by_analyst = []
-        for analyst in analysts:
-            analyst_subs = subs.filter(assignments__analyst=analyst, assignments__status="ACTIVE")
-            assigned_c = analyst_subs.count()
-            analyzing_c = analyst_subs.filter(
-                workflow_status=Submission.WorkflowStatus.UNDER_ANALYSIS
-            ).count()
-            concluded_c = analyst_subs.filter(
-                workflow_status__in=[
-                    Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING,
-                    Submission.WorkflowStatus.INELIGIBLE,
-                    Submission.WorkflowStatus.RANKED,
-                    Submission.WorkflowStatus.CLOSED,
-                    Submission.WorkflowStatus.PENDING_REVIEW,
-                ]
-            ).count()
-            by_analyst.append(
-                {
-                    "analyst": analyst,
-                    "total_assigned": assigned_c,
-                    "under_analysis": analyzing_c,
-                    "concluded": concluded_c,
-                }
-            )
-
-        # Distribuição por UF
-        by_uf_qs = (
-            subs.filter(municipality__isnull=False)
-            .values("municipality__state")
-            .annotate(count=Count("id"))
-            .order_by("-count")
-        )
-        by_uf = [
-            {"state": item["municipality__state"], "count": item["count"]} for item in by_uf_qs
+        analyzing = sum(status_counts.get(s, 0) for s in ("ASSIGNED", "UNDER_ANALYSIS"))
+        apt = sum(status_counts.get(s, 0) for s in ("ELIGIBLE_FOR_RANKING", "RANKED"))
+        inapt = status_counts.get("INELIGIBLE", 0)
+        categories = [
+            ("Sem distribuição", unassigned, "neutral"),
+            ("Em análise", analyzing, "info"),
+            ("Em revisão", status_counts.get("PENDING_REVIEW", 0), "warning"),
+            ("Aptas", apt, "success"),
+            ("Inaptas / Inelegíveis", inapt, "danger"),
         ]
-
+        stages = [
+            {
+                "label": label,
+                "count": count,
+                "tone": tone,
+                "percent": round(count * 100 / total, 1) if total else 0,
+            }
+            for label, count, tone in categories
+        ]
+        groups = dict.fromkeys(
+            edital.target_groups.filter(active=True).values_list("code", flat=True), 0
+        )
+        groups["SEM_GRUPO"] = 0
+        for item in subs.values("target_group").annotate(count=Count("pk")):
+            key = item["target_group"] or "SEM_GRUPO"
+            groups[key] = item["count"]
+        assignment_scope = Q(
+            assigned_submissions__status="ACTIVE", assigned_submissions__submission__edital=edital
+        )
+        analysts = (
+            User.objects.filter(role="ANALISTA")
+            .annotate(
+                total_assigned=Count("assigned_submissions", filter=assignment_scope),
+                analyzing_count=Count(
+                    "assigned_submissions",
+                    filter=assignment_scope
+                    & Q(assigned_submissions__submission__workflow_status="UNDER_ANALYSIS"),
+                ),
+                completed_count=Count(
+                    "assigned_submissions",
+                    filter=assignment_scope
+                    & Q(assigned_submissions__submission__evaluation__status="COMPLETED"),
+                ),
+            )
+            .filter(Q(is_active=True) | Q(total_assigned__gt=0))
+            .order_by("-total_assigned", "first_name", "username")
+        )
+        by_analyst = [
+            {
+                "analyst": a,
+                "total_assigned": a.total_assigned,
+                "under_analysis": a.analyzing_count,
+                "concluded": a.completed_count,
+            }
+            for a in analysts
+        ]
+        timeline = [
+            {"date": item["day"], "count": item["count"]}
+            for item in subs.annotate(day=TruncDate("received_at"))
+            .values("day")
+            .annotate(count=Count("pk"))
+            .order_by("day")
+        ]
+        # DEMO is the explicit process prefix used by seed_demo (no inferred chronology).
+        has_demo = subs.filter(processo_sei__istartswith="DEMO-").exists()
         return {
-            "total_received": total_received,
-            "distributed_count": distributed_count,
-            "unassigned_count": unassigned_count,
-            "under_analysis": under_analysis,
-            "pending_review": pending_review,
-            "pending_diligence": pending_diligence,
-            "concluded": concluded,
-            "apt_count": initial_results["APTA"],
-            "inapt_count": initial_results["INAPTA"],
-            "initial_results": initial_results,
-            "consolidated_results": consolidated_results,
-            "consolidated_labels": consolidated_labels,
-            "consolidated_cards": [
-                {"label": label, "count": consolidated_results[outcome]}
-                for outcome, label in consolidated_labels.items()
-            ],
-            "by_group": by_group,
+            "total_received": total,
+            "distributed_count": subs.filter(assignments__status="ACTIVE").count(),
+            "unassigned_count": unassigned,
+            "under_analysis": analyzing,
+            "pending_review": status_counts.get("PENDING_REVIEW", 0),
+            "apt_count": apt,
+            "inapt_count": inapt,
+            "concluded": apt + inapt + status_counts.get("CLOSED", 0),
+            "stages": stages,
+            "unrepresented_count": total - sum(c[1] for c in categories),
+            "by_group": groups,
             "by_analyst": by_analyst,
-            "by_uf": by_uf,
+            "timeline": timeline,
+            "show_timeline": len(timeline) >= 3 and total >= 5 and not has_demo,
+            "by_uf": list(subs.values("municipality__state").annotate(count=Count("pk"))),
         }
+
+    @classmethod
+    def get_top_failed_checks(cls, edital=None, limit=8):
+        from apps.editais.operational import get_operational_edital
+
+        edital = edital if edital is not None else get_operational_edital()
+        # Original completed human findings; revisions never erase this analytical dimension.
+        rows = (
+            CheckResult.objects.filter(
+                evaluation__submission__edital=edital,
+                evaluation__status="COMPLETED",
+                status="NAO_ATENDE",
+            )
+            .values(
+                "requirement_check__code",
+                "requirement_check__name",
+                "requirement__code",
+                "requirement__name",
+            )
+            .annotate(failure_count=Count("evaluation__submission_id", distinct=True))
+            .order_by("-failure_count", "requirement__code", "requirement_check__code")[:limit]
+        )
+        return [
+            {
+                "code": row["requirement_check__code"] or row["requirement__code"],
+                "name": row["requirement_check__name"] or row["requirement__name"],
+                "document": row["requirement__name"],
+                "failure_count": row["failure_count"],
+            }
+            for row in rows
+        ]
 
     @classmethod
     def get_top_failed_requirements(

@@ -8,7 +8,7 @@ from config.views import dashboard, health_check
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("administracao/", include("apps.administration.urls")),
-    path("admin-editais/", include("apps.editais.urls")),
+    path("admin-editais/", include("apps.editais.operational_urls")),
     path("health/", health_check, name="health-check"),
     path("login/", auth_views.LoginView.as_view(template_name="accounts/login.html"), name="login"),
     path("logout/", auth_views.LogoutView.as_view(next_page="login"), name="logout"),
