@@ -81,7 +81,8 @@ podem ser abertos por linha. Endereço completo permanece no detalhe.
 ## Análise documental
 
 Minhas análises resume pendentes, em andamento e concluídas, com progresso,
-resultado e última atualização. O workspace enumera os documentos e critérios na
+resultado e última atualização. A abertura mostra apenas pendentes/em andamento;
+concluídas ficam em uma aba própria. O workspace enumera os documentos e critérios na
 ordem configurada no banco. A configuração-base 2026 contém **14 blocos/23 checks**;
 esses números e IDs não são fixados na implementação da tela.
 
@@ -236,7 +237,8 @@ resultado derivado, estado vazio, navegação de Consulta e acesso proibido.
 
 ## Atenção à base de demonstração
 
-A base Docker encontrada contém **DEMO-CRUD/2027, 2 blocos/3 checks**, não o
+A base Docker encontrada contém **DEMO-CRUD/2027, 2 blocos/3 itens de análise** (2 checks e um requisito
+com decisão direta, compatível com a configuração anterior), não o
 edital-base 2026. Ela foi preservada. O sistema mostra a configuração ativa real;
 não transforma o demo em 14/23 nem escolhe outro edital por ano.
 
@@ -252,7 +254,7 @@ um ACTIVE. Esta fase não inventa data jurídica, lista PRONASCI ou dados de pro
 - Django system check: nenhum problema.
 - `makemigrations --check --dry-run`: nenhuma alteração detectada.
 - Ruff: todos os checks passaram.
-- Pytest completo: **332 passed, 2 skipped, 0 failed**, em 200,62 segundos.
+- Pytest completo: **333 passed, 2 skipped, 0 failed**, em 209,51 segundos.
 - `git diff --check`: sem erros.
 - Browser desktop/mobile: telas sem overflow nas cinco larguras; fluxo de análise
   apta sem Review indevido e revisão apta preservando a falha original confirmados
@@ -263,3 +265,8 @@ O ambiente manual temporário é `http://127.0.0.1:8001/`, container
 `http://127.0.0.1:8000/` e seu PostgreSQL demonstrativo foi preservado.
 O container temporário usa a branch montada e dados descartáveis; não é ambiente
 de produção. Credenciais são fornecidas no relatório de entrega.
+
+
+O refinamento final da lista do analista foi validado com 42 testes focados e nova
+execução completa da suíte. A aba padrão mantém o trabalho pendente/em andamento;
+concluídas ficam disponíveis sem competir com a próxima ação.

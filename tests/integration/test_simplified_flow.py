@@ -391,6 +391,25 @@ def test_timeline_uses_weeks_for_long_period_and_hides_demo_data(operational):
     assert DashboardMetricsService.get_summary_metrics()["show_timeline"] is False
 
 
+def test_analyst_default_list_prioritizes_unfinished_work(client, operational):
+    evaluation = EvaluationService.start_evaluation(operational["sub"], operational["analyst"])
+    client.force_login(operational["analyst"])
+    assert len(client.get("/minhas-analises/").context["eval_items"]) == 1
+    EvaluationService.save_draft(
+        evaluation,
+        [{"check_result_id": evaluation.check_results.get().pk, "status": "ATENDE"}],
+        operational["analyst"],
+    )
+    EvaluationService.conclude_evaluation(evaluation, operational["analyst"])
+    response = client.get("/minhas-analises/")
+    assert response.context["eval_items"] == []
+    assert response.context["completed_count"] == 1
+    assert "Nenhuma análise pendente." in response.content.decode()
+    response = client.get("/minhas-analises/?status=completed")
+    assert len(response.context["eval_items"]) == 1
+    assert response.context["show_completed"] is True
+
+
 def test_review_justification_and_previous_decision_audit(domain):
     evaluation = EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
     check = evaluation.check_results.get()

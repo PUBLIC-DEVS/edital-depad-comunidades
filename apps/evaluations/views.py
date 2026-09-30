@@ -62,11 +62,23 @@ def my_evaluations_view(request: HttpRequest) -> HttpResponse:
             }
         )
 
+    completed_items = [
+        item
+        for item in eval_items
+        if item["evaluation"] and item["evaluation"].status == "COMPLETED"
+    ]
+    active_items = [
+        item
+        for item in eval_items
+        if not item["evaluation"] or item["evaluation"].status != "COMPLETED"
+    ]
+    show_completed = request.GET.get("status") == "completed"
     return render(
         request,
         "evaluations/my_evaluations.html",
         {
-            "eval_items": eval_items,
+            "eval_items": completed_items if show_completed else active_items,
+            "show_completed": show_completed,
             "total_count": len(eval_items),
             "pending_count": sum(not item["evaluation"] for item in eval_items),
             "ongoing_count": sum(
