@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load operational_ui %}
 
 {% block title %}{{ institution.name }} — DEPAD/MDS{% endblock %}
 
@@ -49,7 +50,7 @@
                             {% elif sub.workflow_status == 'INELIGIBLE' %}depad-badge-danger
                             {% elif sub.workflow_status == 'UNDER_ANALYSIS' %}depad-badge-info
                             {% else %}depad-badge-neutral{% endif %}">
-                            {{ sub.get_workflow_status_display }}
+                            {{ sub.workflow_status|workflow_label }}
                         </span>
                     </div>
                 </a>

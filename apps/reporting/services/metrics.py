@@ -20,7 +20,7 @@ class DashboardMetricsService:
     @classmethod
     def get_summary_metrics(cls, edital: Edital | None = None) -> dict[str, Any]:
         """Current workflow outcomes, scoped to one active edital by default."""
-        from django.db.models.functions import TruncDate
+        from django.db.models.functions import TruncDate, TruncWeek
 
         from apps.editais.operational import get_operational_edital
 
@@ -98,6 +98,16 @@ class DashboardMetricsService:
             .annotate(count=Count("pk"))
             .order_by("day")
         ]
+        timeline_unit = "dia"
+        if timeline and (timeline[-1]["date"] - timeline[0]["date"]).days > 90:
+            timeline = [
+                {"date": row["week"].date(), "count": row["count"]}
+                for row in subs.annotate(week=TruncWeek("received_at"))
+                .values("week")
+                .annotate(count=Count("pk"))
+                .order_by("week")
+            ]
+            timeline_unit = "semana"
         # DEMO is the explicit process prefix used by seed_demo (no inferred chronology).
         has_demo = subs.filter(processo_sei__istartswith="DEMO-").exists()
         return {
@@ -114,6 +124,7 @@ class DashboardMetricsService:
             "by_group": groups,
             "by_analyst": by_analyst,
             "timeline": timeline,
+            "timeline_unit": timeline_unit,
             "show_timeline": len(timeline) >= 3 and total >= 5 and not has_demo,
             "by_uf": list(subs.values("municipality__state").annotate(count=Count("pk"))),
         }

@@ -8,6 +8,7 @@ from apps.accounts.permissions import require_role
 from apps.csv_utils import SafeCsvWriter
 from apps.editais.models import Requirement
 from apps.editais.operational import operational_edital_required
+from apps.reporting.charts import operational_charts
 from apps.reporting.services.metrics import DashboardMetricsService
 from apps.submissions.selectors import operational_process_context
 
@@ -34,7 +35,7 @@ def dashboard_metrics_view(request):
             "edital": edital,
             "selected_edital": edital,
             "summary": summary,
-            "top_failures": DashboardMetricsService.get_top_failed_checks(edital),
+            **operational_charts(summary, DashboardMetricsService.get_top_failed_checks(edital)),
         },
     )
 

@@ -1,18 +1,19 @@
 {% extends "base.html" %}
+{% load operational_ui %}
 
-{% block title %}Classificação e Ranking Oficial — DEPAD / MDS{% endblock %}
+{% block title %}Classificação Oficial — DEPAD / MDS{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-6" x-data="{}">
     <!-- Header com Ações -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-slate-800">Classificação e Ranking</h1>
-            <p class="text-sm text-slate-500">Ordenação determinística por grupos, precedência temporal e snapshots oficiais imutáveis</p>
+            <h1 class="text-2xl font-bold text-slate-800">Classificação</h1>
+            <p class="text-sm text-slate-500">Resultados por grupo e ordem de recebimento</p>
         </div>
         <div class="flex flex-wrap items-center gap-2.5">
             <a href="{% url 'ranking-history' %}" class="btn-secondary text-xs">
-                Histórico de Snapshots
+                Histórico de resultados
             </a>
             {% if latest_snapshot.policy_metadata.eligible_statuses %}
                 <a href="{% url 'ranking-export-csv' snapshot_id=latest_snapshot.id %}" class="btn-secondary text-xs text-emerald-800 border-emerald-300 hover:bg-emerald-50">
@@ -21,7 +22,7 @@
             {% endif %}
             {% if can_generate %}
                 <button type="button" @click="$refs.generateModal.showModal()" class="btn-primary text-xs">
-                    + Gerar Novo Snapshot
+                    + Gerar classificação
                 </button>
             {% endif %}
         </div>
@@ -31,16 +32,16 @@
     {% if latest_snapshot %}
         <div class="card p-4 bg-blue-50/70 border-blue-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
             <div>
-                <span class="font-bold text-[#171B55] uppercase tracking-wider text-[11px] block">Snapshot Oficial Ativo:</span>
+                <span class="font-bold text-[#171B55] uppercase tracking-wider text-[11px] block">Resultado publicado:</span>
                 <span class="text-sm font-bold text-slate-900">{{ latest_snapshot.get_snapshot_type_display }}</span>
                 <span class="text-slate-600 ml-2">
-                    ({{ latest_snapshot.created_at|date:"d/m/Y H:i:s" }}) — Regras v{{ latest_snapshot.rules_version }} — Política: <strong>{{ latest_snapshot.duplicate_policy }}</strong>
+                    ({{ latest_snapshot.created_at|date:"d/m/Y H:i" }})
                 </span>
             </div>
             <div class="flex items-center space-x-2">
                 <span class="px-2.5 py-1 rounded text-[11px] font-bold {% if latest_snapshot.policy_metadata.eligible_statuses %}bg-emerald-100 text-emerald-900 border border-emerald-300{% else %}bg-amber-100 text-amber-900 border border-amber-300{% endif %}">
                     {% if latest_snapshot.policy_metadata.eligible_statuses %}
-                        &check; Snapshot Protegido
+                        &check; Registro preservado
                     {% else %}
                         Histórico anterior: conteúdo não validado
                     {% endif %}
@@ -57,12 +58,12 @@
     <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs text-xs">
         <div class="flex flex-wrap items-center gap-1.5">
             <span class="font-semibold text-slate-600 mr-1">Filtrar Grupo:</span>
-            <a href="?edital={{ edital.pk|default:'' }}&snapshot_id={{ latest_snapshot.pk|default:'' }}&group="
+            <a href="?snapshot_id={{ latest_snapshot.pk|default:'' }}&group="
                class="px-3 py-1.5 rounded-md font-semibold transition {% if not group_filter %}bg-[#0248AB] text-white shadow-xs{% else %}bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
                 Todos os Grupos
             </a>
             {% for group in target_groups %}
-                <a href="?edital={{ edital.pk|default:'' }}&snapshot_id={{ latest_snapshot.pk|default:'' }}&group={{ group|urlencode }}"
+                <a href="?snapshot_id={{ latest_snapshot.pk|default:'' }}&group={{ group|urlencode }}"
                    class="px-3 py-1.5 rounded-md font-semibold transition {% if group_filter == group %}bg-[#0248AB] text-white shadow-xs{% else %}bg-blue-50 text-[#0248AB] border border-blue-200 hover:bg-blue-100{% endif %}">
                     {{ group }}
                 </a>
@@ -127,7 +128,7 @@
                                     {% if entry.qualification_status == 'Apta' or entry.qualification_status == 'Elegível para Ranking' or entry.qualification_status == 'Classificada no Ranking' %}&check;
                                     {% elif entry.qualification_status == 'Inapta' or entry.qualification_status == 'Inabilitada / Inelegível' %}&times;
                                     {% endif %}
-                                    {{ entry.qualification_status }}
+                                    {{ entry.qualification_status|qualification_label }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-[11px] text-slate-500">
@@ -150,14 +151,14 @@
     {% if can_generate %}
         <dialog x-ref="generateModal" class="p-6 rounded-xl shadow-xl border border-slate-200 max-w-md w-full backdrop:bg-slate-900/50">
             <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
-                <h3 class="font-bold text-sm text-slate-800">Gerar Novo Snapshot de Ranking</h3>
+                <h3 class="font-bold text-sm text-slate-800">Gerar classificação de Ranking</h3>
                 <button type="button" @click="$refs.generateModal.close()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
             </div>
             <form method="post" action="{% url 'ranking-generate-snapshot' %}" class="space-y-4 text-xs">
                 {% csrf_token %}
                 <input type="hidden" name="edital_id" value="{{ edital.id }}">
                 <div>
-                    <label class="form-label">Tipo de Snapshot:</label>
+                    <label class="form-label">Tipo de resultado:</label>
                     <select name="snapshot_type" class="form-select text-xs">
                         {% for code, label in snapshot_types %}
                             <option value="{{ code }}">{{ label }}</option>
@@ -165,7 +166,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="form-label">Descrição / Justificativa da Emissão:</label>
+                    <label class="form-label">Observação da publicação:</label>
                     <input type="text" name="description" placeholder="Ex: Publicação do resultado preliminar oficial"
                            class="form-input text-xs">
                 </div>

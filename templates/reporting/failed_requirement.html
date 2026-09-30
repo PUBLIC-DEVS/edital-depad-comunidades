@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load operational_ui %}
 
 {% block title %}Processos Reprovados — Requisito {{ code }} — DEPAD/MDS{% endblock %}
 
@@ -68,7 +69,7 @@
                                 </td>
                                 <td class="text-center">
                                     <span class="depad-badge depad-badge-neutral">
-                                        {{ sub.get_workflow_status_display }}
+                                        {{ sub.workflow_status|workflow_label }}
                                     </span>
                                 </td>
                                 <td class="text-right whitespace-nowrap">

@@ -27,7 +27,7 @@
             {{ form.non_field_errors }}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <p class="font-semibold">{{ form.fields.edital.initial }}</p>
+                    <p class="font-semibold">Edital {{ edital.number }}/{{ edital.year }}</p>
                     {{ form.edital }}
                     {{ form.edital.errors }}
                 </div>

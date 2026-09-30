@@ -76,7 +76,9 @@ def submission_create_view(request: HttpRequest) -> HttpResponse:
     else:
         form = SubmissionIntakeForm(operational_edital=request.operational_edital)
 
-    return render(request, "submissions/create.html", {"form": form})
+    return render(
+        request, "submissions/create.html", {"form": form, "edital": request.operational_edital}
+    )
 
 
 @login_required
