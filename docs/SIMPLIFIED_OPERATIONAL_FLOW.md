@@ -248,7 +248,7 @@ outro edital ativo, sem transformar ou desativar o demo existente. A segunda
 execução preserva decisões, senhas e histórico. Datas/vínculos são sintéticos;
 não resolvem decisões jurídicas nem representam municípios PRONASCI oficiais.
 
-## Resultado da validação final
+## Registro da validação da simplificação
 
 - Django system check: nenhum problema.
 - `makemigrations --check --dry-run`: nenhuma alteração detectada.
@@ -286,3 +286,26 @@ O bootstrap verifica Docker/Compose, constrói os serviços, espera PostgreSQL,
 aplica migrations, executa seed/check e verifica HTTP do web. Não altera Git nem
 apaga volumes. A ausência de shellcheck no ambiente é suprida por revisão manual
 e validação `bash -n`; nenhuma instalação no host é necessária.
+
+
+### Validação da entrega para homologação externa
+
+- Suíte completa após a consolidação: **343 passed, 2 skipped, 0 failed**.
+  Os dois skips continuam dependentes do XLSX histórico externo; o seed e o
+  teste manual não dependem desse arquivo.
+- Django check, verificação de migrations, Ruff e `git diff --check` passaram.
+  Nenhuma migration foi criada.
+- Clone limpo e PostgreSQL vazio em projeto Compose isolado: o bootstrap completo
+  preparou sozinho os serviços, migrations, usuários e oito processos.
+- Segunda execução do seed preservou todos os registros, inclusive auditoria;
+  a segunda execução do bootstrap também passou sem reset.
+- Login real dos seis usuários documentados e navegação/RBAC conferidos em browser,
+  em 1440×900 e 375×812. Workspace com 14 blocos/23 checks, autosave e bloqueio por
+  pendências foram exercitados.
+- Revisão de item originalmente aprovado e de itens reprovados, motivo obrigatório,
+  resultado APTA derivado e preservação integral dos CheckResult originais foram
+  confirmados na interface e no banco.
+- A classificação apresenta rótulos humanos; valores técnicos e notas dos snapshots
+  permanecem preservados. Essa correção é somente de apresentação.
+
+As capturas e os bancos isolados de validação não fazem parte do repositório.
