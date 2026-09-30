@@ -12,6 +12,8 @@ def workflow_label(status):
 
 @register.filter
 def qualification_label(value):
+    if value in STATUS_LABELS:
+        return STATUS_LABELS[value]
     return {
         "Elegível para Ranking": "Apta",
         "Classificada no Ranking": "Classificada",
@@ -19,3 +21,10 @@ def qualification_label(value):
         "Pré-Habilitado": "Apta",
         "Pré-Inabilitado": "Inapta",
     }.get(value, value)
+
+
+@register.filter
+def ranking_note_label(value):
+    if value.startswith("Policy:"):
+        return "Ordem de recebimento"
+    return value

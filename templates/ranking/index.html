@@ -121,18 +121,20 @@
                                 {{ entry.total_vacancies }}
                             </td>
                             <td class="px-4 py-3 whitespace-nowrap">
+                                {% with qualification=entry.qualification_status|qualification_label %}
                                 <span class="badge-status
-                                    {% if entry.qualification_status == 'Apta' or entry.qualification_status == 'Elegível para Ranking' or entry.qualification_status == 'Classificada no Ranking' %}badge-apta
-                                    {% elif entry.qualification_status == 'Inapta' or entry.qualification_status == 'Inabilitada / Inelegível' %}badge-inapta
+                                    {% if qualification == 'Apta' or qualification == 'Classificada' %}badge-apta
+                                    {% elif qualification == 'Inapta' %}badge-inapta
                                     {% else %}badge-emanalise{% endif %}">
-                                    {% if entry.qualification_status == 'Apta' or entry.qualification_status == 'Elegível para Ranking' or entry.qualification_status == 'Classificada no Ranking' %}&check;
-                                    {% elif entry.qualification_status == 'Inapta' or entry.qualification_status == 'Inabilitada / Inelegível' %}&times;
+                                    {% if qualification == 'Apta' or qualification == 'Classificada' %}&check;
+                                    {% elif qualification == 'Inapta' %}&times;
                                     {% endif %}
-                                    {{ entry.qualification_status|qualification_label }}
+                                    {{ qualification }}
                                 </span>
+                                {% endwith %}
                             </td>
                             <td class="px-4 py-3 text-[11px] text-slate-500">
-                                {{ entry.tie_breaker_notes }}
+                                {{ entry.tie_breaker_notes|ranking_note_label }}
                             </td>
                         </tr>
                     {% empty %}

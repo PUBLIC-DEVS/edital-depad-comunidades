@@ -135,6 +135,19 @@ def test_seed_second_run_preserves_human_work_and_counts(seeded):
     assert analyst.check_password("Senha.alterada#Local")
 
 
+def test_ranking_uses_human_labels_without_mutating_snapshot(client, seeded):
+    snapshot = RankingSnapshot.objects.get()
+    before = list(snapshot.entries.values())
+    client.force_login(User.objects.get(username="homolog.admin"))
+    response = client.get("/classificacao/")
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "ELIGIBLE_FOR_RANKING" not in html
+    assert "Policy: SEI_LEXICOGRAPHIC" not in html
+    assert "Apta" in html and "Ordem de recebimento" in html
+    assert list(snapshot.entries.values()) == before
+
+
 def test_documented_homologation_credentials_authenticate(client, seeded):
     for key, role in ROLES.items():
         client.logout()
