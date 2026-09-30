@@ -22,9 +22,10 @@ python manage.py runserver
 
 `seed_demo` constrói um edital com quatro grupos, regras financeiras e processos fictícios, sem `import_legacy_edital`. O comando informa os logins; a senha de demonstração local pode ser definida por `DEMO_PASSWORD`. Não execute o seed em produção. Para testar o produto sem carregar o app legado, use `ENABLE_LEGACY_IMPORT=false` antes de `migrate`, `seed_demo` e `runserver`. Uma instalação apenas do núcleo pode usar `pip install -e .`; o extra `.[legacy]` instala `openpyxl` quando a migração histórica for necessária.
 
-Com Docker:
+Com Docker (caminho oficial recomendado; consulte o [Guia de Desenvolvimento Local](docs/LOCAL_DEVELOPMENT.md)):
 
 ```bash
+./scripts/dev-check.sh
 docker compose up --build -d
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py seed_demo
