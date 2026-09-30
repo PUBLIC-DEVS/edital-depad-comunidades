@@ -52,6 +52,10 @@ class TestEvaluationWorkspaceIntegration:
             status=Assignment.Status.ACTIVE,
         )
 
+        from tests.operational_helpers import publish_fixture
+
+        publish_fixture(edital)
+
         return {
             "a": analyst_a,
             "b": analyst_b,

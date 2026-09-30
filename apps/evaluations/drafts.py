@@ -36,6 +36,8 @@ def update_result(evaluation, payload, actor):
         raise ValidationError("Item não pertence a esta avaliação.")
     definition = result.definition
     allowed = set(definition.allowed_statuses) | {"EM_BRANCO"}
+    if result.status != "NAO_ENVIADO":
+        allowed.discard("NAO_ENVIADO")
     if payload.get("status", result.status) not in allowed:
         raise ValidationError("Resultado não permitido para este item.")
     values = {name: payload[name] for name in ("status", *EVIDENCE_FIELDS) if name in payload}

@@ -38,10 +38,10 @@ class EvaluationService:
     """Serviço responsável pela execução, cálculo de conformidade e conclusão de análises documentais."""
 
     @staticmethod
-    def calculate_assessment(evaluation, status_overrides=None):
+    def calculate_assessment(evaluation, status_overrides=None, rows=None):
         from apps.evaluations.assessment import assess
 
-        return EvaluationAssessment(**assess(evaluation, status_overrides))
+        return EvaluationAssessment(**assess(evaluation, status_overrides, rows))
 
     @staticmethod
     def blocking_check_results(evaluation):
@@ -213,21 +213,10 @@ class EvaluationService:
         assessment = cls.calculate_assessment(evaluation)
 
         if not assessment.is_complete:
-            msg = (
-                f"Não é possível concluir a avaliação com {assessment.pending_checks} "
-                "checagens pendentes. Avalie todos os itens ou salve como rascunho."
-            )
+            msg = f"Existem {assessment.pending_checks} itens obrigatórios ainda não avaliados (pendentes)."
             raise InconsistentEvaluationError(msg)
-        from apps.evaluations.validation_rules import ValidationRuleEvaluator
-
-        blockers = ValidationRuleEvaluator.blockers(evaluation)
-        if blockers:
-            labels = "; ".join(
-                f"{outcome.rule.requirement_check.name}: {outcome.message}" for outcome in blockers
-            )
-            raise InconsistentEvaluationError(
-                f"Validações críticas impedem concluir a análise: {labels}"
-            )
+        # Human documentary checks are authoritative. Declarative validators remain
+        # available as supporting alerts, including their historical configuration.
 
         evaluation.status = Evaluation.Status.COMPLETED
         evaluation.result = assessment.result

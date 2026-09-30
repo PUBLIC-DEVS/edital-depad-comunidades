@@ -11,6 +11,7 @@ from apps.audit.models import AuditEvent
 from apps.editais.edital_2026 import configure_edital_2026_base
 from apps.editais.models import Edital, ProgramMunicipality, RequirementValidationRule
 from apps.editais.services import EditalConfigurationService
+from apps.evaluations.models import Evaluation
 from apps.evaluations.services import EvaluationService, InconsistentEvaluationError
 from apps.reviews.models import Diligence, Review
 from apps.reviews.services import ReviewService
@@ -26,7 +27,11 @@ def operational(domain):
     domain["edital"].closes_at += timezone.timedelta(days=30)
     domain["edital"].requires_financial_rules = False
     domain["edital"].save()
-    ProgramMunicipality.objects.create(edital=domain["edital"], program=domain["edital"].target_groups.get(code="G2").program, municipality=domain["sub"].municipality)
+    ProgramMunicipality.objects.create(
+        edital=domain["edital"],
+        program=domain["edital"].target_groups.get(code="G2").program,
+        municipality=domain["sub"].municipality,
+    )
     EditalConfigurationService.publish(domain["edital"], domain["admin"])
     return domain
 
@@ -39,7 +44,11 @@ def test_resolver_requires_exactly_one_active(domain):
     domain["edital"].closes_at += timezone.timedelta(days=30)
     domain["edital"].requires_financial_rules = False
     domain["edital"].save()
-    ProgramMunicipality.objects.create(edital=domain["edital"], program=domain["edital"].target_groups.get(code="G2").program, municipality=domain["sub"].municipality)
+    ProgramMunicipality.objects.create(
+        edital=domain["edital"],
+        program=domain["edital"].target_groups.get(code="G2").program,
+        municipality=domain["sub"].municipality,
+    )
     EditalConfigurationService.publish(domain["edital"], domain["admin"])
     assert get_operational_edital() == domain["edital"]
     other = Edital.objects.create(
@@ -53,7 +62,11 @@ def test_resolver_requires_exactly_one_active(domain):
     other.requires_financial_rules = False
     other.validation_reference_date = date(2031, 1, 1)
     other.save()
-    ProgramMunicipality.objects.create(edital=other, program=other.target_groups.get(code="G2").program, municipality=domain["sub"].municipality)
+    ProgramMunicipality.objects.create(
+        edital=other,
+        program=other.target_groups.get(code="G2").program,
+        municipality=domain["sub"].municipality,
+    )
     EditalConfigurationService.publish(other, domain["admin"])
     with pytest.raises(OperationalEditalError, match="Mais de um edital ativo"):
         get_operational_edital()
@@ -231,6 +244,7 @@ def test_review_effective_result_preserves_original(domain, original, effective,
     assert domain["sub"].workflow_status == target
     assert check.status == original
     assert check.updated_at == original_time
+    evaluation.refresh_from_db()
     assert evaluation.status == "COMPLETED"
 
 
@@ -325,3 +339,119 @@ def test_metrics_math_and_active_scope(client, operational):
     client.force_login(operational["coord"])
     response = client.get(f"/metricas/?edital={other.pk}")
     assert response.context["summary"]["total_received"] == 9
+    for url in ["/", "/processos/"]:
+        response = client.get(url)
+        assert response.status_code == 200
+        assert "M-0" in response.content.decode()
+        assert "OUTSIDE" not in response.content.decode()
+
+
+def test_workspace_23_checks_uses_bounded_queries(client, domain):
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    edital = Edital.objects.create(
+        name="Base", number="base", year=2030, opens_at=timezone.now(), closes_at=timezone.now()
+    )
+    configure_edital_2026_base(edital, domain["admin"])
+    domain["sub"].edital = edital
+    domain["sub"].save()
+    EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
+    client.force_login(domain["analyst"])
+    with CaptureQueriesContext(connection) as queries:
+        response = client.get(reverse("evaluation-workspace", args=[domain["sub"].pk]))
+    assert response.status_code == 200
+    assert len(response.context["document_sections"]) == 14
+    assert response.context["assessment"].total_checks == 23
+    assert len(queries) <= 20, [q["sql"] for q in queries]
+    html = response.content.decode()
+    assert 'value="NAO_ENVIADO"' not in html
+    assert 'name="check_' in html
+    assert "Detalhes do documento" in html
+    assert "Diligência" not in html
+
+
+def test_review_justification_and_previous_decision_audit(domain):
+    evaluation = EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
+    check = evaluation.check_results.get()
+    EvaluationService.save_draft(
+        evaluation, [{"check_result_id": check.pk, "status": "NAO_ATENDE"}], domain["analyst"]
+    )
+    EvaluationService.conclude_evaluation(evaluation, domain["analyst"])
+    review = ReviewService.claim_review(evaluation.review, domain["reviewer"])
+    with pytest.raises(ValidationError):
+        ReviewService.record_effective_status(review, check.pk, "ATENDE", "", domain["reviewer"])
+    decision = ReviewService.record_effective_status(
+        review, check.pk, "ATENDE", "Primeira decisão", domain["reviewer"]
+    )
+    ReviewService.record_effective_status(
+        review, check.pk, "NAO_ATENDE", "Conferência posterior", domain["reviewer"]
+    )
+    event = AuditEvent.objects.filter(
+        entity_type="ReviewItemDecision", entity_id=str(decision.pk)
+    ).latest("pk")
+    assert "Primeira decisão" in event.old_value
+    assert "Conferência posterior" in event.new_value
+
+
+def test_top_failed_checks_counts_completed_original_decisions(domain):
+    from apps.reporting.services.metrics import DashboardMetricsService
+
+    evaluation = EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
+    EvaluationService.save_draft(
+        evaluation,
+        [{"check_result_id": evaluation.check_results.get().pk, "status": "NAO_ATENDE"}],
+        domain["analyst"],
+    )
+    assert DashboardMetricsService.get_top_failed_checks(domain["edital"]) == []
+    EvaluationService.conclude_evaluation(evaluation, domain["analyst"])
+    top = DashboardMetricsService.get_top_failed_checks(domain["edital"])
+    assert top[0]["code"] == domain["check"].code
+    assert top[0]["failure_count"] == 1
+
+
+@pytest.mark.parametrize("failure_behavior", ["MARK_INELIGIBLE", "NONE"])
+def test_every_failed_mandatory_check_reaches_review(domain, failure_behavior):
+    requirement = domain["check"].requirement
+    requirement.failure_behavior = failure_behavior
+    requirement.save()
+    evaluation = EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
+    EvaluationService.save_draft(
+        evaluation,
+        [{"check_result_id": evaluation.check_results.get().pk, "status": "NAO_ATENDE"}],
+        domain["analyst"],
+    )
+    EvaluationService.conclude_evaluation(evaluation, domain["analyst"])
+    domain["sub"].refresh_from_db()
+    assert domain["sub"].workflow_status == "PENDING_REVIEW"
+    assert Review.objects.get(evaluation=evaluation).status == "PENDING"
+
+
+def test_historical_not_sent_is_preserved_and_requires_current_decision(domain):
+    evaluation = EvaluationService.start_evaluation(domain["sub"], domain["analyst"])
+    # Historical importer compatibility; new drafts cannot introduce this status.
+    evaluation.check_results.update(status="NAO_ENVIADO")
+    result = evaluation.check_results.get()
+    EvaluationService.save_draft(
+        evaluation,
+        [{"check_result_id": result.pk, "status": "NAO_ENVIADO", "notes": "Histórico preservado"}],
+        domain["analyst"],
+    )
+    result.refresh_from_db()
+    assert result.status == "NAO_ENVIADO"
+    with pytest.raises(InconsistentEvaluationError):
+        EvaluationService.conclude_evaluation(evaluation, domain["analyst"])
+    EvaluationService.save_draft(
+        evaluation, [{"check_result_id": result.pk, "status": "NAO_ATENDE"}], domain["analyst"]
+    )
+    EvaluationService.conclude_evaluation(evaluation, domain["analyst"])
+    assert Review.objects.filter(evaluation=evaluation).exists()
+
+
+@pytest.mark.parametrize("role", ["admin", "coord"])
+def test_no_active_edital_displays_clear_operational_error(client, domain, role):
+    client.force_login(domain[role])
+    response = client.get("/")
+    assert response.status_code == 503
+    assert "Nenhum edital ativo" in response.content.decode()
+    assert not Evaluation.objects.exists()

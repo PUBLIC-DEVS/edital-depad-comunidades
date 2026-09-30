@@ -151,9 +151,7 @@ class ValidationRuleEvaluator:
     @classmethod
     def evaluate_result(cls, result):
         rules = (
-            RequirementValidationRule.objects.filter(
-                requirement_check=result.requirement_check, active=True
-            )
+            [rule for rule in result.requirement_check.validation_rules.all() if rule.active]
             if result.requirement_check_id
             else RequirementValidationRule.objects.none()
         )

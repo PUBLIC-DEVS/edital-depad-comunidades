@@ -16,6 +16,7 @@ class CheckResultForm(forms.Form):
                 (value, label)
                 for value, label in CheckResult.Status.choices
                 if value in {*definition.allowed_statuses, "EM_BRANCO"}
+                and (value != "NAO_ENVIADO" or result.status == "NAO_ENVIADO")
             ],
             initial=result.status,
         )
