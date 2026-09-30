@@ -1,4 +1,64 @@
 {% extends "base.html" %}
-{% block content %}<h1 class="text-2xl font-bold">{{ institution.name }}</h1><p class="text-slate-500 mb-4">{{ institution.formatted_cnpj }}</p>
-<div class="card p-5 mb-6"><p>{{ institution.address }} · {{ institution.municipality }}</p><p>{{ institution.contact_email }} · {{ institution.contact_phone }}</p>{% if can_write %}<a class="text-blue-700" href="{% url 'catalog-edit' 'instituicoes' institution.pk %}">Editar dados cadastrais</a>{% endif %}</div>
-<h2 class="font-bold text-lg mb-3">Participações e processos autorizados</h2><div class="space-y-3">{% for sub in submissions %}<a class="card p-4 block" href="{% url 'submission-detail' sub.pk %}">{{ sub.processo_sei }} · {{ sub.edital.number }}/{{ sub.edital.year }} · {{ sub.get_workflow_status_display }}</a>{% empty %}<p>Sem processos disponíveis.</p>{% endfor %}</div>{% endblock %}
+
+{% block title %}{{ institution.name }} — DEPAD/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center space-x-2 text-xs text-slate-500 pb-3 border-b border-slate-200">
+        <a href="{% url 'catalog-list' 'instituicoes' %}" class="text-govblue-600 hover:text-govblue-800">&larr; Voltar para Instituições</a>
+        <span>/</span>
+        <span class="font-bold text-slate-700 font-mono">{{ institution.formatted_cnpj }}</span>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">{{ institution.name }}</h1>
+            <p class="text-sm font-mono text-slate-500 mt-0.5">{{ institution.formatted_cnpj }}</p>
+        </div>
+        {% if can_write %}
+            <a class="depad-button depad-button-outline" href="{% url 'catalog-edit' 'instituicoes' institution.pk %}">
+                Editar Dados Cadastrais
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="depad-card">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Informações de Contato e Endereço</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div>
+                <span class="text-slate-500 block">Endereço:</span>
+                <span class="font-medium text-slate-800">{{ institution.address|default:"Não informado" }} · {{ institution.municipality|default:"Município não associado" }}</span>
+            </div>
+            <div>
+                <span class="text-slate-500 block">Contato:</span>
+                <span class="font-medium text-slate-800">{{ institution.contact_email|default:"Sem e-mail" }} · {{ institution.contact_phone|default:"Sem telefone" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-3">
+        <h2 class="font-bold text-base text-slate-800">Participações e Processos Cadastrados</h2>
+        <div class="space-y-3">
+            {% for sub in submissions %}
+                <a class="depad-card block hover:border-govblue-300 transition" href="{% url 'submission-detail' sub.pk %}">
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span class="font-mono font-bold text-govblue-700 text-sm">{{ sub.processo_sei }}</span>
+                        <span class="text-slate-600 font-medium">Edital {{ sub.edital.number }}/{{ sub.edital.year }}</span>
+                        <span class="depad-badge
+                            {% if sub.workflow_status == 'ELIGIBLE_FOR_RANKING' %}depad-badge-success
+                            {% elif sub.workflow_status == 'INELIGIBLE' %}depad-badge-danger
+                            {% elif sub.workflow_status == 'UNDER_ANALYSIS' %}depad-badge-info
+                            {% else %}depad-badge-neutral{% endif %}">
+                            {{ sub.get_workflow_status_display }}
+                        </span>
+                    </div>
+                </a>
+            {% empty %}
+                <div class="depad-card text-center py-8 text-slate-400 text-xs">
+                    Sem processos disponíveis para esta entidade.
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

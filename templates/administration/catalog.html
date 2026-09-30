@@ -1,5 +1,69 @@
 {% extends "base.html" %}
-{% block content %}<div class="flex justify-between mb-4"><h1 class="text-2xl font-bold">{{ title }}</h1>{% if can_write %}<a class="btn-primary" href="{% url 'catalog-create' catalog %}">Novo cadastro</a>{% endif %}</div>
-<form method="get" class="flex gap-2 mb-4"><label class="sr-only" for="catalog-search">Buscar por nome</label><input id="catalog-search" name="q" value="{{ search }}" class="form-input" placeholder="Buscar por nome"><button class="btn-secondary">Buscar</button></form>
-<div class="space-y-3">{% for object in page %}<article class="card p-4 flex justify-between gap-4"><div>{% if catalog == 'instituicoes' %}<a class="text-blue-700" href="{% url 'institution-detail' object.pk %}">{{ object }}</a>{% else %}{{ object }}{% endif %}</div>{% if can_write %}<a href="{% url 'catalog-edit' catalog object.pk %}" class="text-blue-700">Editar</a>{% endif %}</article>{% empty %}<p>Nenhum cadastro encontrado.</p>{% endfor %}</div>
-<div class="flex gap-4 mt-4">{% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&q={{ search|urlencode }}">Anterior</a>{% endif %}<span>{{ page.number }} / {{ page.paginator.num_pages }}</span>{% if page.has_next %}<a href="?page={{ page.next_page_number }}&q={{ search|urlencode }}">Próxima</a>{% endif %}</div>{% endblock %}
+
+{% block title %}{{ title }} — Administração — DEPAD / MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
+        <div>
+            <div class="text-xs text-slate-500 mb-1">
+                <a href="/administracao/" class="text-[#0248AB] hover:underline">&larr; Voltar para Administração</a>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800">{{ title }}</h1>
+        </div>
+        {% if can_write %}
+            <a class="btn-primary text-xs" href="{% url 'catalog-create' catalog %}">
+                + Novo Cadastro
+            </a>
+        {% endif %}
+    </div>
+
+    <!-- Barra de Busca -->
+    <form method="get" class="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs flex gap-3">
+        <label class="sr-only" for="catalog-search">Buscar registros</label>
+        <input id="catalog-search" name="q" value="{{ search }}" class="form-input text-xs flex-1" placeholder="Buscar por nome, código ou identificador...">
+        <button type="submit" class="btn-secondary text-xs">Buscar</button>
+    </form>
+
+    <!-- Lista de Objetos -->
+    <div class="space-y-2.5">
+        {% for object in page %}
+            <article class="card p-4 flex justify-between items-center gap-4 hover:border-slate-300 transition">
+                <div class="font-medium text-slate-800 text-sm">
+                    {% if catalog == 'instituicoes' %}
+                        <a class="text-[#0248AB] hover:underline font-semibold" href="{% url 'institution-detail' object.pk %}">
+                            {{ object }}
+                        </a>
+                    {% else %}
+                        {{ object }}
+                    {% endif %}
+                </div>
+                {% if can_write %}
+                    <a href="{% url 'catalog-edit' catalog object.pk %}" class="btn-secondary btn-sm text-xs font-semibold">
+                        Editar
+                    </a>
+                {% endif %}
+            </article>
+        {% empty %}
+            <div class="card p-8 text-center text-slate-400 text-xs">
+                Nenhum registro encontrado com os critérios informados.
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginação -->
+    {% if page.has_other_pages %}
+        <div class="flex justify-between items-center pt-4 border-t border-slate-200 text-xs text-slate-600">
+            <span>Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+            <div class="flex gap-2">
+                {% if page.has_previous %}
+                    <a href="?page={{ page.previous_page_number }}&q={{ search|urlencode }}" class="btn-secondary btn-sm">Anterior</a>
+                {% endif %}
+                {% if page.has_next %}
+                    <a href="?page={{ page.next_page_number }}&q={{ search|urlencode }}" class="btn-secondary btn-sm">Próxima</a>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

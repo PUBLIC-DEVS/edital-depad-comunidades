@@ -1,9 +1,59 @@
 {% extends "base.html" %}
-{% block title %}Programas municipais{% endblock %}
+
+{% block title %}Programas Municipais — DEPAD/MDS{% endblock %}
+
 {% block content %}
-<div class="space-y-5">
-    <a href="{% url 'edital-list' %}" class="text-sm text-govblue-700 underline">← Editais</a>
-    <div class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-2xl font-bold">Programas</h1><p class="text-sm text-slate-600">Cadastre a identidade dos programas e, dentro de cada edital, associe municípios elegíveis.</p></div><a href="{% url 'program-create' %}" class="rounded bg-govblue-700 px-4 py-2 text-white">Novo programa</a></div>
-    <div class="space-y-3">{% for program in programs %}<article class="flex flex-wrap justify-between gap-3 rounded-lg border bg-white p-5"><div><h2 class="font-semibold">{{ program.code }} · {{ program.name }}</h2>{% if program.description %}<p class="text-sm text-slate-600">{{ program.description }}</p>{% endif %}<p class="text-xs">{% if program.active %}Ativo{% else %}Desativado{% endif %} · {{ program.municipality_links.count }} associação(ões) de município</p></div><a class="text-govblue-700 underline" href="{% url 'program-edit' program.pk %}">Editar</a></article>{% empty %}<p class="rounded border bg-white p-5">Nenhum programa cadastrado.</p>{% endfor %}</div>
+<div class="space-y-6">
+    <div class="flex items-center space-x-2 text-xs text-slate-500 pb-3 border-b border-slate-200">
+        <a href="{% url 'edital-list' %}" class="text-govblue-600 hover:text-govblue-800">&larr; Voltar para Editais</a>
+        <span>/</span>
+        <span class="font-bold text-slate-700">Programas Municipais</span>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Programas Municipais</h1>
+            <p class="text-sm text-slate-500 mt-1">Cadastre a identidade dos programas e, dentro de cada edital, associe municípios elegíveis.</p>
+        </div>
+        <a href="{% url 'program-create' %}" class="depad-button depad-button-primary">
+            + Novo Programa
+        </a>
+    </div>
+
+    <div class="space-y-3">
+        {% for program in programs %}
+            <article class="depad-card">
+                <div class="flex flex-wrap justify-between items-start gap-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold font-mono text-sm text-govblue-700">{{ program.code }}</span>
+                            <span class="text-slate-400">·</span>
+                            <h2 class="font-bold text-slate-900 text-sm">{{ program.name }}</h2>
+                        </div>
+                        {% if program.description %}
+                            <p class="text-xs text-slate-600">{{ program.description }}</p>
+                        {% endif %}
+                        <div class="flex items-center gap-2 pt-1 text-xs">
+                            <span class="depad-badge {% if program.active %}depad-badge-success{% else %}depad-badge-neutral{% endif %}">
+                                {% if program.active %}Ativo{% else %}Desativado{% endif %}
+                            </span>
+                            <span class="text-slate-500">
+                                {{ program.municipality_links.count }} associação(ões) de município
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <a class="depad-button depad-button-outline text-xs py-1 px-3" href="{% url 'program-edit' program.pk %}">
+                            Editar
+                        </a>
+                    </div>
+                </div>
+            </article>
+        {% empty %}
+            <div class="depad-card text-center py-12 text-slate-400 text-xs">
+                Nenhum programa cadastrado.
+            </div>
+        {% endfor %}
+    </div>
 </div>
 {% endblock %}

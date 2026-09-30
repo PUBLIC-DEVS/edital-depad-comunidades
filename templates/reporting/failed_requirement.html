@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Processos Reprovados — Requisito {{ code }} — DEPED/MDS{% endblock %}
+{% block title %}Processos Reprovados — Requisito {{ code }} — DEPAD/MDS{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -8,7 +8,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200 gap-4">
         <div>
             <div class="flex items-center gap-2">
-                <a href="{% url 'reporting:dashboard' %}" class="text-xs text-blue-600 hover:text-blue-800 font-medium">&larr; Voltar ao Painel Geral</a>
+                <a href="{% url 'reporting:dashboard' %}" class="text-xs text-govblue-600 hover:text-govblue-800 font-medium">&larr; Voltar ao Painel Geral</a>
             </div>
             <h1 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">
                 Processos Reprovados no Requisito <span class="text-govblue-700 font-mono">{{ code }}</span>
@@ -22,58 +22,58 @@
             </p>
         </div>
         <div>
-            <span class="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-100 text-red-900 border border-red-300">
+            <span class="depad-badge depad-badge-danger text-xs py-1.5 px-3">
                 Total de Reprovações: {{ submissions|length }}
             </span>
         </div>
     </div>
 
     <!-- Tabela de Submissões Afetadas -->
-    <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+    <div class="depad-card p-0 overflow-hidden">
         {% if submissions %}
             <div class="overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                    <thead class="bg-slate-50 text-slate-600 uppercase border-b border-slate-200">
+                <table class="depad-table">
+                    <thead>
                         <tr>
-                            <th class="py-3 px-4">Processo SEI</th>
-                            <th class="py-3 px-4">Instituição / Razão Social</th>
-                            <th class="py-3 px-4">CNPJ</th>
-                            <th class="py-3 px-4">Município / UF</th>
-                            <th class="py-3 px-4">Analista Responsável</th>
-                            <th class="py-3 px-4 text-center">Status do Processo</th>
-                            <th class="py-3 px-4 text-right">Ação</th>
+                            <th>Processo SEI</th>
+                            <th>Instituição / Razão Social</th>
+                            <th>CNPJ</th>
+                            <th>Município / UF</th>
+                            <th>Analista Responsável</th>
+                            <th class="text-center">Status do Processo</th>
+                            <th class="text-right">Ação</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody>
                         {% for sub in submissions %}
-                            <tr class="hover:bg-slate-50 transition">
-                                <td class="py-3 px-4 font-mono font-bold text-govblue-700">
+                            <tr>
+                                <td class="font-mono font-bold text-govblue-700">
                                     {{ sub.processo_sei }}
                                 </td>
-                                <td class="py-3 px-4 font-medium text-slate-800">
+                                <td class="font-medium text-slate-800">
                                     {{ sub.institution.name }}
                                 </td>
-                                <td class="py-3 px-4 font-mono text-slate-600">
+                                <td class="font-mono text-slate-600 text-xs">
                                     {{ sub.institution.cnpj }}
                                 </td>
-                                <td class="py-3 px-4 text-slate-600">
+                                <td class="text-slate-600">
                                     {% if sub.municipality %}
                                         {{ sub.municipality.name }}/{{ sub.municipality.state }}
                                     {% else %}
                                         <span class="text-slate-400">Não informado</span>
                                     {% endif %}
                                 </td>
-                                <td class="py-3 px-4 text-slate-700">
+                                <td class="text-slate-700">
                                     {{ sub.assigned_analyst.get_full_name|default:sub.assigned_analyst.username|default:"Não distribuído" }}
                                 </td>
-                                <td class="py-3 px-4 text-center">
-                                    <span class="inline-block px-2 py-0.5 font-bold text-[11px] rounded bg-slate-100 text-slate-800 border border-slate-200">
+                                <td class="text-center">
+                                    <span class="depad-badge depad-badge-neutral">
                                         {{ sub.get_workflow_status_display }}
                                     </span>
                                 </td>
-                                <td class="py-3 px-4 text-right space-x-2">
-                                    <a href="/avaliacoes/{{ sub.id }}/" class="text-xs bg-govblue-600 hover:bg-govblue-700 text-white font-medium px-2.5 py-1 rounded transition">
-                                        Ver Análise
+                                <td class="text-right whitespace-nowrap">
+                                    <a href="/avaliacoes/{{ sub.id }}/" class="depad-button depad-button-primary text-xs py-1 px-2.5">
+                                        Ver Análise &rarr;
                                     </a>
                                 </td>
                             </tr>
@@ -82,7 +82,7 @@
                 </table>
             </div>
         {% else %}
-            <div class="py-12 text-center text-slate-500">
+            <div class="py-12 text-center text-slate-400 text-xs">
                 Nenhum processo foi reprovado com o requisito <strong class="font-mono text-slate-700">{{ code }}</strong>.
             </div>
         {% endif %}

@@ -1,13 +1,198 @@
 {% extends "base.html" %}
+
+{% block title %}{{ edital.number }}/{{ edital.year }} — Configuração — DEPAD / MDS{% endblock %}
+
 {% block content %}
 <div class="space-y-6">
-<a href="{% url 'edital-list' %}" class="text-sm text-govblue-600">← Editais</a>
-<div class="bg-white rounded-lg border p-6 flex flex-wrap justify-between gap-4"><div><span class="text-xs bg-slate-100 px-2 py-1 rounded">{{ edital.get_status_display }} · v{{ edital.rules_version }}</span><h1 class="text-2xl font-bold mt-3">{{ edital.number }}/{{ edital.year }} · {{ edital.name }}</h1><p class="text-sm text-slate-600 mt-2">{{ edital.description }}</p>{% if edital.published_at %}<p class="text-xs text-slate-500 mt-3">Publicado em {{ edital.published_at|date:"d/m/Y H:i" }} por {{ edital.published_by }}. Configuração protegida.</p>{% endif %}</div>
-{% if can_configure %}<div class="flex gap-3 items-start">{% if edital.configuration_editable %}<a class="text-govblue-700 underline" href="{% url 'edital-edit' edital.pk %}">Editar dados gerais</a>{% endif %}<a href="{% url 'edital-clone' edital.pk %}" class="bg-govblue-700 text-white px-4 py-2 rounded">Duplicar edital</a></div>{% endif %}</div>
-<nav aria-label="Seções do edital" class="flex flex-wrap gap-2 text-sm"><a class="bg-white border rounded px-3 py-2" href="{% url 'edital-detail' edital.pk %}">Visão geral / configuração</a>{% for key, label in sections %}<a class="bg-white border rounded px-3 py-2" href="{% url 'edital-section' edital.pk key %}">{{ label }}</a>{% endfor %}<a class="bg-white border rounded px-3 py-2" href="/processos/?edital={{ edital.pk }}">Processos</a><a class="bg-white border rounded px-3 py-2" href="/classificacao/?edital={{ edital.pk }}">Classificação</a><a class="bg-white border rounded px-3 py-2" href="/metricas/?edital={{ edital.pk }}">Métricas</a><a class="bg-white border rounded px-3 py-2" href="#auditoria">Auditoria</a>{% if can_configure %}<a class="bg-amber-100 border border-amber-200 rounded px-3 py-2" href="{% url 'edital-analyst-preview' edital.pk %}">Pré-visualizar formulário do analista</a>{% endif %}</nav>
-<section class="bg-white border rounded-lg p-5"><h2 class="font-bold">Estrutura de análise</h2><p class="text-sm text-slate-600 mt-1">{{ requirements|length }} requisito(s) ativo(s). Os subcritérios e evidências são apresentados em cartões, conforme a configuração deste edital.</p><div class="mt-3 flex flex-wrap gap-2">{% for requirement in requirements %}<span class="rounded-full bg-slate-100 px-3 py-1 text-xs">{{ requirement.code }} · {{ requirement.checks.count }} checks</span>{% endfor %}</div></section>
-<div class="grid lg:grid-cols-3 gap-6"><div class="lg:col-span-2 bg-white border rounded-lg p-5"><h2 class="font-bold mb-4">Configuração guiada</h2><ol class="space-y-3">{% for step in validation.checklist %}<li class="flex justify-between border-b pb-3"><span>{{ step.label }}</span><span class="text-sm {% if step.complete %}text-green-700{% else %}text-amber-800{% endif %}">{% if step.complete %}✓ Configurado{% else %}○ Pendente{% endif %}</span></li>{% endfor %}</ol></div>
-<div class="bg-white border rounded-lg p-5 space-y-4"><h2 class="font-bold">Publicação</h2>{% if edital.configuration_editable %}{% if validation.errors %}<p class="text-amber-800 font-semibold">Edital ainda não pode ser ativado</p><ul class="text-sm list-disc pl-5 space-y-2">{% for error in validation.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% else %}<p class="text-green-700">Configuração validada. A publicação preservará esta versão das regras.</p>{% endif %}{% if can_configure %}<form method="post" action="{% url 'edital-publish' edital.pk %}">{% csrf_token %}<button {% if not validation.can_publish %}disabled{% endif %} class="bg-govblue-700 disabled:bg-slate-300 text-white px-4 py-2 rounded">Publicar edital</button></form>{% endif %}{% else %}<p class="text-sm">As regras desta edição permanecem preservadas. Para uma nova configuração, duplique o edital.</p>{% endif %}{% for warning in validation.warnings %}<p class="text-sm text-amber-800">{{ warning }}</p>{% endfor %}{% if can_configure and edital.status == 'ACTIVE' %}<form method="post" action="{% url 'edital-status' edital.pk %}">{% csrf_token %}<input type="hidden" name="status" value="CLOSED"><button class="text-red-700 underline">Encerrar edital</button></form>{% elif can_configure and edital.status == 'CLOSED' %}<form method="post" action="{% url 'edital-status' edital.pk %}">{% csrf_token %}<input type="hidden" name="status" value="ARCHIVED"><button class="text-slate-600 underline">Arquivar edital</button></form>{% endif %}</div></div>
-<section id="auditoria" class="bg-white border rounded-lg p-5"><h2 class="font-bold mb-3">Auditoria do edital</h2>{% for event in events %}<p class="text-sm border-b py-2">{{ event.timestamp|date:"d/m/Y H:i" }} · {{ event.actor|default:"Sistema" }} · {{ event.action }} · {{ event.old_value }} → {{ event.new_value }}</p>{% empty %}<p class="text-sm text-slate-500">Sem eventos.</p>{% endfor %}</section>
+    <div class="flex items-center space-x-2 text-xs text-slate-500">
+        <a href="{% url 'edital-list' %}" class="text-[#0248AB] hover:underline font-medium">&larr; Voltar para Lista de Editais</a>
+    </div>
+
+    <!-- Header do Edital -->
+    <div class="card p-6 flex flex-wrap justify-between items-start gap-4 border-l-4 border-l-[#0248AB]">
+        <div class="space-y-2 max-w-3xl">
+            <div class="flex items-center gap-2">
+                <span class="badge {% if edital.status == 'ACTIVE' %}badge-atende{% elif edital.status == 'DRAFT' %}badge-rascunho{% elif edital.status == 'CLOSED' %}badge-naoaplicavel{% else %}badge-distribuido{% endif %}">
+                    {{ edital.get_status_display }}
+                </span>
+                <span class="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                    Regras v{{ edital.rules_version }}
+                </span>
+            </div>
+            <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
+                {{ edital.number }}/{{ edital.year }} — {{ edital.name }}
+            </h1>
+            <p class="text-xs text-slate-600 leading-relaxed">
+                {{ edital.description|default:"Edital sem descrição informada." }}
+            </p>
+            {% if edital.published_at %}
+                <p class="text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded inline-block border border-emerald-200 font-medium">
+                    &check; Publicado em {{ edital.published_at|date:"d/m/Y H:i" }} por {{ edital.published_by }}. Configuração selada e protegida.
+                </p>
+            {% endif %}
+        </div>
+        {% if can_configure %}
+            <div class="flex flex-wrap items-center gap-2.5">
+                {% if edital.configuration_editable %}
+                    <a class="btn-secondary text-xs" href="{% url 'edital-edit' edital.pk %}">
+                        Editar Dados Gerais
+                    </a>
+                {% endif %}
+                <a href="{% url 'edital-clone' edital.pk %}" class="btn-primary text-xs">
+                    Duplicar Edital
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Subnavegação das Seções do Edital -->
+    <nav aria-label="Seções do edital" class="flex flex-wrap gap-1.5 text-xs bg-white p-2.5 rounded-lg border border-slate-200 shadow-xs">
+        <a class="px-3 py-1.5 rounded-md font-semibold bg-[#0248AB] text-white shadow-xs" href="{% url 'edital-detail' edital.pk %}">
+            Visão Geral / Configuração
+        </a>
+        {% for key, label in sections %}
+            <a class="px-3 py-1.5 rounded-md font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition border border-transparent" href="{% url 'edital-section' edital.pk key %}">
+                {{ label }}
+            </a>
+        {% endfor %}
+        <a class="px-3 py-1.5 rounded-md font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition border border-transparent" href="/processos/?edital={{ edital.pk }}">
+            Processos
+        </a>
+        <a class="px-3 py-1.5 rounded-md font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition border border-transparent" href="/classificacao/?edital={{ edital.pk }}">
+            Classificação
+        </a>
+        <a class="px-3 py-1.5 rounded-md font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition border border-transparent" href="/metricas/?edital={{ edital.pk }}">
+            Métricas
+        </a>
+        <a class="px-3 py-1.5 rounded-md font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition border border-transparent" href="#auditoria">
+            Auditoria
+        </a>
+        {% if can_configure %}
+            <a class="px-3 py-1.5 rounded-md font-semibold text-amber-900 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition ml-auto" href="{% url 'edital-analyst-preview' edital.pk %}">
+                Pré-visualizar Formulário do Analista
+            </a>
+        {% endif %}
+    </nav>
+
+    <!-- Estrutura de Análise -->
+    <section class="card p-5">
+        <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider">Estrutura Técnica de Análise</h2>
+        <p class="text-xs text-slate-500 mt-1">
+            <strong>{{ requirements|length }}</strong> requisito(s) ativo(s). Subcritérios e evidências são organizados conforme a parametrização desta edição.
+        </p>
+        <div class="mt-3.5 flex flex-wrap gap-2">
+            {% for requirement in requirements %}
+                <span class="rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs flex items-center gap-1.5">
+                    <strong class="font-mono text-[#0248AB]">{{ requirement.code }}</strong>
+                    <span class="text-slate-700">{{ requirement.name }}</span>
+                    <span class="text-[10px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        {{ requirement.checks.count }} check(s)
+                    </span>
+                </span>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Configuração Guiada e Publicação -->
+    <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 card p-5">
+            <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider mb-4 pb-2 border-b border-slate-100">
+                Checklist de Configuração Guiada
+            </h2>
+            <ol class="space-y-3">
+                {% for step in validation.checklist %}
+                    <li class="flex justify-between items-center border-b border-slate-100 pb-2.5 text-xs">
+                        <span class="text-slate-800 font-medium">{{ step.label }}</span>
+                        <span class="font-semibold {% if step.complete %}text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded{% else %}text-amber-800 bg-amber-50 px-2 py-0.5 rounded{% endif %}">
+                            {% if step.complete %}&check; Configurado{% else %}&#9675; Pendente{% endif %}
+                        </span>
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+
+        <div class="card p-5 space-y-4">
+            <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider pb-2 border-b border-slate-100">
+                Status de Publicação
+            </h2>
+            {% if edital.configuration_editable %}
+                {% if validation.errors %}
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs space-y-2">
+                        <p class="text-amber-900 font-bold">Edital ainda não pode ser ativado</p>
+                        <ul class="list-disc pl-4 space-y-1 text-amber-800">
+                            {% for error in validation.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% else %}
+                    <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900 font-medium">
+                        &check; Configuração validada com sucesso. A publicação gravará um snapshot imutável das regras.
+                    </div>
+                {% endif %}
+
+                {% if can_configure %}
+                    <form method="post" action="{% url 'edital-publish' edital.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" {% if not validation.can_publish %}disabled{% endif %}
+                                class="w-full btn-primary text-xs py-2.5 font-bold">
+                            Publicar Edital Oficial
+                        </button>
+                    </form>
+                {% endif %}
+            {% else %}
+                <p class="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    As regras desta edição permanecem imutáveis. Para aplicar novos parâmetros, utilize a opção <strong>Duplicar Edital</strong>.
+                </p>
+            {% endif %}
+
+            {% for warning in validation.warnings %}
+                <p class="text-xs text-amber-800 bg-amber-50 p-2.5 rounded border border-amber-200">
+                    &#9888; {{ warning }}
+                </p>
+            {% endfor %}
+
+            {% if can_configure and edital.status == 'ACTIVE' %}
+                <form method="post" action="{% url 'edital-status' edital.pk %}" class="pt-2 border-t border-slate-100">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="CLOSED">
+                    <button type="submit" class="text-xs text-red-700 hover:underline font-semibold">
+                        Encerrar Edital
+                    </button>
+                </form>
+            {% elif can_configure and edital.status == 'CLOSED' %}
+                <form method="post" action="{% url 'edital-status' edital.pk %}" class="pt-2 border-t border-slate-100">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="ARCHIVED">
+                    <button type="submit" class="text-xs text-slate-600 hover:underline font-semibold">
+                        Arquivar Edital
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Auditoria do Edital -->
+    <section id="auditoria" class="card p-5">
+        <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider mb-3 pb-2 border-b border-slate-100">
+            Trilha de Auditoria do Edital
+        </h2>
+        <div class="space-y-2">
+            {% for event in events %}
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center py-2 border-b border-slate-100 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-slate-500 text-[11px]">{{ event.timestamp|date:"d/m/Y H:i" }}</span>
+                        <strong class="text-slate-800">{{ event.actor|default:"Sistema" }}</strong>
+                        <span class="text-slate-600">&bull; {{ event.action }}</span>
+                    </div>
+                    <div class="text-slate-500 font-mono text-[11px] mt-1 sm:mt-0">
+                        {{ event.old_value }} &rarr; {{ event.new_value }}
+                    </div>
+                </div>
+            {% empty %}
+                <p class="text-xs text-slate-400">Nenhum evento registrado até o momento.</p>
+            {% endfor %}
+        </div>
+    </section>
 </div>
 {% endblock %}

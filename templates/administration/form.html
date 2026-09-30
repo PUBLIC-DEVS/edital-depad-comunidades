@@ -1,22 +1,55 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} — Gestão de editais{% endblock %}
+
+{% block title %}{{ title }} — Gestão de Editais — DEPAD / MDS{% endblock %}
+
 {% block content %}
-<div class="max-w-3xl mx-auto space-y-5">
-  <a href="{{ back_url }}" class="text-sm text-govblue-600">← Voltar</a>
-  <div><span class="text-xs font-semibold uppercase text-slate-500">Administração{% if edital %} · {{ edital.number }}/{{ edital.year }}{% endif %}</span><h1 class="text-2xl font-bold mt-1">{{ title }}</h1></div>
-  {% if help_text %}<p class="text-sm text-slate-600">{{ help_text }}</p>{% endif %}
-  <form method="post" class="bg-white border border-slate-200 rounded-lg p-6 space-y-5">
-    {% csrf_token %}
-    {% if form.non_field_errors %}<div role="alert" class="text-red-800 bg-red-50 p-3 rounded">{{ form.non_field_errors }}</div>{% endif %}
-    {% for field in form %}
-      <div class="space-y-1">
-        <label for="{{ field.id_for_label }}" class="block text-sm font-semibold">{{ field.label }}{% if field.field.required %}<span class="text-red-600"> *</span>{% endif %}</label>
-        {{ field }}
-        {% if field.help_text %}<p class="text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
-        {% if field.errors %}<div role="alert" class="text-sm text-red-700">{{ field.errors }}</div>{% endif %}
-      </div>
-    {% endfor %}
-    <div class="border-t pt-5 flex gap-4 items-center"><button class="bg-govblue-700 text-white px-5 py-2 rounded font-semibold" type="submit">Salvar</button><a href="{{ back_url }}" class="text-sm text-slate-600">Cancelar</a></div>
-  </form>
+<div class="max-w-3xl mx-auto space-y-6">
+    <div class="text-xs text-slate-500">
+        <a href="{{ back_url }}" class="text-[#0248AB] hover:underline font-medium">&larr; Voltar</a>
+    </div>
+
+    <div class="pb-3 border-b border-slate-200">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Administração{% if edital %} · Edital {{ edital.number }}/{{ edital.year }}{% endif %}
+        </span>
+        <h1 class="text-2xl font-bold text-slate-800 mt-1">{{ title }}</h1>
+        {% if help_text %}
+            <p class="text-xs text-slate-600 mt-1">{{ help_text }}</p>
+        {% endif %}
+    </div>
+
+    <form method="post" class="card p-6 sm:p-8 space-y-5">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div role="alert" class="text-xs text-red-900 bg-red-50 p-3.5 rounded-lg border border-red-200">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        {% for field in form %}
+            <div class="space-y-1.5">
+                <label for="{{ field.id_for_label }}" class="form-label">
+                    {{ field.label }}
+                    {% if field.field.required %}<span class="text-[#B4232A] font-bold" aria-hidden="true">*</span>{% endif %}
+                </label>
+                {{ field }}
+                {% if field.help_text %}
+                    <p class="form-hint">{{ field.help_text }}</p>
+                {% endif %}
+                {% if field.errors %}
+                    <div role="alert" class="text-xs text-[#B4232A] font-semibold mt-1">{{ field.errors }}</div>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <div class="pt-5 border-t border-slate-100 flex items-center gap-3">
+            <button class="btn-primary text-xs font-bold" type="submit">
+                Salvar Alterações
+            </button>
+            <a href="{{ back_url }}" class="btn-secondary text-xs">
+                Cancelar
+            </a>
+        </div>
+    </form>
 </div>
 {% endblock %}

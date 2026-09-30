@@ -1,12 +1,170 @@
 {% extends "base.html" %}
+
+{% block title %}Métricas do Edital — DEPAD / MDS{% endblock %}
+
 {% block content %}
-<div class="flex justify-between flex-wrap gap-4 mb-6"><div><h1 class="text-2xl font-bold">Métricas do edital</h1><p class="text-slate-500">A análise inicial e o andamento consolidado são dimensões independentes.</p></div><a class="btn-secondary" href="{% url 'reporting:export-csv' %}{% if selected_edital %}?edital={{ selected_edital.pk }}{% endif %}">Exportar CSV</a></div>
-<form method="get" class="flex gap-3 mb-6"><label class="sr-only" for="metrics-edital">Edital</label><select class="form-select" name="edital" id="metrics-edital"><option value="">Todos os editais</option>{% for e in editais %}<option value="{{ e.pk }}" {% if selected_edital.pk == e.pk %}selected{% endif %}>{{ e.number }}/{{ e.year }} · {{ e.name }}</option>{% endfor %}</select><button class="btn-primary">Consultar</button></form>
-<div class="card p-5 mb-6"><span class="text-slate-500">Recebidos</span><strong class="text-3xl ml-3">{{ summary.total_received }}</strong><p>{{ summary.distributed_count }} distribuídos · {{ summary.unassigned_count }} sem atribuição</p></div>
-<h2 class="text-lg font-bold mb-3">Resultado da análise inicial</h2><div class="grid sm:grid-cols-3 gap-4 mb-6">{% for result, count in summary.initial_results.items %}<div class="card p-5"><p>{{ result }}</p><strong class="text-2xl">{{ count }}</strong></div>{% endfor %}</div>
-<h2 class="text-lg font-bold mb-3">Resultado consolidado / workflow</h2><div class="grid sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">{% for item in summary.consolidated_cards %}<div class="card p-5"><p>{{ item.label }}</p><strong class="text-2xl">{{ item.count }}</strong></div>{% endfor %}</div>
-<div class="grid md:grid-cols-2 gap-6 mb-6"><section class="card p-5"><h2 class="font-bold mb-3">Grupos configurados</h2>{% for group, count in summary.by_group.items %}<p class="flex justify-between py-2 border-b"><span>{{ group }}</span><strong>{{ count }}</strong></p>{% empty %}<p>Sem processos.</p>{% endfor %}</section><section class="card p-5"><h2 class="font-bold mb-3">Distribuição por UF</h2>{% for item in summary.by_uf %}<p class="flex justify-between py-2 border-b"><span>{{ item.state }}</span><strong>{{ item.count }}</strong></p>{% endfor %}</section></div>
-<section class="card p-5 mb-6"><h2 class="font-bold mb-3">Carga dos analistas</h2><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr><th>Analista</th><th>Atribuídos</th><th>Em análise</th><th>Concluídos</th></tr></thead><tbody>{% for item in summary.by_analyst %}<tr><td class="py-2">{{ item.analyst }}</td><td>{{ item.total_assigned }}</td><td>{{ item.under_analysis }}</td><td>{{ item.concluded }}</td></tr>{% endfor %}</tbody></table></div></section>
-<section class="card p-5"><h2 class="font-bold mb-3">Impedimentos na análise inicial</h2>{% for item in top_failures %}<a class="block py-2 text-blue-700" href="{% url 'reporting:failed-requirement' item.code %}?edital={{ item.edital_id }}">{{ item.code }} · {{ item.name }} — {{ item.failure_count }} processos</a>{% empty %}<p>Nenhum impedimento registrado.</p>{% endfor %}</section>
-<a class="btn-secondary inline-block mt-4" href="{% url 'reporting:validations' %}{% if selected_edital %}?edital={{ selected_edital.pk }}{% endif %}">Conferência de dados · {{ anomalies_count }} ocorrências</a>
+<div class="space-y-6">
+    <!-- Header com Ações -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Métricas do Edital</h1>
+            <p class="text-sm text-slate-500">A análise técnica inicial e o andamento consolidado do workflow são dimensões independentes.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <a class="btn-secondary" href="{% url 'reporting:export-csv' %}{% if selected_edital %}?edital={{ selected_edital.pk }}{% endif %}">
+                &darr; Exportar Métricas (CSV)
+            </a>
+            <a class="btn-secondary" href="{% url 'reporting:validations' %}{% if selected_edital %}?edital={{ selected_edital.pk }}{% endif %}">
+                Conferência de Dados ({{ anomalies_count }})
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtro de Edital -->
+    <form method="get" class="bg-white p-4 rounded-lg border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+        <div class="flex-1">
+            <label class="form-label" for="metrics-edital">Selecionar Edital em Monitoramento</label>
+            <select class="form-select" name="edital" id="metrics-edital">
+                <option value="">Todos os editais autorizados</option>
+                {% for e in editais %}
+                    <option value="{{ e.pk }}" {% if selected_edital.pk == e.pk %}selected{% endif %}>
+                        {{ e.number }}/{{ e.year }} — {{ e.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn-primary">
+            Filtrar Métricas
+        </button>
+    </form>
+
+    <!-- Indicador Macro de Recebimento -->
+    <div class="card p-6 border-l-4 border-l-[#0248AB]">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total de Inscrições Recebidas</span>
+                <div class="text-4xl font-extrabold text-slate-900 mt-1">{{ summary.total_received }}</div>
+            </div>
+            <div class="flex gap-4 text-xs font-medium text-slate-600">
+                <span class="px-3 py-1.5 bg-blue-50 text-blue-900 rounded-md border border-blue-200">
+                    <strong>{{ summary.distributed_count }}</strong> distribuídos
+                </span>
+                <span class="px-3 py-1.5 bg-amber-50 text-amber-900 rounded-md border border-amber-200">
+                    <strong>{{ summary.unassigned_count }}</strong> sem atribuição
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Análise Inicial -->
+    <section>
+        <h2 class="text-base font-bold text-slate-800 uppercase tracking-wider mb-3">Resultado da análise inicial</h2>
+        <div class="grid sm:grid-cols-3 gap-4">
+            {% for result, count in summary.initial_results.items %}
+                <div class="card p-5 border-t-2 {% if result == 'APTA' %}border-t-emerald-600{% elif result == 'INAPTA' %}border-t-red-600{% else %}border-t-blue-600{% endif %}">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">{{ result }}</span>
+                    <div class="text-3xl font-extrabold text-slate-900 mt-2">{{ count }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Resultado Consolidado / Workflow -->
+    <section>
+        <h2 class="text-base font-bold text-slate-800 uppercase tracking-wider mb-3">Estágios Consolidados do Workflow</h2>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for item in summary.consolidated_cards %}
+                <div class="card p-4">
+                    <span class="text-xs font-medium text-slate-500">{{ item.label }}</span>
+                    <div class="text-2xl font-bold text-slate-900 mt-1">{{ item.count }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Grupos e UFs -->
+    <div class="grid md:grid-cols-2 gap-6">
+        <section class="card p-5">
+            <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider mb-3 pb-2 border-b border-slate-100">Inscrições por Grupo</h2>
+            <div class="space-y-2">
+                {% for group, count in summary.by_group.items %}
+                    <div class="flex justify-between items-center py-1.5 border-b border-slate-100 text-xs">
+                        <span class="text-slate-700 font-medium">{{ group }}</span>
+                        <strong class="px-2 py-0.5 bg-slate-100 rounded text-slate-800">{{ count }}</strong>
+                    </div>
+                {% empty %}
+                    <p class="text-xs text-slate-400">Sem processos registrados.</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card p-5">
+            <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider mb-3 pb-2 border-b border-slate-100">Distribuição por UF</h2>
+            <div class="space-y-2">
+                {% for item in summary.by_uf %}
+                    <div class="flex justify-between items-center py-1.5 border-b border-slate-100 text-xs">
+                        <span class="text-slate-700 font-medium">{{ item.state }}</span>
+                        <strong class="px-2 py-0.5 bg-slate-100 rounded text-slate-800">{{ item.count }}</strong>
+                    </div>
+                {% empty %}
+                    <p class="text-xs text-slate-400">Sem dados geográficos.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+
+    <!-- Carga dos Analistas -->
+    <section class="card p-5">
+        <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider mb-3 pb-2 border-b border-slate-100">Carga Operacional dos Analistas</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Analista</th>
+                        <th>Atribuídos</th>
+                        <th>Em Análise</th>
+                        <th>Concluídos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in summary.by_analyst %}
+                        <tr>
+                            <td class="font-semibold text-slate-800">{{ item.analyst }}</td>
+                            <td>{{ item.total_assigned }}</td>
+                            <td>
+                                <span class="badge badge-emanalise">{{ item.under_analysis }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-atende">{{ item.concluded }}</span>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-slate-400 py-4">Nenhum analista com carga registrada.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Principais Impedimentos na Análise Inicial -->
+    <section class="card p-5">
+        <h2 class="font-bold text-slate-800 text-sm uppercase tracking-wider mb-3 pb-2 border-b border-slate-100">Principais Impedimentos Técnicos Identificados</h2>
+        <div class="space-y-2">
+            {% for item in top_failures %}
+                <a class="flex justify-between items-center p-2.5 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition text-xs group"
+                   href="{% url 'reporting:failed-requirement' item.code %}?edital={{ item.edital_id }}">
+                    <span class="font-semibold text-slate-800 group-hover:text-[#0248AB]">
+                        <span class="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 mr-2">{{ item.code }}</span>
+                        {{ item.name }}
+                    </span>
+                    <span class="badge badge-naoatende">{{ item.failure_count }} processo(s)</span>
+                </a>
+            {% empty %}
+                <p class="text-xs text-slate-500">Nenhum impedimento registrado.</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>
 {% endblock %}
