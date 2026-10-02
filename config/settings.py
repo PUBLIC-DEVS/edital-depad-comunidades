@@ -122,6 +122,24 @@ LOGOUT_REDIRECT_URL = "login"
 # Authentication Adapter Configuration
 AUTH_ADAPTER = os.getenv("AUTH_ADAPTER", "local")
 
+# Microsoft Entra ID (Azure AD) / MSAL Configuration
+# Preenchidos via .env. Só são usados quando AUTH_ADAPTER=microsoft.
+MS_CLIENT_ID = os.getenv("MS_CLIENT_ID", "")
+MS_CLIENT_SECRET = os.getenv("MS_CLIENT_SECRET", "")
+MS_TENANT_ID = os.getenv("MS_TENANT_ID", "")
+# Authority padrão single-tenant. Pode ser sobrescrita no .env se necessário.
+MS_AUTHORITY = os.getenv(
+    "MS_AUTHORITY",
+    f"https://login.microsoftonline.com/{MS_TENANT_ID}" if MS_TENANT_ID else "",
+)
+# Deve coincidir EXATAMENTE com o Redirect URI registrado no portal do Entra ID.
+MS_REDIRECT_URI = os.getenv(
+    "MS_REDIRECT_URI",
+    "http://localhost:8000/auth/microsoft/callback/",
+)
+# Escopos de recurso. openid/profile/offline_access são adicionados pelo MSAL.
+MS_SCOPES = [s.strip() for s in os.getenv("MS_SCOPES", "User.Read").split(",") if s.strip()]
+
 # Logging Configuration
 LOGGING = {
     "version": 1,
