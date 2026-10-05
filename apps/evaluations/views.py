@@ -212,6 +212,25 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
 
 @login_required
 @require_POST
+def evaluation_reopen_view(request: HttpRequest, evaluation_id: int) -> HttpResponse:
+    """Reabre uma análise concluída para edição pelo analista responsável."""
+    from django.core.exceptions import PermissionDenied, ValidationError
+    from django.shortcuts import get_object_or_404
+
+    evaluation = get_object_or_404(Evaluation, pk=evaluation_id)
+    # Garante que o usuário pode acessar o processo antes de qualquer operação.
+    enforce_submission_access(request, evaluation.submission_id)
+    try:
+        EvaluationService.reopen_evaluation(evaluation, request.user)
+    except (ValidationError, PermissionDenied) as exc:
+        messages.error(request, "; ".join(getattr(exc, "messages", None) or [str(exc)]))
+    else:
+        messages.success(request, "Análise reaberta para edição.")
+    return redirect("evaluation-workspace", submission_id=evaluation.submission_id)
+
+
+@login_required
+@require_POST
 def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpResponse:
     """Conclui a avaliação documental após validação formal de consistência."""
     evaluation = enforce_evaluation_edit_access(request, evaluation_id)
@@ -246,6 +265,9 @@ def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpRe
 
 def workspace_context(request, evaluation, bound_forms=None):
     can_edit = RolePermissionPolicy.can_edit_evaluation(request.user, evaluation)
+    can_reopen = RolePermissionPolicy.can_reopen_evaluation(
+        request.user, evaluation
+    ) and EvaluationService.is_reopenable(evaluation)
     rows = definition_rows(evaluation)
     sections = {}
     outcomes = []
@@ -289,6 +311,7 @@ def workspace_context(request, evaluation, bound_forms=None):
         "document_sections": list(sections.values()),
         "assessment": assessment,
         "can_edit": can_edit,
+        "can_reopen": can_reopen,
         "can_conclude": assessment.is_complete,
         "progress_percent": round(assessment.evaluated_checks * 100 / assessment.total_checks)
         if assessment.total_checks

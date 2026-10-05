@@ -19,7 +19,11 @@ class RolePermissionPolicy:
 
     @staticmethod
     def can_view_all_submissions(user: User) -> bool:
-        """Coordenadores, Distribuidores, Administradores e Consulta veem o conjunto completo."""
+        """Coord., Distribuidores, Admins, Consulta e Revisores veem o conjunto completo.
+
+        Revisores têm visão ampla de leitura (todas as abas) para dar contexto à revisão;
+        isso não lhes concede poderes de escrita (distribuir, gerar ranking, editar análise).
+        """
         if not user.is_authenticated:
             return False
         if user.is_superuser:
@@ -29,6 +33,7 @@ class RolePermissionPolicy:
             User.Role.COORDENADOR,
             User.Role.DISTRIBUIDOR,
             User.Role.CONSULTA,
+            User.Role.REVISOR,
         }
         return user.role in allowed_roles
 
@@ -100,6 +105,22 @@ class RolePermissionPolicy:
         return False
 
     @staticmethod
+    def can_reopen_evaluation(user: User, evaluation: Evaluation) -> bool:
+        """Quem pode reabrir uma análise concluída para edição.
+
+        O analista dono pode reabrir a própria análise (editar registro antigo);
+        coordenação e administração também podem. A reabertura em si ainda é restrita
+        pelas regras de workflow aplicadas no EvaluationService.reopen_evaluation.
+        """
+        if not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        if user.role == User.Role.ANALISTA:
+            return evaluation.analyst_id == user.id
+        return user.role in {User.Role.COORDENADOR, User.Role.ADMINISTRADOR}
+
+    @staticmethod
     def can_edit_review(user: User, review: Review) -> bool:
         """Revisor só pode editar sua própria revisão enquanto pendente."""
         if not user.is_authenticated:
@@ -156,16 +177,12 @@ class ScopedQuerySetSelector:
             User.Role.COORDENADOR,
             User.Role.ADMINISTRADOR,
             User.Role.CONSULTA,
+            User.Role.REVISOR,
         }:
             return queryset
 
         if user.role == User.Role.ANALISTA:
             return queryset.filter(analyst=user)
-
-        if user.role == User.Role.REVISOR:
-            return queryset.filter(
-                Q(review__reviewer=user) | Q(review__reviewer__isnull=True, review__isnull=False)
-            )
 
         return queryset.none()
 

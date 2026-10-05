@@ -42,7 +42,11 @@ from apps.submissions.services.workflow import WorkflowService
 
 @login_required
 @require_role(
-    User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA
+    User.Role.DISTRIBUIDOR,
+    User.Role.COORDENADOR,
+    User.Role.ADMINISTRADOR,
+    User.Role.CONSULTA,
+    User.Role.REVISOR,
 )
 @operational_edital_required
 def submission_list_view(request: HttpRequest) -> HttpResponse:

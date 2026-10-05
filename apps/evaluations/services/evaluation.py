@@ -192,6 +192,110 @@ class EvaluationService:
         )
         return assessment
 
+    @staticmethod
+    def is_reopenable(evaluation: Evaluation) -> bool:
+        """Indica (sem efeitos colaterais) se uma análise concluída pode ser reaberta agora.
+
+        Espelha os guardrails de reopen_evaluation para controlar a exibição do botão.
+        """
+        if evaluation.status != Evaluation.Status.COMPLETED:
+            return False
+        from apps.reviews.models import Review
+        from apps.submissions.services.workflow import WorkflowService
+
+        current = evaluation.submission.workflow_status
+        target = Submission.WorkflowStatus.UNDER_ANALYSIS
+        if current != target and target not in WorkflowService.ALLOWED_TRANSITIONS.get(
+            current, set()
+        ):
+            return False
+        review = Review.objects.filter(evaluation=evaluation).first()
+        if review and (review.status != Review.Status.PENDING or review.reviewer_id is not None):
+            return False
+        return True
+
+    @classmethod
+    @transaction.atomic
+    def reopen_evaluation(cls, evaluation: Evaluation, actor: User) -> Evaluation:
+        """Reabre uma análise concluída, devolvendo-a ao estágio de rascunho para edição.
+
+        Permite ao analista responsável (ou à coordenação) corrigir um registro antigo.
+        A operação é restrita para preservar a integridade do fluxo: só é possível quando
+        o processo ainda pode retornar para "Em Análise" e nenhuma revisão foi iniciada.
+        """
+        from apps.accounts.permissions import RolePermissionPolicy
+        from apps.reviews.models import Review
+        from apps.submissions.services.workflow import WorkflowService
+
+        evaluation = (
+            Evaluation.objects.select_for_update()
+            .select_related("submission")
+            .get(pk=evaluation.pk)
+        )
+        if not RolePermissionPolicy.can_reopen_evaluation(actor, evaluation):
+            raise PermissionDenied("Você não tem permissão para reabrir esta análise.")
+        if evaluation.status != Evaluation.Status.COMPLETED:
+            raise ValidationError("Apenas análises concluídas podem ser reabertas.")
+
+        submission = Submission.objects.select_for_update().get(pk=evaluation.submission_id)
+        current = submission.workflow_status
+        target = Submission.WorkflowStatus.UNDER_ANALYSIS
+
+        # Bloqueia se uma revisão já foi atribuída ou concluída: nesse caso a reabertura
+        # depende da coordenação para não descartar trabalho de revisão em andamento.
+        review = Review.objects.filter(evaluation=evaluation).first()
+        if review and (
+            review.status != Review.Status.PENDING or review.reviewer_id is not None
+        ):
+            raise ValidationError(
+                "Já existe revisão atribuída ou concluída para esta análise; "
+                "a reabertura precisa ser tratada pela coordenação."
+            )
+
+        needs_transition = current != target
+        if needs_transition and target not in WorkflowService.ALLOWED_TRANSITIONS.get(
+            current, set()
+        ):
+            raise ValidationError(
+                "A reabertura não é permitida no estágio atual do processo "
+                f"({submission.get_workflow_status_display()}). Solicite à coordenação."
+            )
+
+        evaluation.status = Evaluation.Status.DRAFT
+        evaluation.completed_at = None
+        evaluation.save(update_fields=["status", "completed_at", "updated_at"])
+
+        if needs_transition:
+            WorkflowService.transition(
+                submission,
+                target,
+                actor,
+                reason="Reabertura da análise para edição pelo responsável.",
+            )
+
+        # Remove a tarefa de revisão pendente não atribuída, evitando um registro órfão.
+        if review:
+            review_id = review.id
+            review.delete()
+            AuditEvent.objects.create(
+                actor=actor,
+                entity_type="Review",
+                entity_id=str(review_id),
+                action="CANCEL_REVIEW_TASK",
+                metadata={"reason": "Reabertura da análise pelo analista responsável."},
+            )
+
+        AuditEvent.objects.create(
+            actor=actor,
+            entity_type="Evaluation",
+            entity_id=str(evaluation.id),
+            action="REOPEN",
+            old_value=Evaluation.Status.COMPLETED,
+            new_value=Evaluation.Status.DRAFT,
+            metadata={"processo_sei": submission.processo_sei},
+        )
+        return evaluation
+
     @classmethod
     @transaction.atomic
     def conclude_evaluation(

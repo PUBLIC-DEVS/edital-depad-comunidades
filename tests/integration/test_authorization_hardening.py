@@ -17,7 +17,9 @@ pytestmark = pytest.mark.django_db
     "role,allowed",
     [
         ("analyst", False),
-        ("reviewer", False),
+        # Revisores têm visão ampla de leitura (todas as abas, incluindo métricas e
+        # classificação); escrita (gerar snapshot) permanece restrita à coordenação.
+        ("reviewer", True),
         ("distributor", False),
         ("consulta", True),
         ("coord", True),

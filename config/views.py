@@ -23,12 +23,11 @@ def dashboard(request):
         "ADMINISTRADOR",
         "COORDENADOR",
         "CONSULTA",
+        "REVISOR",
     }:
         from apps.reporting.views import operational_home_view
 
         return operational_home_view(request)
     if request.user.role == "ANALISTA":
         return redirect("my-evaluations")
-    if request.user.role == "REVISOR":
-        return redirect("review-list")
     return redirect("submission-list")

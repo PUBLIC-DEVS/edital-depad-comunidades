@@ -21,4 +21,7 @@ urlpatterns = [
     path(
         "<int:evaluation_id>/concluir/", views.evaluation_conclude_view, name="evaluation-conclude"
     ),
+    path(
+        "<int:evaluation_id>/reabrir/", views.evaluation_reopen_view, name="evaluation-reopen"
+    ),
 ]

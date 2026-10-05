@@ -14,7 +14,7 @@ from apps.submissions.selectors import operational_process_context
 
 
 @login_required
-@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA")
+@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA", "REVISOR")
 @operational_edital_required
 def operational_home_view(request):
     context = operational_process_context(request, distribute=False)
@@ -23,7 +23,7 @@ def operational_home_view(request):
 
 
 @login_required
-@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA")
+@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA", "REVISOR")
 @operational_edital_required
 def dashboard_metrics_view(request):
     edital = request.operational_edital
@@ -41,7 +41,7 @@ def dashboard_metrics_view(request):
 
 
 @login_required
-@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA")
+@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA", "REVISOR")
 @operational_edital_required
 def validation_insights_view(request):
     """Exibe o painel de conferência, exceções e auditoria de validações."""
@@ -58,7 +58,7 @@ def validation_insights_view(request):
 
 
 @login_required
-@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA")
+@require_role("ADMINISTRADOR", "COORDENADOR", "CONSULTA", "REVISOR")
 @operational_edital_required
 def failed_requirement_processes_view(request, code: str):
     """Lista detalhada de processos reprovados em um requisito específico."""
@@ -81,7 +81,7 @@ def failed_requirement_processes_view(request, code: str):
 
 
 @login_required
-@require_role(["ADMINISTRADOR", "COORDENADOR", "CONSULTA"])
+@require_role(["ADMINISTRADOR", "COORDENADOR", "CONSULTA", "REVISOR"])
 @operational_edital_required
 def metrics_export_csv_view(request):
     """Exporta resumo de métricas e carga de analistas em formato CSV auditável."""
