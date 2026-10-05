@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ${DEPAD_DB_CONTAINER:-edital_postgres}
+    environment:
+      POSTGRES_DB: edital_db
+      POSTGRES_USER: edital_user
+      POSTGRES_PASSWORD: edital_pass
+    ports:
+      - "${DEPAD_DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edital_user -d edital_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: ${DEPAD_WEB_CONTAINER:-edital_web}
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "${DEPAD_WEB_PORT:-8000}:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-dev-key-change-in-prod-minimum-50-chars
+      - ALLOWED_HOSTS=*
+      - DATABASE_URL=postgres://edital_user:edital_pass@db:5432/edital_db
+      - AUTH_ADAPTER=local
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

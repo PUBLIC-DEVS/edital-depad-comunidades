@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-[#F6F7FB]">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Gestão e Análise de Edital — DEPAD / MDS{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#F0F2F8',
+                            100: '#E4E8F4',
+                            200: '#CBD5F5',
+                            600: '#3F4AB7',
+                            700: '#343DA5',
+                            800: '#2B3291',
+                            900: '#222873',
+                            950: '#171B55',
+                        },
+                        action: {
+                            50: '#F0F6FF',
+                            100: '#E0ECFF',
+                            500: '#1769D2',
+                            600: '#0B57C5',
+                            700: '#0248AB',
+                            800: '#003682',
+                        },
+                        accentred: {
+                            50: '#FEF2F2',
+                            100: '#FEE2E2',
+                            500: '#E33A40',
+                            600: '#D12B32',
+                            700: '#B4232A',
+                            800: '#93191E',
+                        },
+                        govblue: {
+                            50: '#F0F2F8',
+                            100: '#E0ECFF',
+                            600: '#0B57C5',
+                            700: '#0248AB',
+                            800: '#222873',
+                            900: '#171B55',
+                        },
+                        status: {
+                            atende: '#16a34a',
+                            naoatende: '#dc2626',
+                            naoenviado: '#d97706',
+                            naoaplicavel: '#64748b',
+                            emanalise: '#0B57C5',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <!-- Alpine.js for lightweight declarative UI only -->
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full flex flex-col text-[#182230] antialiased bg-[#F6F7FB]" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <div id="htmx-progress-bar"></div>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-[#171B55] focus:font-bold focus:px-4 focus:py-2 focus:rounded-md focus:shadow-lg focus:ring-2 focus:ring-[#0B57C5]">
+        Pular para o conteúdo principal
+    </a>
+    <header class="bg-[#171B55] text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between min-h-16 py-2 sm:py-0 items-center gap-2">
+                <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
+                    <div class="font-bold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">
+                        DEPAD / MDS
+                    </div>
+                    <span class="hidden sm:inline text-blue-300/60 font-light" aria-hidden="true">|</span>
+                    <a href="{% url 'dashboard' %}" class="hidden sm:inline text-sm sm:text-base font-semibold text-white hover:text-blue-100 transition truncate">
+                        Sistema de Gestão e Análise de Edital
+                    </a>
+                    <a href="{% url 'dashboard' %}" class="sm:hidden text-xs text-blue-200 hover:text-white truncate">
+                        Edital
+                    </a>
+                </div>
+                <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                    {% if user.is_authenticated %}
+                        <div class="text-xs text-blue-100 flex items-center gap-1.5">
+                            <span class="font-medium text-white max-w-[90px] sm:max-w-none truncate">{{ user.get_full_name|default:user.username }}</span>
+                            <span class="hidden sm:inline-block px-2 py-0.5 text-[11px] font-semibold bg-[#222873] text-blue-100 rounded border border-blue-400/30">
+                                {{ user.get_role_display }}
+                            </span>
+                        </div>
+                        <form method="post" action="{% url 'logout' %}" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="text-xs font-medium bg-[#222873] hover:bg-[#2B3291] text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded border border-white/10 transition shadow-sm">
+                                Sair
+                            </button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="text-xs bg-white text-[#0248AB] font-semibold px-3 py-1.5 rounded hover:bg-blue-50 transition shadow-sm">
+                            Entrar
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if user.is_authenticated %}
+            <nav class="bg-[#222873] border-t border-white/10" aria-label="Navegação Principal">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex space-x-1 sm:space-x-2 text-xs font-medium py-1.5 overflow-x-auto">
+                        {% if user.is_superuser or user.role == 'ADMINISTRADOR' or user.role == 'COORDENADOR' or user.role == 'CONSULTA' %}
+                          <a href="{% url 'dashboard' %}" class="nav-link" {% if request.path == '/' %}aria-current="page"{% endif %}>Início</a>
+                          <a href="{% url 'submission-list' %}" class="nav-link" {% if '/processos/' in request.path %}aria-current="page"{% endif %}>Processos</a>
+                          {% if user.is_superuser or user.role != 'CONSULTA' %}<a href="{% url 'review-list' %}" class="nav-link" {% if '/revisoes/' in request.path %}aria-current="page"{% endif %}>Revisão</a>{% endif %}
+                          <a href="{% url 'ranking-index' %}" class="nav-link" {% if '/classificacao/' in request.path %}aria-current="page"{% endif %}>Classificação</a>
+                          {% if user.is_superuser or user.role != 'CONSULTA' %}<a href="{% url 'administration-index' %}" class="nav-link" {% if '/administracao/' in request.path %}aria-current="page"{% endif %}>Administração</a>{% endif %}
+                        {% elif user.role == 'ANALISTA' %}
+                          <a href="{% url 'my-evaluations' %}" class="nav-link" aria-current="page">Minhas Análises</a>
+                        {% elif user.role == 'REVISOR' %}
+                          <a href="{% url 'review-list' %}" class="nav-link" aria-current="page">Revisão</a>
+                        {% elif user.role == 'DISTRIBUIDOR' %}
+                          <a href="{% url 'submission-list' %}" class="nav-link" aria-current="page">Processos</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </nav>
+        {% endif %}
+        <div class="depad-accent-bar" aria-hidden="true"></div>
+    </header>
+
+    <main id="main-content" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% if messages %}
+            <div class="mb-4 space-y-2" role="region" aria-label="Mensagens do sistema">
+                {% for message in messages %}
+                    <div class="p-3.5 text-sm rounded-lg shadow-xs flex items-start gap-2.5 {% if message.tags == 'error' %}bg-red-50 text-red-900 border-l-4 border-[#B4232A]{% elif message.tags == 'success' %}bg-emerald-50 text-emerald-900 border-l-4 border-emerald-600{% else %}bg-blue-50 text-blue-900 border-l-4 border-[#0B57C5]{% endif %}">
+                        <span class="font-bold">{% if message.tags == 'error' %}!{% elif message.tags == 'success' %}&check;{% else %}&#8505;{% endif %}</span>
+                        <div>{{ message }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-1">
+            <p class="font-semibold text-slate-700">Departamento de Entidades de Apoio e Acolhimento — DEPAD</p>
+            <p class="text-slate-500">Secretaria Nacional de Cuidados e Prevenção às Drogas — SENAPRED</p>
+            <p class="text-slate-400 text-[11px]">Ministério do Desenvolvimento e Assistência Social, Família e Combate à Fome</p>
+        </div>
+    </footer>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

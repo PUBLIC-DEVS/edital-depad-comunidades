@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Restrições de Participação — DEPAD/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center space-x-2 text-xs text-slate-500 pb-3 border-b border-slate-200">
+        <a href="{% url 'submission-anomalies' %}" class="text-govblue-600 hover:text-govblue-800">&larr; Voltar para Fila de Exceções</a>
+        <span>/</span>
+        <span class="font-bold text-slate-700">Restrições Cadastradas</span>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Restrições de Participação</h1>
+            <p class="text-sm text-slate-500 mt-1">Fontes configuráveis de impedimento por edital e CNPJ. Ativar uma restrição bloqueia distribuição e início de análise.</p>
+        </div>
+        <a href="{% url 'restriction-create' %}" class="depad-button depad-button-primary">
+            + Cadastrar Restrição
+        </a>
+    </div>
+
+    <div class="space-y-3">
+        {% for restriction in restrictions %}
+            <article class="depad-card">
+                <div class="flex flex-wrap justify-between gap-3">
+                    <div class="space-y-1.5">
+                        <div class="flex items-center gap-2">
+                            {% if restriction.active %}
+                                <span class="depad-badge depad-badge-danger" aria-label="Restrição ativa">⛔ IMPEDIMENTO ATIVO</span>
+                            {% else %}
+                                <span class="depad-badge depad-badge-neutral">Restrição inativa</span>
+                            {% endif %}
+                            <span class="text-xs font-semibold text-slate-700">Edital {{ restriction.edital.number }}/{{ restriction.edital.year }}</span>
+                        </div>
+                        <p class="font-mono text-sm font-bold text-slate-900">CNPJ {{ restriction.cnpj }}</p>
+                        <p class="text-sm text-slate-700 mt-1">{{ restriction.reason }}</p>
+                        <p class="text-xs text-slate-500 mt-2">
+                            Fonte: <strong>{{ restriction.source }}</strong> · Referência: {{ restriction.reference_period|default:"não informada" }} · Cadastrada por {{ restriction.created_by|default:"sistema" }} em {{ restriction.created_at|date:"d/m/Y H:i" }}
+                        </p>
+                    </div>
+                    <div>
+                        <a class="depad-button depad-button-outline text-xs py-1 px-3" href="{% url 'restriction-edit' restriction.pk %}">
+                            Editar
+                        </a>
+                    </div>
+                </div>
+            </article>
+        {% empty %}
+            <div class="depad-card text-center py-12 text-slate-400">
+                Nenhuma fonte de restrição cadastrada.
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

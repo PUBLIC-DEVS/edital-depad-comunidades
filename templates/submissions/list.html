@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Processos — DEPAD / MDS{% endblock %}
+{% block content %}
+<div class="space-y-5" x-data="{selectedIds: []}">
+ <header class="flex flex-wrap justify-between items-end gap-4">
+  <div><p class="eyebrow">Edital {{ edital.number }}/{{ edital.year }}</p><h1 class="text-2xl font-bold mt-1">Processos</h1><p class="text-sm text-slate-500 mt-1">{{ total_count }} inscrições · distribuição e acompanhamento</p></div>
+  {% if can_distribute %}<div class="flex gap-2"><a class="btn-secondary" href="{% url 'submission-import-csv' %}">Importar CSV</a><a class="btn-primary" href="{% url 'submission-create' %}">+ Novo processo</a></div>{% endif %}
+ </header>
+ {% include "submissions/partials/filters.html" %}
+ {% if can_distribute %}
+ <form action="{% url 'submission-bulk-assign' %}" method="post" class="bulk-toolbar" @submit="$refs.ids.value=selectedIds.join(',')">
+ {% csrf_token %}<input type="hidden" name="selected_ids" x-ref="ids"><span class="text-sm font-medium" x-text="selectedIds.length + ' selecionados'">Selecione processos para distribuir</span>
+ <label class="sr-only" for="bulk-analyst">Atribuir ao analista</label><select class="form-select" name="analyst" id="bulk-analyst" required><option value="">Atribuir a…</option>{% for a in analysts %}<option value="{{ a.pk }}">{{ a.get_full_name|default:a.username }}</option>{% endfor %}</select>
+ <button class="btn-primary" type="submit" :disabled="!selectedIds.length">Distribuir selecionados</button>
+ </form>
+ {% endif %}
+ <div id="submissions-table-container">{% include "submissions/partials/table.html" %}</div>
+</div>
+{% endblock %}

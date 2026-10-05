@@ -1,0 +1,127 @@
+/**
+ * Design Tokens — DEPAD / MDS
+ * Sistema de Gestão e Análise de Editais
+ * 
+ * Cores derivadas da referência visual (identidade_visual.pdf):
+ * - Azul Índigo Profundo (Brand): #2B3291 / #222873 / #171B55
+ * - Azul Ação / Interativo (Action): #0248AB / #0B57C5 / #1769D2
+ * - Vermelho Acolhimento / Alerta (Accent Red): #B4232A / #D12B32 / #E33A40
+ * - Superfícies Neutras e Claras: #FFFFFF / #F6F7FB / #F0F2F8
+ */
+
+:root {
+  /* ==========================================================================
+     1. PALETA DE CORES (BRAND & ACTION)
+     ========================================================================== */
+  
+  /* Brand Primary (Índigo Institucional DEPAD) */
+  --brand-950: #171B55;
+  --brand-900: #222873;
+  --brand-800: #2B3291;
+  --brand-700: #343DA5;
+  --brand-600: #3F4AB7;
+  --brand-200: #CBD5F5;
+  --brand-100: #E4E8F4;
+  --brand-50:  #F0F2F8;
+
+  /* Action & Interactivity (Azul Royal Operacional) */
+  --action-900: #002B66;
+  --action-800: #003682;
+  --action-700: #0248AB;
+  --action-600: #0B57C5;
+  --action-500: #1769D2;
+  --action-400: #3B82F6;
+  --action-100: #E0ECFF;
+  --action-50:  #F0F6FF;
+
+  /* Accent (Vermelho de Acento / Alertas / Destrutivo - nunca ação primária) */
+  --accent-red-900: #7A1418;
+  --accent-red-800: #93191E;
+  --accent-red-700: #B4232A;
+  --accent-red-600: #D12B32;
+  --accent-red-500: #E33A40;
+  --accent-red-200: #FECACA;
+  --accent-red-100: #FEE2E2;
+  --accent-red-50:  #FEF2F2;
+
+  /* ==========================================================================
+     2. SUPERFÍCIES E FUNDOS (SURFACES)
+     ========================================================================== */
+  --surface-page:    #F6F7FB;
+  --surface-raised:  #FFFFFF;
+  --surface-subtle:  #F0F2F8;
+  --surface-muted:   #E9ECF2;
+  --surface-overlay: rgba(15, 23, 42, 0.45);
+
+  /* ==========================================================================
+     3. TIPOGRAFIA & TEXTO (NEUTRAL CONTRAST)
+     ========================================================================== */
+  --text-primary:    #182230;
+  --text-secondary:  #475467;
+  --text-muted:      #667085;
+  --text-inverse:    #FFFFFF;
+  --text-inverse-subtle: #D0D7E5;
+
+  /* Font Stacks */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* ==========================================================================
+     4. BORDAS E DIVISORES
+     ========================================================================== */
+  --border-subtle:   #E5E9F0;
+  --border-default:  #D8DEE9;
+  --border-strong:   #C2CAD8;
+  --border-brand:    #343DA5;
+  --border-action:   #0B57C5;
+
+  /* ==========================================================================
+     5. CORES SEMÂNTICAS (FEEDBACK & WORKFLOW)
+     ========================================================================== */
+  /* Sucesso / Apto */
+  --success-bg:      #DCFCE7;
+  --success-border:  #86EFAC;
+  --success-text:    #14532D;
+
+  /* Aviso / Pendente / Diligência */
+  --warning-bg:      #FEF3C7;
+  --warning-border:  #FCD34D;
+  --warning-text:    #78350F;
+
+  /* Erro / Inapto / Falha */
+  --danger-bg:       #FEE2E2;
+  --danger-border:   #FCA5A5;
+  --danger-text:     #7F1D1D;
+
+  /* Informativo / Em Análise */
+  --info-bg:         #EFF6FF;
+  --info-border:     #BFDBFE;
+  --info-text:       #1E3A8A;
+
+  /* Diligência / Revisão */
+  --purple-bg:       #F3E8FF;
+  --purple-border:   #D8B4FE;
+  --purple-text:     #581C87;
+
+  /* ==========================================================================
+     6. RAIOS E SOMBRAS (RADII & SHADOWS)
+     ========================================================================== */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+
+  /* Acessibilidade - Focus Ring */
+  --focus-ring: 0 0 0 3px rgba(11, 87, 197, 0.35);
+
+  /* Transições suaves */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Configuração de Editais — DEPAD / MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
+        <div>
+            <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gestão Normativa</span>
+            <h1 class="text-2xl font-bold text-slate-800 mt-0.5">Editais e Parâmetros</h1>
+            <p class="text-sm text-slate-500">Configure uma nova edição ou reutilize parâmetros de editais anteriores sem manipulação de planilhas.</p>
+        </div>
+        {% if can_configure %}
+            <a href="{% url 'edital-create' %}" class="btn-primary text-xs">
+                + Novo Edital
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for edital in editais %}
+            <a href="{% url 'edital-detail' edital.pk %}" class="card p-5 hover:border-[#0B57C5] hover:shadow-md transition group flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start gap-2">
+                        <span class="badge {% if edital.status == 'ACTIVE' %}badge-atende{% elif edital.status == 'DRAFT' %}badge-rascunho{% elif edital.status == 'CLOSED' %}badge-naoaplicavel{% else %}badge-distribuido{% endif %}">
+                            {{ edital.get_status_display }}
+                        </span>
+                        <span class="text-[11px] font-mono font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                            v{{ edital.rules_version }}
+                        </span>
+                    </div>
+                    <h2 class="font-bold text-slate-900 group-hover:text-[#0248AB] transition mt-3 text-base">
+                        {{ edital.number }}/{{ edital.year }} — {{ edital.name }}
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-2 line-clamp-2">
+                        {{ edital.description|default:"Sem descrição informada." }}
+                    </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
+                    <span>Vigência:</span>
+                    <strong class="text-slate-700 font-mono">{{ edital.opens_at|date:"d/m/Y" }} a {{ edital.closes_at|date:"d/m/Y" }}</strong>
+                </div>
+            </a>
+        {% empty %}
+            <div class="card p-8 col-span-full text-center space-y-3">
+                <p class="text-slate-500 text-sm">Nenhum edital cadastrado no sistema.</p>
+                {% if can_configure %}
+                    <a href="{% url 'edital-create' %}" class="btn-primary inline-flex text-xs">
+                        Cadastrar Primeiro Edital
+                    </a>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

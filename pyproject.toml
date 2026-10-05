@@ -1,0 +1,84 @@
+[project]
+name = "edital-depad-comunidades"
+version = "0.1.0"
+description = "Sistema de Gestão e Análise de Edital - DEPED / MDS"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "Django>=5.2.17,<5.3",
+    "psycopg[binary]>=3.2",
+    "dj-database-url>=2.2",
+    "python-dotenv>=1.0",
+    "msal>=1.31",
+]
+
+[project.optional-dependencies]
+legacy = ["openpyxl>=3.1"]
+dev = [
+    "pytest>=8.0",
+    "pytest-django>=4.9",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "openpyxl>=3.1",  # historical regression is part of development/CI only
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["apps*", "config*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "migrations",
+    "staticfiles",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C4",  # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "B904",  # allow raise without from inside custom exceptions where clean
+    "B008",  # do not perform function calls in argument defaults
+    "E501",  # line length handled by ruff format
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "apps"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = "--strict-markers -ra"
+markers = [
+    "legacy: synthetic importer and historical normalization tests (not real parity)",
+    "legacy_real: external historical workbook golden master; requires LEGACY_XLSX_PATH",
+    "slow: tests with extensive dataset setup",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["apps", "config"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/wsgi.py",
+    "*/asgi.py",
+    "config/settings.py",
+]

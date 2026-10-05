@@ -1,0 +1,100 @@
+"""Formulários de revisão de conformidade e gestão de diligências."""
+
+from django import forms
+
+from apps.evaluations.models import CheckResult
+from apps.reviews.models import Diligence, Review
+from apps.submissions.models import Submission
+
+
+class ReviewConcludeForm(forms.ModelForm):
+    """Formulário para emissão do parecer conclusivo da revisão."""
+
+    class Meta:
+        model = Review
+        fields = ["decision_notes"]
+        labels = {"decision_notes": "Observação final da revisão"}
+        widgets = {
+            "decision_notes": forms.Textarea(
+                attrs={
+                    "rows": 4,
+                    "placeholder": "Fundamentação técnica da conclusão da revisão...",
+                    "class": "form-input",
+                }
+            ),
+        }
+
+
+class DiligenceCreateForm(forms.ModelForm):
+    """Formulário para abertura de diligência no processo."""
+
+    deadline = forms.DateField(required=True, widget=forms.DateInput(attrs={"type": "date"}))
+    unsatisfied_return_status = forms.ChoiceField(
+        required=False,
+        label="Estágio após diligência não saneada",
+        choices=[("", "Política ainda não definida")]
+        + [
+            (code, label)
+            for code, label in Submission.WorkflowStatus.choices
+            if code in {"UNDER_ANALYSIS", "PENDING_REVIEW", "ELIGIBLE_FOR_RANKING", "INELIGIBLE"}
+        ],
+        help_text="Decisão expressa do coordenador. Sem política, a conclusão não saneada será bloqueada.",
+    )
+    related_check_results = forms.ModelMultipleChoiceField(
+        queryset=CheckResult.objects.none(),
+        required=False,
+        label="Itens documentais relacionados",
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Selecione somente os itens que fundamentam esta diligência.",
+    )
+
+    def __init__(self, *args, actor=None, submission=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if submission and hasattr(submission, "evaluation"):
+            self.fields[
+                "related_check_results"
+            ].queryset = submission.evaluation.check_results.select_related(
+                "requirement_check", "requirement"
+            )
+        if actor and not (actor.is_superuser or actor.role in {"COORDENADOR", "ADMINISTRADOR"}):
+            self.fields.pop("unsatisfied_return_status")
+
+    class Meta:
+        model = Diligence
+        fields = ["reason", "deadline", "unsatisfied_return_status"]
+        widgets = {
+            "deadline": forms.DateInput(attrs={"type": "date", "class": "form-input"}),
+            "reason": forms.Textarea(
+                attrs={
+                    "rows": 4,
+                    "placeholder": "Descreva com clareza o motivo e os documentos a serem apresentados...",
+                    "class": "form-input",
+                }
+            ),
+        }
+
+
+class DiligenceResponseForm(forms.ModelForm):
+    """Formulário para registro da resposta e conclusão da diligência."""
+
+    result = forms.ChoiceField(
+        choices=[
+            (Diligence.Result.SANEADA, Diligence.Result.SANEADA.label),
+            (Diligence.Result.NAO_SANEADA, Diligence.Result.NAO_SANEADA.label),
+        ],
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
+    class Meta:
+        model = Diligence
+        fields = ["response", "result"]
+        widgets = {
+            "result": forms.Select(attrs={"class": "form-select"}),
+            "response": forms.Textarea(
+                attrs={
+                    "rows": 4,
+                    "placeholder": "Teor da resposta, número do documento SEI de juntada...",
+                    "class": "form-input",
+                }
+            ),
+        }

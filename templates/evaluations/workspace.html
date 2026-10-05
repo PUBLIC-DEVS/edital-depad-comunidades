@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Análise {{ submission.processo_sei }} — DEPAD / MDS{% endblock %}
+{% block content %}
+<div id="analysis-workspace" class="analysis-workspace space-y-5">
+ <a class="text-sm text-action-700 font-semibold" href="{% url 'my-evaluations' %}">← Minhas análises</a>
+ <header><p class="eyebrow">{{ submission.target_group }} · {{ submission.municipality.name }}/{{ submission.municipality.state }}</p><h1 class="text-xl sm:text-2xl font-bold font-mono mt-2">{{ submission.processo_sei }}</h1><p class="text-sm mt-2">{{ submission.institution.name }} <span class="text-slate-500 font-mono">· {{ submission.institution.formatted_cnpj }}</span></p></header>
+ {% include "evaluations/partials/summary_panel.html" %}
+ <div class="document-list">
+ {% for section in document_sections %}
+  <section class="document-block" aria-labelledby="document-{{ section.number }}">
+    <h2 id="document-{{ section.number }}"><span class="document-number">{{ section.number }}</span>{{ section.requirement.name }}</h2>
+    {% for item in section.checks %}
+    <form class="check-form" method="post" action="{% url 'evaluation-save-draft' evaluation.pk %}" {% if can_edit %}hx-post="{% url 'evaluation-save-draft' evaluation.pk %}" hx-trigger="change, submit" hx-target="#analysis-summary" hx-swap="outerHTML" hx-sync="#analysis-workspace:queue all"{% endif %}>
+     {% csrf_token %}
+     <fieldset {% if not can_edit %}disabled{% endif %}>
+      <legend class="check-title">{{ item.number }} {{ item.check.name }}</legend>
+      <span class="sr-only">{{ item.check.code }}</span>
+      {% if item.result.status == 'NAO_ENVIADO' %}<p class="text-xs text-amber-900 mb-3">Não enviado (histórico). Registre a decisão atual para concluir.</p>{% endif %}
+      <input type="hidden" name="{{ item.form.status.html_name }}" value="{% if item.result.status == 'NAO_ENVIADO' %}NAO_ENVIADO{% else %}EM_BRANCO{% endif %}">
+      <div class="status-options">
+      {% for value,label in item.status_choices %}
+        <label class="status-option status-{{ value }}"><input type="radio" name="{{ item.form.status.html_name }}" value="{{ value }}" {% if item.form.status.value == value %}checked{% endif %}><span>{% if value == 'ATENDE' %}✓ ATENDE{% elif value == 'NAO_ATENDE' %}✕ NÃO ATENDE{% else %}— NÃO SE APLICA{% endif %}</span></label>
+      {% endfor %}
+      </div>
+      {% if item.form.notes %}<div class="check-notes"><label for="{{ item.form.notes.id_for_label }}" class="form-label">Observação <span class="font-normal text-slate-500">(opcional)</span></label>{{ item.form.notes }}{{ item.form.notes.errors }}</div>{% endif %}
+      {% if item.detail_fields %}<details class="document-details"><summary>Detalhes do documento</summary><div class="grid sm:grid-cols-2 gap-4 mt-4">{% for field in item.detail_fields %}<div><label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div></details>{% endif %}
+      {% if item.validations %}<details class="support-alerts"><summary>{{ item.validations|length }} alerta(s) de apoio à conferência</summary>{% for outcome in item.validations %}<p class="mt-2 text-xs">⚠ {{ outcome.message }}</p>{% endfor %}</details>{% endif %}
+      {% if can_edit %}<button type="submit" class="btn-secondary btn-sm check-save">Salvar item</button>{% endif %}
+     </fieldset>
+    </form>
+    {% endfor %}
+  </section>
+ {% endfor %}
+ </div>
+ {% if can_edit %}<form class="check-form card p-5" method="post" action="{% url 'evaluation-save-draft' evaluation.pk %}" hx-post="{% url 'evaluation-save-draft' evaluation.pk %}" hx-target="#analysis-summary" hx-swap="outerHTML" hx-trigger="change, submit" hx-sync="#analysis-workspace:queue all">{% csrf_token %}<label for="general-notes" class="form-label">Observação geral da análise (opcional)</label><textarea id="general-notes" name="general_notes" class="form-input" rows="2">{{ evaluation.general_notes }}</textarea><button class="btn-secondary mt-3" type="submit">Salvar rascunho</button></form>{% endif %}
+</div>
+{% endblock %}
+{% block extra_scripts %}<script src="{% static 'js/documentary-workspace.js' %}"></script>{% endblock %}

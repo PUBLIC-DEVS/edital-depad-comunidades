@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Edital {{ edital.number }}/{{ edital.year }} — DEPAD/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center space-x-2 text-xs text-slate-500 pb-3 border-b border-slate-200">
+        <a href="{% url 'edital-detail' edital.pk %}" class="text-govblue-600 hover:text-govblue-800">&larr; Configuração {{ edital.number }}/{{ edital.year }}</a>
+        <span>/</span>
+        <span class="font-bold text-slate-700">{{ title }}</span>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">{{ title }}</h1>
+            {% if section == 'financeiro' %}
+                <p class="text-xs text-slate-500 mt-1">
+                    Patrimônio mínimo: <strong class="text-slate-700">{{ edital.minimum_equity_percentage }}%</strong> do valor global.
+                    {% if can_configure %}
+                        <a class="text-govblue-600 underline ml-1" href="{% url 'edital-edit' edital.pk %}">Editar percentual</a>
+                    {% endif %}
+                </p>
+            {% elif section == 'validacoes' %}
+                <p class="text-xs text-slate-500 mt-1">Validadores tipados: CNPJ canônico, vigência documental, idade mínima do CNPJ e CNAE. A data de referência é configurada nos dados gerais do edital.</p>
+            {% endif %}
+        </div>
+        {% if can_configure %}
+            <a class="depad-button depad-button-primary" href="{% url 'edital-section-create' edital.pk section %}">
+                + Adicionar Item
+            </a>
+        {% endif %}
+    </div>
+
+    {% if not edital.configuration_editable %}
+        <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-900 p-4 rounded-r-lg text-xs" role="alert">
+            Configuração publicada. Para alterar regras ou critérios, duplique o edital para criar uma nova versão.
+        </div>
+    {% endif %}
+
+    <div class="space-y-3">
+        {% for obj in objects %}
+            <article class="depad-card">
+                <div class="flex flex-wrap justify-between items-start gap-4">
+                    <div class="space-y-1">
+                        <h2 class="font-bold text-slate-900 text-sm">
+                            {% if section == 'classificacao' %}
+                                {{ obj.get_policy_type_display }}
+                            {% elif section == 'financeiro' %}
+                                {{ obj.get_vacancy_type_display }} · R$ {{ obj.monthly_value }}/mês · {{ obj.duration_months }} meses
+                            {% elif section == 'validacoes' %}
+                                {{ obj.get_rule_type_display }} · <span class="font-mono text-govblue-700">{{ obj.requirement_check.requirement.code }} / {{ obj.requirement_check.code }}</span>
+                            {% else %}
+                                {{ obj }}
+                            {% endif %}
+                        </h2>
+                        {% if obj.description %}
+                            <p class="text-xs text-slate-600">{{ obj.description }}</p>
+                        {% endif %}
+                        {% if obj.active == False %}
+                            <span class="depad-badge depad-badge-neutral text-[10px]">Desativado</span>
+                        {% endif %}
+                        {% if section == 'requisitos' %}
+                            <p class="text-xs text-slate-500 mt-1">{{ obj.get_failure_behavior_display }} · {{ obj.checks.count }} subcritério(s)</p>
+                        {% elif section == 'validacoes' %}
+                            <p class="text-xs text-slate-500 mt-1">{{ obj.get_severity_display }} · {% if obj.blocks_completion %}<strong class="text-red-700">bloqueia conclusão</strong>{% else %}informativa{% endif %} · <code class="font-mono text-[11px]">{{ obj.config }}</code></p>
+                        {% endif %}
+                        {% if section == 'subcriterios' %}
+                            <p class="text-xs text-slate-500 mt-1">{{ obj.requirement.code }} · Permitidos: {{ obj.allowed_statuses|join:", " }} · Evidências: {{ obj.evidence_fields|join:", "|default:"nenhuma" }}</p>
+                        {% endif %}
+                    </div>
+                    {% if can_configure %}
+                        <div class="flex flex-wrap gap-2 text-xs items-center">
+                            <a class="depad-button depad-button-outline py-1 px-2.5" href="{% url 'edital-section-edit' edital.pk section obj.pk %}">Editar</a>
+                            {% if section == 'requisitos' %}
+                                <a class="depad-button depad-button-outline py-1 px-2.5" href="{% url 'edital-section-create' edital.pk 'subcriterios' %}?requirement={{ obj.pk }}">+ Subcritério</a>
+                            {% endif %}
+                            {% if section == 'subcriterios' %}
+                                <a class="depad-button depad-button-outline py-1 px-2.5" href="{% url 'edital-section-create' edital.pk 'validacoes' %}?check={{ obj.pk }}">+ Validação</a>
+                            {% endif %}
+                            {% if section == 'requisitos' or section == 'subcriterios' %}
+                                <form method="post" action="{% url 'edital-section-action' edital.pk section obj.pk 'up' %}" class="inline">
+                                    {% csrf_token %}
+                                    <button class="depad-button depad-button-secondary py-1 px-2" aria-label="Mover {{ obj }} para cima">↑</button>
+                                </form>
+                                <form method="post" action="{% url 'edital-section-action' edital.pk section obj.pk 'down' %}" class="inline">
+                                    {% csrf_token %}
+                                    <button class="depad-button depad-button-secondary py-1 px-2" aria-label="Mover {{ obj }} para baixo">↓</button>
+                                </form>
+                            {% endif %}
+                            {% if section == 'financeiro' or section == 'classificacao' %}
+                                <form method="post" action="{% url 'edital-section-action' edital.pk section obj.pk 'remover' %}" class="inline">
+                                    {% csrf_token %}
+                                    <button class="depad-button depad-button-danger py-1 px-2">Remover</button>
+                                </form>
+                            {% endif %}
+                            {% if obj.active %}
+                                <form method="post" action="{% url 'edital-section-action' edital.pk section obj.pk 'desativar' %}" class="inline">
+                                    {% csrf_token %}
+                                    <button class="depad-button depad-button-secondary py-1 px-2 text-red-600 hover:bg-red-50">Desativar</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
+        {% empty %}
+            <div class="depad-card text-center py-12 text-slate-400 text-xs">
+                Nenhum item configurado nesta seção.
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

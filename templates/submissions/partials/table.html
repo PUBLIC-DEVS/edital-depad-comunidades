@@ -1,0 +1,17 @@
+{% if page_obj.object_list %}
+<div class="table-wrapper"><div class="overflow-x-auto">
+<table class="operational-table"><caption class="sr-only">Inscrições por ordem de recebimento</caption>
+<thead><tr>{% if can_distribute %}<th><span class="sr-only">Selecionar</span></th>{% endif %}<th>Processo SEI</th><th class="desktop-cell">Recebimento</th><th>Instituição</th><th class="desktop-cell">CNPJ</th><th class="desktop-cell">Município/UF</th><th class="desktop-cell">Vagas</th><th class="desktop-cell">Grupo</th><th class="desktop-cell">Analista</th><th>Status</th><th class="desktop-cell">Ações</th></tr></thead>
+<tbody>{% for sub in page_obj %}<tr>
+{% if can_distribute %}<td>{% if sub.can_assign %}<input type="checkbox" class="submission-checkbox" value="{{ sub.pk }}" x-model="selectedIds" aria-label="Selecionar {{ sub.processo_sei }}">{% endif %}</td>{% endif %}
+<td><a class="font-mono font-semibold text-action-700" href="{% url 'submission-detail' sub.pk %}">{{ sub.processo_sei }}</a></td>
+<td class="desktop-cell whitespace-nowrap">{{ sub.received_at|date:"d/m/Y H:i" }}</td>
+<td><span class="font-medium">{{ sub.institution.name }}</span><details class="mobile-detail"><summary>Dados da inscrição</summary><p>{{ sub.institution.formatted_cnpj }}<br>{{ sub.municipality|default:"Município não informado" }}<br>{{ sub.received_at|date:"d/m/Y H:i" }}<br>F: {{ sub.vagas_femininas }} · M: {{ sub.vagas_masculinas }} · MN: {{ sub.vagas_maes_nutrizes }}<br>Grupo {{ sub.target_group }} · {% if sub.operational_analyst %}{{ sub.operational_analyst.get_full_name|default:sub.operational_analyst.username }}{% else %}Sem analista{% endif %}</p></details></td>
+<td class="desktop-cell font-mono whitespace-nowrap">{{ sub.institution.formatted_cnpj }}</td><td class="desktop-cell">{{ sub.municipality.name|default:"—" }}/{{ sub.municipality.state }}</td>
+<td class="desktop-cell whitespace-nowrap text-xs" title="Capacidade: {{ sub.capacidade_total }}">F: {{ sub.vagas_femininas }}<br>M: {{ sub.vagas_masculinas }} · MN: {{ sub.vagas_maes_nutrizes }}</td>
+<td class="desktop-cell">{{ sub.target_group }}</td><td class="desktop-cell">{% if sub.operational_analyst %}{{ sub.operational_analyst.get_full_name|default:sub.operational_analyst.username }}{% else %}—{% endif %}</td>
+<td><span class="badge-status {% if sub.workflow_status == 'INELIGIBLE' %}badge-inapta{% elif sub.workflow_status == 'ELIGIBLE_FOR_RANKING' or sub.workflow_status == 'RANKED' %}badge-apta{% elif sub.workflow_status == 'PENDING_REVIEW' %}badge-naoenviado{% else %}badge-emanalise{% endif %}">{{ sub.operational_status }}</span></td>
+<td class="desktop-cell"><a class="text-action-700 font-semibold" href="{% url 'submission-detail' sub.pk %}">Ver →</a></td>
+</tr>{% endfor %}</tbody></table></div>
+{% if page_obj.has_other_pages %}<nav class="pagination" aria-label="Paginação"><span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span><div>{% if page_obj.has_previous %}<a class="btn-secondary" href="?{{ filter_query }}&page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}{% if page_obj.has_next %}<a class="btn-secondary" href="?{{ filter_query }}&page={{ page_obj.next_page_number }}">Próxima</a>{% endif %}</div></nav>{% endif %}
+</div>{% else %}<div class="empty-state">Nenhuma inscrição encontrada.</div>{% endif %}

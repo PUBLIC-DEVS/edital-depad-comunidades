@@ -1,0 +1,34 @@
+/* Design System & Base Styles — DEPAD / MDS */
+@import "tokens.css";
+@import "components.css";
+
+/* Print stylesheet for administrative exports & classification snapshots */
+@media print {
+  header, nav, footer, .no-print, form button, .btn-action, .depad-accent-bar {
+    display: none !important;
+  }
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10pt;
+  }
+  main {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  th, td {
+    border: 1px solid #d1d5db !important;
+    padding: 4px 6px !important;
+  }
+  .shadow-sm, .shadow-md, .shadow-lg, .card {
+    box-shadow: none !important;
+  }
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+}

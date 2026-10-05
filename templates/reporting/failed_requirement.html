@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load operational_ui %}
+
+{% block title %}Processos Reprovados — Requisito {{ code }} — DEPAD/MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200 gap-4">
+        <div>
+            <div class="flex items-center gap-2">
+                <a href="{% url 'reporting:dashboard' %}" class="text-xs text-govblue-600 hover:text-govblue-800 font-medium">&larr; Voltar ao Painel Geral</a>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+                Processos Reprovados no Requisito <span class="text-govblue-700 font-mono">{{ code }}</span>
+            </h1>
+            <p class="text-sm text-slate-600 mt-1">
+                {% if requirement %}
+                    <strong>{{ requirement.name }}:</strong> {{ requirement.description|default:"Critério documental obrigatório." }}
+                {% else %}
+                    Detalhamento dos processos com resultado "Não Atende" ou "Não Enviado" neste item.
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <span class="depad-badge depad-badge-danger text-xs py-1.5 px-3">
+                Total de Reprovações: {{ submissions|length }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Tabela de Submissões Afetadas -->
+    <div class="depad-card p-0 overflow-hidden">
+        {% if submissions %}
+            <div class="overflow-x-auto">
+                <table class="depad-table">
+                    <thead>
+                        <tr>
+                            <th>Processo SEI</th>
+                            <th>Instituição / Razão Social</th>
+                            <th>CNPJ</th>
+                            <th>Município / UF</th>
+                            <th>Analista Responsável</th>
+                            <th class="text-center">Status do Processo</th>
+                            <th class="text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in submissions %}
+                            <tr>
+                                <td class="font-mono font-bold text-govblue-700">
+                                    {{ sub.processo_sei }}
+                                </td>
+                                <td class="font-medium text-slate-800">
+                                    {{ sub.institution.name }}
+                                </td>
+                                <td class="font-mono text-slate-600 text-xs">
+                                    {{ sub.institution.cnpj }}
+                                </td>
+                                <td class="text-slate-600">
+                                    {% if sub.municipality %}
+                                        {{ sub.municipality.name }}/{{ sub.municipality.state }}
+                                    {% else %}
+                                        <span class="text-slate-400">Não informado</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-slate-700">
+                                    {{ sub.assigned_analyst.get_full_name|default:sub.assigned_analyst.username|default:"Não distribuído" }}
+                                </td>
+                                <td class="text-center">
+                                    <span class="depad-badge depad-badge-neutral">
+                                        {{ sub.workflow_status|workflow_label }}
+                                    </span>
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    <a href="/avaliacoes/{{ sub.id }}/" class="depad-button depad-button-primary text-xs py-1 px-2.5">
+                                        Ver Análise &rarr;
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="py-12 text-center text-slate-400 text-xs">
+                Nenhum processo foi reprovado com o requisito <strong class="font-mono text-slate-700">{{ code }}</strong>.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

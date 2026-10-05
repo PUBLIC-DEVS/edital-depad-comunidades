@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Diligências e Contraditório — DEPAD / MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Fila de Diligências</h1>
+            <p class="text-sm text-slate-500">Acompanhamento formal de pedidos de saneamento documental e prazos do contraditório</p>
+        </div>
+        <div class="text-xs bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5">
+            <span>&#9888;</span>
+            <span><strong>{{ total_count }}</strong> diligência(s) registrada(s)</span>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-xs">
+                <thead>
+                    <tr>
+                        <th class="px-4 py-3">Processo SEI</th>
+                        <th class="px-4 py-3">Instituição</th>
+                        <th class="px-4 py-3">Data de Abertura</th>
+                        <th class="px-4 py-3">Prazo Limite</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Resultado</th>
+                        <th class="px-4 py-3">Solicitante</th>
+                        <th class="px-4 py-3 text-right">Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dil in diligences %}
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-4 py-3 font-semibold text-[#0248AB]">
+                                <span class="font-mono">{{ dil.submission.processo_sei }}</span>
+                            </td>
+                            <td class="px-4 py-3 font-medium text-slate-900">
+                                {{ dil.submission.institution.name }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-slate-600 font-mono text-[11px]">
+                                {{ dil.requested_at|date:"d/m/Y H:i" }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap font-bold text-slate-900 font-mono text-[11px]">
+                                {{ dil.deadline|date:"d/m/Y" }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2.5 py-0.5 rounded text-[11px] font-semibold border
+                                    {% if dil.status == 'OPEN' %}bg-amber-50 text-amber-900 border-amber-200
+                                    {% elif dil.status == 'ANSWERED' %}bg-blue-50 text-blue-900 border-blue-200
+                                    {% elif dil.status == 'CONCLUDED' %}bg-emerald-50 text-emerald-900 border-emerald-200
+                                    {% else %}bg-slate-100 text-slate-600 border-slate-200{% endif %}">
+                                    {{ dil.get_status_display }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="font-medium text-slate-700">{{ dil.get_result_display }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-slate-700">
+                                {{ dil.requested_by.get_full_name|default:dil.requested_by.username }}
+                            </td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <a href="{% url 'diligence-detail' diligence_id=dil.id %}" class="btn-primary btn-sm text-xs font-semibold">
+                                    Ver Detalhes &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="px-4 py-8 text-center text-slate-400">
+                                Nenhuma diligência em andamento no momento.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

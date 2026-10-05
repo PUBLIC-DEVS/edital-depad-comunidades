@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Iniciar Análise — SEI {{ submission.processo_sei }} — DEPAD / MDS{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div class="text-xs text-slate-500">
+        <a href="{% url 'submission-list' %}" class="text-[#0248AB] hover:underline font-medium">&larr; Voltar para Processos</a>
+    </div>
+
+    <div class="card p-8 text-center space-y-4 border-l-4 border-l-[#0248AB]">
+        <div class="space-y-1">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Análise Documental Técnica</span>
+            <h1 class="text-2xl font-extrabold text-slate-900 font-mono">Processo SEI {{ submission.processo_sei }}</h1>
+            <p class="text-sm text-slate-600 font-medium">{{ submission.institution.name }} (CNPJ: {{ submission.institution.formatted_cnpj }})</p>
+        </div>
+
+        <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 max-w-md mx-auto text-left space-y-1.5">
+            <div><strong>Edital:</strong> {{ submission.edital.number }}/{{ submission.edital.year }}</div>
+            <div><strong>Grupo:</strong> {{ submission.target_group }}</div>
+            <div><strong>Recebido em:</strong> {{ submission.received_at|date:"d/m/Y H:i" }}</div>
+        </div>
+
+        <p class="text-xs text-slate-500">A análise documental ainda não foi formalmente iniciada para este processo.</p>
+
+        {% if can_start %}
+            <form method="post" action="{% url 'evaluation-start' submission_id=submission.id %}" class="pt-2">
+                {% csrf_token %}
+                <button type="submit" class="btn-primary text-sm font-bold px-6 py-2.5 shadow-sm">
+                    Iniciar Análise Técnica
+                </button>
+            </form>
+        {% else %}
+            <p class="text-xs text-amber-800 bg-amber-50 p-2.5 rounded border border-amber-200 max-w-md mx-auto">
+                Você não possui atribuição como analista responsável para iniciar esta avaliação técnica.
+            </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

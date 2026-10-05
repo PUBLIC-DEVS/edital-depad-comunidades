@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% load operational_ui %}
+
+{% block title %}Processo {{ submission.processo_sei }} — DEPAD / MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Top Action & Navigation -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-200 gap-3">
+        <div class="flex items-center space-x-2 text-xs text-slate-500">
+            <a href="{% url 'submission-list' %}" class="text-[#0248AB] hover:underline font-medium">&larr; Voltar para Processos</a>
+            <span>/</span>
+            <span class="font-bold text-slate-700 font-mono">{{ submission.processo_sei }}</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="badge-status
+                {% if submission.workflow_status == 'UNDER_ANALYSIS' %}badge-emanalise
+                {% elif submission.workflow_status == 'ELIGIBLE_FOR_RANKING' %}badge-apta
+                {% elif submission.workflow_status == 'INELIGIBLE' %}badge-inapta
+                {% elif submission.workflow_status == 'PENDING_REVIEW' %}badge-naoenviado
+                {% else %}badge-naoaplicavel{% endif %}">
+                {% if submission.workflow_status == 'ELIGIBLE_FOR_RANKING' %}&check;
+                {% elif submission.workflow_status == 'INELIGIBLE' %}&times;
+                {% endif %}
+                {{ submission.workflow_status|workflow_label }}
+            </span>
+            <span class="badge badge-prioritario">
+                {{ submission.target_group }}
+            </span>
+            {% if can_edit %}
+                <a class="btn-secondary btn-sm text-xs ml-2" href="{% url 'submission-edit' submission.pk %}">
+                    Editar Dados
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Anomaly Alerts Banner if any -->
+    {% if alerts %}
+        <div class="bg-amber-50 border-l-4 border-l-amber-500 p-4 rounded-lg shadow-xs">
+            <h3 class="text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Alertas e Inconsistências Detectadas</h3>
+            <ul class="space-y-1.5" aria-label="Alertas de triagem">
+                {% for alert in alerts %}
+                    <li class="text-xs text-amber-800 flex items-start gap-1.5">
+                        <span aria-hidden="true">{% if alert.severity == 'danger' %}&times;{% else %}&#9888;{% endif %}</span>
+                        <span><strong>{{ alert.code }}:</strong> {{ alert.message }}{% for detail in alert.details %}<span class="block pl-2 text-slate-600">{{ detail }}</span>{% endfor %}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if restricted %}
+        <section role="alert" class="rounded-lg border-2 border-red-600 bg-red-50 p-4 text-red-900 shadow-xs">
+            <h2 class="font-bold text-sm">⛔ CONTRATO VIGENTE / PARTICIPAÇÃO BLOQUEADA</h2>
+            <p class="text-xs mt-1">Este processo não pode ser distribuído nem iniciar análise enquanto a restrição de contrato vigente estiver ativa.</p>
+        </section>
+    {% endif %}
+
+    {% if can_correct_cnpj %}
+        <section class="card p-5 bg-amber-50/50 border-amber-200">
+            <h2 class="font-bold text-amber-900 text-sm">Corrigir CNPJ da candidatura</h2>
+            <p class="text-xs text-slate-600 mt-1">
+                A correção substitui a instituição exclusivamente nesta inscrição, exige justificativa formal e gera registro permanente na trilha de auditoria. O CNPJ nunca é alterado automaticamente a partir de um documento.
+            </p>
+            <form method="post" action="{% url 'submission-cnpj-correction' submission.pk %}" class="mt-4 grid gap-3">
+                {% csrf_token %}
+                <div>
+                    <label for="correct-cnpj" class="form-label">CNPJ correto declarado no Anexo I:</label>
+                    <input class="form-input text-xs" id="correct-cnpj" name="cnpj" placeholder="00.000.000/0000-00" required>
+                </div>
+                <div>
+                    <label for="correction-reason" class="form-label">Justificativa da Correção:</label>
+                    <textarea class="form-input text-xs" id="correction-reason" name="reason" minlength="10" rows="2" placeholder="Informe a fundamentação da alteração cadastral..." required></textarea>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                    <input type="checkbox" name="confirm" required>
+                    <span>Confirmo a correção formal; documentos serão preservados e o CNPJ será revalidado.</span>
+                </label>
+                <div>
+                    <button type="submit" class="btn-primary text-xs bg-amber-700 hover:bg-amber-800 border-amber-800">
+                        Registrar Correção Auditada
+                    </button>
+                </div>
+            </form>
+        </section>
+    {% endif %}
+
+    {% if can_release_restriction %}
+        <section class="card p-5 bg-amber-50/50 border-amber-200">
+            <h2 class="font-bold text-amber-900 text-sm">Liberar Bloqueio Pré-Análise</h2>
+            <p class="text-xs text-slate-600 mt-1">A restrição foi desativada nas fontes contratuais. A liberação formal retorna o processo para recepção, sem atribuição automática.</p>
+            <form method="post" action="{% url 'submission-restriction-release' submission.pk %}" class="mt-4 grid gap-3">
+                {% csrf_token %}
+                <div>
+                    <label for="release-reason" class="form-label">Justificativa da Liberação:</label>
+                    <textarea id="release-reason" name="reason" required class="form-input text-xs" rows="2" placeholder="Motivo da liberação do processo..."></textarea>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                    <input type="checkbox" name="confirm" value="on" required>
+                    <span>Confirmo a liberação para nova distribuição regular.</span>
+                </label>
+                <div>
+                    <button type="submit" class="btn-secondary text-xs">
+                        Liberar Processo
+                    </button>
+                </div>
+            </form>
+        </section>
+    {% endif %}
+
+    <!-- Main Overview Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left: Process and Institution Info -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="card p-6 space-y-4">
+                <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
+                    Dados da Instituição e Protocolo
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <span class="text-slate-500 block">Razão Social:</span>
+                        <strong class="text-slate-900 text-sm">{{ submission.institution.name }}</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">CNPJ da candidatura / declarado no Anexo I:</span>
+                        <strong class="font-mono text-slate-900 text-sm">{{ submission.institution.formatted_cnpj }}</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Endereço e CEP:</span>
+                        <span class="text-slate-800">{{ submission.institution.address|default:"Não informado" }} · {{ submission.institution.postal_code|default:"CEP não informado" }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Município / UF da Execução:</span>
+                        <span class="text-slate-800">{{ submission.municipality.name }}/{{ submission.municipality.state }} (IBGE: {{ submission.municipality.ibge_code }})</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Data e Hora de Recebimento:</span>
+                        <span class="text-slate-800 font-mono">{{ submission.received_at|date:"d/m/Y H:i:s" }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Edital de Referência:</span>
+                        <span class="text-slate-800 font-semibold">{{ submission.edital.number }}/{{ submission.edital.year }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Processo Administrativo SEI:</span>
+                        <strong class="text-[#0248AB] font-mono text-sm">{{ submission.processo_sei }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vacancies & Financial Grid -->
+            <div class="card p-6 space-y-4">
+                <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">
+                    Vagas Solicitadas e Proposta Financeira
+                </h2>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-150 text-center">
+                        <span class="text-slate-500 block text-[11px]">Femininas</span>
+                        <span class="text-xl font-bold text-slate-800">{{ submission.vagas_femininas }}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-150 text-center">
+                        <span class="text-slate-500 block text-[11px]">Masculinas</span>
+                        <span class="text-xl font-bold text-slate-800">{{ submission.vagas_masculinas }}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-150 text-center">
+                        <span class="text-slate-500 block text-[11px]">Mães Nutrizes</span>
+                        <span class="text-xl font-bold text-slate-800">{{ submission.vagas_maes_nutrizes }}</span>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-200 text-center">
+                        <span class="text-[#0248AB] block text-[11px] font-bold">Total Vagas</span>
+                        <span class="text-xl font-black text-[#171B55]">{{ submission.vagas_solicitadas }}</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
+                    <div>
+                        <span class="text-slate-500 block">Capacidade Total Declarada:</span>
+                        <strong class="text-slate-800">{{ submission.capacidade_total }} vagas</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Valor Global da Proposta:</span>
+                        <strong class="text-slate-900 font-mono text-sm">R$ {{ submission.valor_global|default:"0,00" }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workspace Actions Link -->
+            <div class="card p-5 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border-blue-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h3 class="text-xs font-bold text-[#171B55] uppercase tracking-wider">Análise Técnica Documental</h3>
+                    <p class="text-xs text-slate-600 mt-0.5">Verificação estruturada dos requisitos configurados no edital e emissão de parecer.</p>
+                </div>
+                <a href="/avaliacoes/processo/{{ submission.id }}/" class="btn-primary text-xs">
+                    Acessar Espaço de Análise &rarr;
+                </a>
+            </div>
+        </div>
+
+        <!-- Right: Assignment & History Panel -->
+        <div class="space-y-6">
+            <!-- Assignment Form (Distributors/Coordinators only) -->
+            {% if can_distribute and assignment_form %}
+                <div class="card p-5 space-y-3">
+                    <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100">
+                        Atribuição / Redistribuição
+                    </h2>
+                    <form method="post" action="{% url 'submission-assign' submission_id=submission.id %}" class="space-y-3 text-xs">
+                        {% csrf_token %}
+                        <div>
+                            <label class="form-label">Designar Analista:</label>
+                            {{ assignment_form.analyst }}
+                        </div>
+                        <div>
+                            <label class="form-label">Motivo (opcional):</label>
+                            {{ assignment_form.reason }}
+                        </div>
+                        <button type="submit" class="w-full btn-primary text-xs py-2 font-semibold">
+                            Atualizar Atribuição
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+
+            <!-- Assignment History Drawer -->
+            <div class="card p-5 space-y-3">
+                <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100">
+                    Histórico de Atribuições
+                </h2>
+                <div class="divide-y divide-slate-100 text-xs">
+                    {% for asgn in assignment_history %}
+                        <div class="py-2.5 space-y-1">
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold text-slate-800">{{ asgn.analyst.get_full_name|default:asgn.analyst.username }}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if asgn.status == 'ACTIVE' %}bg-emerald-100 text-emerald-900{% else %}bg-slate-100 text-slate-500{% endif %}">
+                                    {{ asgn.get_status_display }}
+                                </span>
+                            </div>
+                            <div class="text-[11px] text-slate-500">
+                                Atribuído por {{ asgn.assigned_by.username }} em {{ asgn.assigned_at|date:"d/m/Y H:i" }}
+                            </div>
+                            {% if asgn.reason %}
+                                <div class="text-[11px] text-slate-600 italic">"{{ asgn.reason }}"</div>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="py-4 text-center text-slate-400">Nenhuma atribuição registrada.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
