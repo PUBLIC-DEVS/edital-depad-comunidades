@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.db.models import Q
 from django.http import HttpRequest
 
 from apps.accounts.models import User
@@ -35,19 +36,40 @@ class MicrosoftAuthAdapter(AuthenticationAdapter):
             logger.warning("Claims Microsoft incompletos; perfil não sincronizado.")
             return None
 
-        user, created = User.objects.get_or_create(
-            azure_oid=azure_oid,
-            defaults={
-                "username": upn or email,
-                "email": email,
-                "first_name": claims.get("given_name", ""),
-                "last_name": claims.get("family_name", ""),
-                "upn": upn,
-                "role": User.Role.CONSULTA,
-            },
-        )
-        if not created:
+        # 1) Conta já vinculada a este OID.
+        user = User.objects.filter(azure_oid=azure_oid).first()
+
+        # 2) Conta pré-provisionada pela administração (e-mail/UPN já cadastrado, sem OID):
+        #    vincula o OID a ela, preservando o papel atribuído (ex.: ADMINISTRADOR).
+        if user is None:
+            lookup = Q(email__iexact=email)
+            if upn:
+                lookup |= Q(upn__iexact=upn)
+            user = User.objects.filter(lookup, azure_oid__isnull=True).first()
+            if user is not None:
+                user.azure_oid = azure_oid
+                user.save(update_fields=["azure_oid"])
+
+        # 3) Primeiro acesso de um usuário novo: cria com o menor privilégio.
+        if user is None:
+            user = User(
+                username=upn or email,
+                email=email,
+                azure_oid=azure_oid,
+                first_name=claims.get("given_name", ""),
+                last_name=claims.get("family_name", ""),
+                upn=upn,
+                role=User.Role.CONSULTA,
+            )
+            user.set_unusable_password()
+            user.save()
+        else:
             self.sync_user_profile(user, claims)
+
+        # Contas desativadas pela administração não autenticam.
+        if not user.is_active:
+            logger.warning("Usuário inativo tentou autenticar via Microsoft: %s", email)
+            return None
 
         return user
 

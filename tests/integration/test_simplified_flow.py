@@ -84,12 +84,22 @@ def test_operational_home_is_not_metrics_redirect(client, operational, role):
 @pytest.mark.parametrize(
     "role,items",
     [
-        ("admin", ["Início", "Processos", "Revisão", "Classificação", "Administração"]),
-        ("coord", ["Início", "Processos", "Revisão", "Classificação", "Administração"]),
+        (
+            "admin",
+            ["Início", "Processos", "Revisão", "Classificação", "Métricas", "Administração"],
+        ),
+        (
+            "coord",
+            ["Início", "Processos", "Revisão", "Classificação", "Métricas", "Administração"],
+        ),
         ("distributor", ["Processos"]),
         ("analyst", ["Minhas Análises"]),
-        ("reviewer", ["Revisão"]),
-        ("consulta", ["Início", "Processos", "Classificação"]),
+        # Revisor passa a enxergar todas as abas, incluindo Métricas e Administração.
+        (
+            "reviewer",
+            ["Início", "Processos", "Revisão", "Classificação", "Métricas", "Administração"],
+        ),
+        ("consulta", ["Início", "Processos", "Classificação", "Métricas"]),
     ],
 )
 def test_navbar_by_role(client, operational, role, items):

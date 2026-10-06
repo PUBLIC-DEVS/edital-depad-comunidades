@@ -112,11 +112,12 @@
             <nav class="bg-[#222873] border-t border-white/10" aria-label="Navegação Principal">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="flex space-x-1 sm:space-x-2 text-xs font-medium py-1.5 overflow-x-auto">
-                        {% if user.is_superuser or user.role == 'ADMINISTRADOR' or user.role == 'COORDENADOR' or user.role == 'CONSULTA' %}
+                        {% if user.is_superuser or user.role == 'ADMINISTRADOR' or user.role == 'COORDENADOR' or user.role == 'CONSULTA' or user.role == 'REVISOR' %}
                           <a href="{% url 'dashboard' %}" class="nav-link" {% if request.path == '/' %}aria-current="page"{% endif %}>Início</a>
                           <a href="{% url 'submission-list' %}" class="nav-link" {% if '/processos/' in request.path %}aria-current="page"{% endif %}>Processos</a>
                           {% if user.is_superuser or user.role != 'CONSULTA' %}<a href="{% url 'review-list' %}" class="nav-link" {% if '/revisoes/' in request.path %}aria-current="page"{% endif %}>Revisão</a>{% endif %}
                           <a href="{% url 'ranking-index' %}" class="nav-link" {% if '/classificacao/' in request.path %}aria-current="page"{% endif %}>Classificação</a>
+                          <a href="{% url 'reporting:dashboard' %}" class="nav-link" {% if '/metricas/' in request.path %}aria-current="page"{% endif %}>Métricas</a>
                           {% if user.is_superuser or user.role != 'CONSULTA' %}<a href="{% url 'administration-index' %}" class="nav-link" {% if '/administracao/' in request.path %}aria-current="page"{% endif %}>Administração</a>{% endif %}
                         {% elif user.role == 'ANALISTA' %}
                           <a href="{% url 'my-evaluations' %}" class="nav-link" aria-current="page">Minhas Análises</a>

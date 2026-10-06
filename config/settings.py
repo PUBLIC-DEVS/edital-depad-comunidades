@@ -21,6 +21,23 @@ DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 allowed_hosts_raw = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_raw.split(",") if host.strip()]
 
+# A Vercel injeta VERCEL_URL com o host do deploy (sem esquema); liberamos também
+# qualquer subdomínio *.vercel.app para cobrir URLs de preview geradas a cada build.
+VERCEL_URL = os.getenv("VERCEL_URL")
+if VERCEL_URL and VERCEL_URL not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(VERCEL_URL)
+if ".vercel.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".vercel.app")
+
+# Origens confiáveis para CSRF (exigido pelo Django 4+ em requisições POST sob HTTPS,
+# como o login). Domínio oficial pode ser adicionado via env CSRF_TRUSTED_ORIGINS.
+csrf_origins_raw = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_raw.split(",") if origin.strip()]
+if "https://*.vercel.app" not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append("https://*.vercel.app")
+if VERCEL_URL:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{VERCEL_URL}")
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",

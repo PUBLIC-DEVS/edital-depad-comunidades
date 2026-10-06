@@ -17,7 +17,7 @@ from apps.ranking.services import RankingService
 
 
 @login_required
-@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA, User.Role.REVISOR)
 @operational_edital_required
 def ranking_view(request: HttpRequest) -> HttpResponse:
     """Exibe o ranking oficial com filtros por edital, grupo e histórico de snapshots."""
@@ -105,7 +105,7 @@ def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA, User.Role.REVISOR)
 @operational_edital_required
 def ranking_snapshots_history_view(request: HttpRequest) -> HttpResponse:
     """Exibe o histórico auditável de snapshots de classificação gerados."""
@@ -122,7 +122,7 @@ def ranking_snapshots_history_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA)
+@require_role(User.Role.COORDENADOR, User.Role.ADMINISTRADOR, User.Role.CONSULTA, User.Role.REVISOR)
 @operational_edital_required
 def ranking_export_csv_view(request: HttpRequest, snapshot_id: int) -> HttpResponse:
     """Exporta o snapshot oficial em formato CSV delimitado por ponto e vírgula."""

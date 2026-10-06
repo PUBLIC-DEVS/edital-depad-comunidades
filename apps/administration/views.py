@@ -29,7 +29,13 @@ def catalog_access(user, catalog, write=False):
     if write:
         allowed = RolePermissionPolicy.can_manage_editais_and_rules(user)
     else:
-        allowed = user.is_superuser or user.role in {User.Role.ADMINISTRADOR, User.Role.COORDENADOR}
+        # Leitura dos catálogos é ampla (inclui Revisor, que enxerga todas as abas);
+        # a escrita permanece restrita à administração.
+        allowed = user.is_superuser or user.role in {
+            User.Role.ADMINISTRADOR,
+            User.Role.COORDENADOR,
+            User.Role.REVISOR,
+        }
     if not allowed:
         raise PermissionDenied("Configuração administrativa restrita.")
 
@@ -51,7 +57,7 @@ def scoped_institutions(user):
 
 
 @login_required
-@require_role(User.Role.ADMINISTRADOR, User.Role.COORDENADOR)
+@require_role(User.Role.ADMINISTRADOR, User.Role.COORDENADOR, User.Role.REVISOR)
 def index(request):
     return render(request, "administration/index.html")
 
