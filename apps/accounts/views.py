@@ -93,12 +93,14 @@ def ms_callback(request: HttpRequest) -> HttpResponse:
         return redirect("login")
 
     if "error" in result:
-        logger.warning(
-            "Erro do Entra ID no callback: %s — %s",
-            result.get("error"),
-            result.get("error_description"),
-        )
-        messages.error(request, "O provedor de identidade recusou o login.")
+        err = result.get("error")
+        description = result.get("error_description") or ""
+        logger.warning("Erro do Entra ID no callback: %s — %s", err, description)
+        # Mostra o código do provedor (ex.: AADSTS7000215) para facilitar o diagnóstico
+        # da configuração. Não expõe segredos. Pode ser restringido a DEBUG no futuro.
+        first_line = description.splitlines()[0] if description else ""
+        detail = f" ({err}): {first_line}" if first_line else f" ({err})" if err else ""
+        messages.error(request, f"O provedor de identidade recusou o login{detail}")
         return redirect("login")
 
     claims = result.get("id_token_claims", {})
