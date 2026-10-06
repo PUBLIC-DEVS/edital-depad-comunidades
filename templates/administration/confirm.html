@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar cadastro — {{ title }} — DEPAD / MDS{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <div class="text-xs text-slate-500">
+        <a href="{{ back_url }}" class="text-[#0248AB] hover:underline font-medium">&larr; Voltar</a>
+    </div>
+
+    <div class="pb-3 border-b border-slate-200">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Administração · Confirmação
+        </span>
+        <h1 class="text-2xl font-bold text-slate-800 mt-1">Revise antes de salvar</h1>
+        <p class="text-xs text-slate-600 mt-1">
+            Confira os dados de "{{ title }}". Nada foi salvo ainda — clique em
+            <span class="font-semibold">Confirmar</span> para gravar ou
+            <span class="font-semibold">Editar</span> para corrigir.
+        </p>
+    </div>
+
+    <dl class="card p-6 sm:p-8 divide-y divide-slate-100">
+        {% for label, value in review_fields %}
+        <div class="flex justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+            <dt class="text-xs font-semibold text-slate-500 shrink-0">{{ label }}</dt>
+            <dd class="text-sm text-slate-800 text-right break-words">{{ value }}</dd>
+        </div>
+        {% endfor %}
+    </dl>
+
+    <form method="post" action="{{ form_action }}" class="flex items-center gap-3">
+        {% csrf_token %}
+        {% for key, value in hidden_fields %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <button type="submit" name="_confirmed" value="1" class="btn-primary text-xs font-bold">
+            Confirmar e salvar
+        </button>
+        <button type="submit" name="_edit" value="1" class="btn-secondary text-xs">
+            Editar
+        </button>
+    </form>
+</div>
+{% endblock %}

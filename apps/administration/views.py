@@ -134,6 +134,36 @@ def catalog_form(request, catalog, object_id=None):
             }
     form = form_type(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
+        # Etapa de revisão antes de salvar (instituições): mostra os dados conferidos
+        # antes de gravar. "_confirmed" salva; "_edit" volta ao formulário editável.
+        confirm_required = catalog == "instituicoes" and not request.POST.get("_confirmed")
+        if confirm_required:
+            if request.POST.get("_edit"):
+                return render(
+                    request,
+                    "administration/form.html",
+                    {"form": form, "title": title, "back_url": f"/administracao/{catalog}/"},
+                )
+            review_fields = []
+            for field in form:
+                raw = form.cleaned_data.get(field.name)
+                review_fields.append((field.label, str(raw) if raw not in (None, "") else "—"))
+            hidden_fields = [
+                (key, value)
+                for key, value in request.POST.items()
+                if key not in {"csrfmiddlewaretoken", "_confirmed", "_edit"}
+            ]
+            return render(
+                request,
+                "administration/confirm.html",
+                {
+                    "title": title,
+                    "review_fields": review_fields,
+                    "hidden_fields": hidden_fields,
+                    "form_action": request.path,
+                    "back_url": f"/administracao/{catalog}/",
+                },
+            )
         obj = form.save(commit=False)
         if (
             isinstance(obj, User)

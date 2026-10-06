@@ -51,7 +51,10 @@ def test_csv_export_routes_neutralize_user_values(client, domain):
 def test_institution_postal_create_edit_and_audit(client, domain):
     client.force_login(domain["admin"])
     data = {"cnpj": "11222333000181", "name": "CEP entidade", "postal_code": "01000000"}
-    response = client.post(reverse("catalog-create", args=["instituicoes"]), data)
+    # Instituições passam pela etapa de revisão: "_confirmed" grava.
+    response = client.post(
+        reverse("catalog-create", args=["instituicoes"]), {**data, "_confirmed": "1"}
+    )
     assert response.status_code == 302
     institution = Institution.objects.get(cnpj=data["cnpj"])
     assert institution.postal_code == "01000-000"
@@ -59,7 +62,9 @@ def test_institution_postal_create_edit_and_audit(client, domain):
     response = client.get(url)
     assert response.status_code == 200
     assert 'name="postal_code"' in response.content.decode()
-    assert client.post(url, {**data, "postal_code": "02000-000"}).status_code == 302
+    assert (
+        client.post(url, {**data, "postal_code": "02000-000", "_confirmed": "1"}).status_code == 302
+    )
     institution.refresh_from_db()
     assert institution.postal_code == "02000-000"
     event = AuditEvent.objects.get(

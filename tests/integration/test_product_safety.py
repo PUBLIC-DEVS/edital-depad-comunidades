@@ -15,6 +15,7 @@ from apps.editais.models import (
     TargetGroup,
 )
 from apps.evaluations.services import EvaluationService
+from apps.institutions.models import Institution
 from apps.reporting.services.metrics import DashboardMetricsService
 from apps.reviews.models import Review
 from apps.reviews.services import ReviewService
@@ -243,6 +244,35 @@ def test_institution_catalog_scope_and_create_permissions(domain, client):
         == 200
     )
     assert client.get(reverse("catalog-create", args=["programas"])).status_code == 403
+
+
+@pytest.mark.django_db
+def test_institution_create_requires_review_before_save(domain, client):
+    """Instituição passa por revisão: o primeiro POST não grava; só o confirmado salva."""
+    client.force_login(domain["admin"])
+    url = reverse("catalog-create", args=["instituicoes"])
+    data = {
+        "cnpj": "11.444.777/0001-61",
+        "name": "Instituição Revisão",
+        "contact_email": "rev@exemplo.org",
+        "municipality": domain["sub"].municipality.pk,
+    }
+
+    # Primeiro envio: mostra a revisão e NÃO grava.
+    review = client.post(url, data)
+    assert review.status_code == 200
+    assert "Revise antes de salvar" in review.content.decode()
+    assert not Institution.objects.filter(name="Instituição Revisão").exists()
+
+    # "Editar" volta ao formulário, ainda sem gravar.
+    edit = client.post(url, {**data, "_edit": "1"})
+    assert edit.status_code == 200
+    assert not Institution.objects.filter(name="Instituição Revisão").exists()
+
+    # Confirmado: grava e redireciona.
+    confirmed = client.post(url, {**data, "_confirmed": "1"})
+    assert confirmed.status_code == 302
+    assert Institution.objects.filter(name="Instituição Revisão").exists()
 
 
 @pytest.mark.django_db
