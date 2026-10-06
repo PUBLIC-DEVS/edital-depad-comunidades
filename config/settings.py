@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import dj_database_url
 from dotenv import load_dotenv
@@ -102,6 +103,34 @@ ASGI_APPLICATION = "config.asgi.application"
 DATABASE_URL = (
     os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
 )
+
+
+def _sanitize_pg_url(url: str) -> str:
+    """Remove parâmetros de query que não são opções válidas do libpq/psycopg.
+
+    Strings do Supabase/pooler costumam trazer extras (ex.: 'supa', 'pgbouncer',
+    'connection_limit') que o psycopg rejeita com 'invalid connection option'.
+    O roteamento do pooler é feito pelo usuário (postgres.<ref>), então descartá-los
+    é seguro; mantemos apenas opções reconhecidas de conexão como sslmode.
+    """
+    parts = urlsplit(url)
+    if not parts.scheme.startswith(("postgres", "postgresql")) or not parts.query:
+        return url
+    allowed = {
+        "sslmode",
+        "sslrootcert",
+        "sslcert",
+        "sslkey",
+        "connect_timeout",
+        "application_name",
+        "options",
+        "target_session_attrs",
+    }
+    kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k in allowed]
+    return urlunsplit(parts._replace(query=urlencode(kept)))
+
+
+DATABASE_URL = _sanitize_pg_url(DATABASE_URL)
 # Em serverless (Vercel) as conexões não sobrevivem entre invocações: fecha a cada
 # request e usa o endpoint com pool. Local/Docker mantém conexões persistentes.
 DB_CONN_MAX_AGE = 0 if os.getenv("VERCEL") else int(os.getenv("DB_CONN_MAX_AGE", "600"))
