@@ -95,14 +95,25 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # Database
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+# Prioridade: DATABASE_URL explícito > POSTGRES_URL (injetado pela integração
+# Postgres da Vercel/Neon) > SQLite local para desenvolvimento.
+DATABASE_URL = (
+    os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+)
+# Em serverless (Vercel) as conexões não sobrevivem entre invocações: fecha a cada
+# request e usa o endpoint com pool. Local/Docker mantém conexões persistentes.
+DB_CONN_MAX_AGE = 0 if os.getenv("VERCEL") else int(os.getenv("DB_CONN_MAX_AGE", "600"))
 DATABASES = {
     "default": dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=600,
-        conn_health_checks=True,
+        conn_max_age=DB_CONN_MAX_AGE,
+        conn_health_checks=DB_CONN_MAX_AGE > 0,
     )
 }
+# Supabase/Vercel usam o pooler (pgbouncer, transaction mode). Nesse modo os
+# cursores server-side do Django não funcionam, então os desativamos no serverless.
+if os.getenv("VERCEL"):
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
 
 # Custom User Model
 AUTH_USER_MODEL = "accounts.User"
