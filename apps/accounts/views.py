@@ -15,6 +15,7 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
+from django.urls import reverse
 
 from apps.accounts.adapters import get_auth_adapter
 
@@ -43,6 +44,18 @@ def _microsoft_enabled() -> bool:
     )
 
 
+def _redirect_uri(request: HttpRequest) -> str:
+    """Redirect URI do callback OAuth.
+
+    Usa MS_REDIRECT_URI quando definido explicitamente; caso contrário, deriva do
+    próprio request (funciona em localhost, preview e produção sem configurar env).
+    Precisa estar registrado EXATAMENTE no App registration do Entra ID.
+    """
+    if settings.MS_REDIRECT_URI:
+        return settings.MS_REDIRECT_URI
+    return request.build_absolute_uri(reverse("microsoft-callback"))
+
+
 def ms_login(request: HttpRequest) -> HttpResponse:
     """Inicia o fluxo de login: monta a URL de autorização e redireciona ao Entra ID."""
     if not _microsoft_enabled():
@@ -52,7 +65,7 @@ def ms_login(request: HttpRequest) -> HttpResponse:
     app = _build_msal_app()
     flow = app.initiate_auth_code_flow(
         scopes=settings.MS_SCOPES,
-        redirect_uri=settings.MS_REDIRECT_URI,
+        redirect_uri=_redirect_uri(request),
     )
     # O flow carrega o state e o code_verifier (PKCE); precisa sobreviver ao redirect.
     request.session[_FLOW_SESSION_KEY] = flow

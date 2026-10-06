@@ -19,6 +19,11 @@ SECRET_KEY = os.getenv(
 
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
+# Atrás do proxy da Vercel, o Django enxerga a requisição como HTTPS pelo cabeçalho
+# X-Forwarded-Proto. Necessário para request.build_absolute_uri gerar https:// e
+# para os cookies seguros funcionarem em produção.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 allowed_hosts_raw = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0,testserver")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_raw.split(",") if host.strip()]
 
@@ -203,10 +208,9 @@ MS_AUTHORITY = os.getenv(
     f"https://login.microsoftonline.com/{MS_TENANT_ID}" if MS_TENANT_ID else "",
 )
 # Deve coincidir EXATAMENTE com o Redirect URI registrado no portal do Entra ID.
-MS_REDIRECT_URI = os.getenv(
-    "MS_REDIRECT_URI",
-    "http://localhost:8000/auth/microsoft/callback/",
-)
+# Vazio por padrão: quando não definido, a view deriva do próprio request
+# (request.build_absolute_uri), funcionando em localhost, preview e produção.
+MS_REDIRECT_URI = os.getenv("MS_REDIRECT_URI", "")
 # Escopos de recurso. openid/profile/offline_access são adicionados pelo MSAL.
 MS_SCOPES = [s.strip() for s in os.getenv("MS_SCOPES", "User.Read").split(",") if s.strip()]
 
