@@ -244,9 +244,7 @@ class EvaluationService:
         # Bloqueia se uma revisão já foi atribuída ou concluída: nesse caso a reabertura
         # depende da coordenação para não descartar trabalho de revisão em andamento.
         review = Review.objects.filter(evaluation=evaluation).first()
-        if review and (
-            review.status != Review.Status.PENDING or review.reviewer_id is not None
-        ):
+        if review and (review.status != Review.Status.PENDING or review.reviewer_id is not None):
             raise ValidationError(
                 "Já existe revisão atribuída ou concluída para esta análise; "
                 "a reabertura precisa ser tratada pela coordenação."

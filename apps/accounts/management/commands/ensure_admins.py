@@ -25,7 +25,9 @@ DEFAULT_ADMIN_EMAILS = (
 
 
 class Command(BaseCommand):
-    help = "Garante que os administradores institucionais existam como ADMINISTRADOR + superusuário."
+    help = (
+        "Garante que os administradores institucionais existam como ADMINISTRADOR + superusuário."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -78,8 +80,6 @@ class Command(BaseCommand):
                 changed.append("is_active")
             if changed:
                 user.save(update_fields=changed)
-                self.stdout.write(
-                    self.style.SUCCESS(f"Promovido {email}: {', '.join(changed)}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"Promovido {email}: {', '.join(changed)}"))
             else:
                 self.stdout.write(f"Já administrador, sem alterações: {email}")
