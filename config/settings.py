@@ -65,6 +65,8 @@ if ENABLE_LEGACY_IMPORT:
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serve arquivos estáticos em produção (DEBUG=False), inclusive no serverless.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -139,6 +141,17 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise comprime e serve os estáticos coletados (collectstatic) sem precisar
+# de servidor web externo. Storage sem manifesto para não quebrar se faltar um arquivo.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
+# Serve os estáticos direto da pasta static/ (via finders), dispensando o
+# collectstatic no build — útil no serverless da Vercel, onde a pasta static/
+# já vai no bundle. Rodar collectstatic continua funcionando e tem prioridade.
+WHITENOISE_USE_FINDERS = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
