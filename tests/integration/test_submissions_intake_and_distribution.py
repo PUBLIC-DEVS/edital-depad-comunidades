@@ -220,4 +220,3 @@ class TestSubmissionsIntakeAndDistribution:
         assert submission.received_date.isoformat() == "2026-04-15"
         assert submission.received_time.strftime("%H:%M") == "14:35"
         assert submission.total_vagas == 8
-

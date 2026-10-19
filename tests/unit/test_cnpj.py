@@ -109,4 +109,3 @@ class TestCNPJModule:
         )
         assert rel_diff["relation"] == "DIFFERENT_ROOT"
         assert rel_diff["same_root"] is False
-
