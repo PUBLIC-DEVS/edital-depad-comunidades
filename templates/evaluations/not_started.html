@@ -12,13 +12,19 @@
         <div class="space-y-1">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Análise Documental Técnica</span>
             <h1 class="text-2xl font-extrabold text-slate-900 font-mono">Processo SEI {{ submission.processo_sei }}</h1>
-            <p class="text-sm text-slate-600 font-medium">{{ submission.institution.name }} (CNPJ: {{ submission.institution.formatted_cnpj }})</p>
+            <p class="text-sm text-slate-600 font-medium">
+                {{ submission.institution.name }} (CNPJ: {{ submission.institution.formatted_cnpj }})
+                {% if submission.institution.cnpj_hierarchy_label %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold {% if submission.institution.is_matriz %}bg-sky-100 text-sky-900{% else %}bg-indigo-100 text-indigo-900{% endif %} ml-1">{{ submission.institution.cnpj_hierarchy_label }}</span>
+                {% endif %}
+            </p>
         </div>
 
         <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 max-w-md mx-auto text-left space-y-1.5">
             <div><strong>Edital:</strong> {{ submission.edital.number }}/{{ submission.edital.year }}</div>
             <div><strong>Grupo:</strong> {{ submission.target_group }}</div>
-            <div><strong>Recebido em:</strong> {{ submission.received_at|date:"d/m/Y H:i" }}</div>
+            <div><strong>Data de Recebimento:</strong> {{ submission.received_date|date:"d/m/Y" }}</div>
+            <div><strong>Hora de Recebimento:</strong> {{ submission.received_time|time:"H:i" }}</div>
         </div>
 
         <p class="text-xs text-slate-500">A análise documental ainda não foi formalmente iniciada para este processo.</p>

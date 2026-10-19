@@ -149,3 +149,75 @@ class TestSubmissionsIntakeAndDistribution:
         # Exceções
         response_exc = client.get(reverse("submission-anomalies"))
         assert response_exc.status_code == 200
+
+    def test_vacancy_range_and_matriz_filial_anomaly_alerts(self, setup_data):
+        filial_inst = Institution.objects.create(
+            cnpj="00000000000272",
+            name="OSC Filial",
+            municipality=setup_data["mun"],
+        )
+        sub_matriz = Submission.objects.create(
+            edital=setup_data["edital"],
+            institution=setup_data["inst"],
+            processo_sei="71000.MATRIZ/2024",
+            received_at=setup_data["now"],
+            municipality=setup_data["mun"],
+            vagas_femininas=2,
+            vagas_maes_nutrizes=2,  # Soma = 4 (< 5) -> deve gerar alerta MIN_VACANCIES_FEMALE_MOTHERS
+            vagas_masculinas=8,  # < 10 -> deve gerar alerta MALE_VACANCIES_OUT_OF_RANGE
+            vagas_solicitadas=12,
+        )
+        sub_filial = Submission.objects.create(
+            edital=setup_data["edital"],
+            institution=filial_inst,
+            processo_sei="71000.FILIAL/2024",
+            received_at=setup_data["now"],
+            municipality=setup_data["mun"],
+            vagas_femininas=3,
+            vagas_maes_nutrizes=2,  # Soma = 5 (OK)
+            vagas_masculinas=65,  # > 60 -> deve gerar alerta MALE_VACANCIES_OUT_OF_RANGE
+            vagas_solicitadas=70,
+        )
+
+        alerts_matriz = SubmissionAnomalyDetector.check_submission(sub_matriz)
+        codes_matriz = [a.code for a in alerts_matriz]
+        assert "MIN_VACANCIES_FEMALE_MOTHERS" in codes_matriz
+        assert "MALE_VACANCIES_OUT_OF_RANGE" in codes_matriz
+        assert "SAME_CNPJ_ROOT_MATRIZ_FILIAL" in codes_matriz
+
+        alerts_filial = SubmissionAnomalyDetector.check_submission(sub_filial)
+        codes_filial = [a.code for a in alerts_filial]
+        assert "MIN_VACANCIES_FEMALE_MOTHERS" not in codes_filial
+        assert "MALE_VACANCIES_OUT_OF_RANGE" in codes_filial
+        assert "SAME_CNPJ_ROOT_MATRIZ_FILIAL" in codes_filial
+
+    def test_submission_intake_form_separated_date_and_time_does_not_block_vacancy_alerts(
+        self, setup_data
+    ):
+        from apps.submissions.forms import SubmissionIntakeForm
+        from tests.operational_helpers import publish_fixture
+
+        publish_fixture(setup_data["edital"])
+
+        form = SubmissionIntakeForm(
+            data={
+                "edital": setup_data["edital"].pk,
+                "processo_sei": "71000.SEPARADO/2024",
+                "received_date": "2026-04-15",
+                "received_time": "14:35",
+                "institution_cnpj": "00.000.000/0001-91",
+                "institution_name": "OSC Matriz",
+                "municipality": setup_data["mun"].pk,
+                "vagas_femininas": 2,
+                "vagas_maes_nutrizes": 1,  # Soma 3 (< 5), mas não bloqueia o salvamento
+                "vagas_masculinas": 5,  # < 10, mas não bloqueia o salvamento
+                "vagas_solicitadas": 8,
+                "capacidade_total": 20,
+            }
+        )
+        assert form.is_valid(), form.errors
+        submission = form.save()
+        assert submission.received_date.isoformat() == "2026-04-15"
+        assert submission.received_time.strftime("%H:%M") == "14:35"
+        assert submission.total_vagas == 8
+

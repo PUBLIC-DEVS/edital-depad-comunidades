@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from apps.institutions.cnpj import normalize_cnpj, validate_cnpj
+from apps.institutions.cnpj import extract_cnpj_root, normalize_cnpj, validate_cnpj
 from apps.submissions.models import Submission
 from apps.submissions.services.eligibility import ParticipationEligibilityService
 
@@ -67,6 +67,37 @@ class SubmissionAnomalyDetector:
                 )
             )
 
+        # 2b. Vínculo Matriz / Filial (mesma raiz de 8 dígitos em CNPJ diferente no mesmo edital)
+        cnpj_root = extract_cnpj_root(norm_cnpj)
+        if len(cnpj_root) == 8:
+            same_root_others = (
+                Submission.objects.filter(
+                    edital=submission.edital,
+                    institution__cnpj__startswith=cnpj_root,
+                )
+                .exclude(institution__cnpj=norm_cnpj)
+                .select_related("institution")
+                .order_by("received_at")
+            )
+            if same_root_others.exists():
+                root_details = tuple(
+                    f"Processo {other.processo_sei} — {other.institution.formatted_cnpj} "
+                    f"({other.institution.cnpj_hierarchy_label}); recebimento "
+                    f"{other.received_at:%d/%m/%Y %H:%M}; {other.get_workflow_status_display()}"
+                    for other in same_root_others
+                )
+                alerts.append(
+                    AnomalyAlert(
+                        code="SAME_CNPJ_ROOT_MATRIZ_FILIAL",
+                        severity="warning",
+                        message=(
+                            f"Existe outra inscrição neste edital com a mesma raiz de CNPJ "
+                            f"({submission.institution.formatted_cnpj_root} — Matriz/Filial)."
+                        ),
+                        details=root_details,
+                    )
+                )
+
         restrictions = list(
             ParticipationEligibilityService.active_restrictions(submission.edital, raw_cnpj)
         )
@@ -124,6 +155,34 @@ class SubmissionAnomalyDetector:
                     message=(
                         f"Soma de vagas ({soma_vagas}) diverge do total informado "
                         f"({submission.vagas_solicitadas})."
+                    ),
+                )
+            )
+
+        # 4b. Faixa de vagas: Mães + Feminino >= 5
+        soma_fem_maes = submission.vagas_femininas + submission.vagas_maes_nutrizes
+        if soma_fem_maes > 0 and soma_fem_maes < 5:
+            alerts.append(
+                AnomalyAlert(
+                    code="MIN_VACANCIES_FEMALE_MOTHERS",
+                    severity="warning",
+                    message=(
+                        f"Mães + Feminino ({soma_fem_maes}) abaixo do mínimo de referência "
+                        f"(Mães + Feminino >= 5; informado: {submission.vagas_femininas} femininas + "
+                        f"{submission.vagas_maes_nutrizes} mães nutrizes)."
+                    ),
+                )
+            )
+
+        # 4c. Faixa de vagas: 10 <= Masculino <= 60
+        if submission.vagas_masculinas > 0 and not (10 <= submission.vagas_masculinas <= 60):
+            alerts.append(
+                AnomalyAlert(
+                    code="MALE_VACANCIES_OUT_OF_RANGE",
+                    severity="warning",
+                    message=(
+                        f"Vagas masculinas ({submission.vagas_masculinas}) fora da faixa de referência "
+                        f"(10 <= Masculino <= 60)."
                     ),
                 )
             )

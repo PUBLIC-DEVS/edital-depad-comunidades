@@ -1,7 +1,16 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from .cnpj import cnpj_validator, format_cnpj, normalize_cnpj
+from .cnpj import (
+    cnpj_branch_label,
+    cnpj_validator,
+    extract_cnpj_branch,
+    extract_cnpj_root,
+    format_cnpj,
+    format_cnpj_root,
+    is_matriz_cnpj,
+    normalize_cnpj,
+)
 
 
 class Municipality(models.Model):
@@ -86,3 +95,23 @@ class Institution(models.Model):
     @property
     def formatted_cnpj(self) -> str:
         return format_cnpj(self.cnpj)
+
+    @property
+    def cnpj_root(self) -> str:
+        return extract_cnpj_root(self.cnpj)
+
+    @property
+    def formatted_cnpj_root(self) -> str:
+        return format_cnpj_root(self.cnpj)
+
+    @property
+    def cnpj_branch(self) -> str:
+        return extract_cnpj_branch(self.cnpj)
+
+    @property
+    def is_matriz(self) -> bool:
+        return is_matriz_cnpj(self.cnpj)
+
+    @property
+    def cnpj_hierarchy_label(self) -> str:
+        return cnpj_branch_label(self.cnpj)

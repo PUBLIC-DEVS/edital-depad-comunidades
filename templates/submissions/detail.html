@@ -124,7 +124,17 @@
                     </div>
                     <div>
                         <span class="text-slate-500 block">CNPJ da candidatura / declarado no Anexo I:</span>
-                        <strong class="font-mono text-slate-900 text-sm">{{ submission.institution.formatted_cnpj }}</strong>
+                        <div class="flex flex-wrap items-center gap-2 mt-0.5">
+                            <strong class="font-mono text-slate-900 text-sm">{{ submission.institution.formatted_cnpj }}</strong>
+                            {% if submission.institution.cnpj_hierarchy_label %}
+                                <span class="badge {% if submission.institution.is_matriz %}badge-prioritario{% else %}badge-emanalise{% endif %}">
+                                    {{ submission.institution.cnpj_hierarchy_label }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        {% if submission.institution.formatted_cnpj_root %}
+                            <span class="text-[11px] text-slate-500 font-mono">Raiz CNPJ: {{ submission.institution.formatted_cnpj_root }}</span>
+                        {% endif %}
                     </div>
                     <div>
                         <span class="text-slate-500 block">Endereço e CEP:</span>
@@ -135,8 +145,12 @@
                         <span class="text-slate-800">{{ submission.municipality.name }}/{{ submission.municipality.state }} (IBGE: {{ submission.municipality.ibge_code }})</span>
                     </div>
                     <div>
-                        <span class="text-slate-500 block">Data e Hora de Recebimento:</span>
-                        <span class="text-slate-800 font-mono">{{ submission.received_at|date:"d/m/Y H:i:s" }}</span>
+                        <span class="text-slate-500 block">Data de Recebimento:</span>
+                        <span class="text-slate-800 font-mono font-semibold">{{ submission.received_at|date:"d/m/Y" }}</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 block">Hora de Recebimento:</span>
+                        <span class="text-slate-800 font-mono font-semibold">{{ submission.received_at|date:"H:i:s" }}</span>
                     </div>
                     <div>
                         <span class="text-slate-500 block">Edital de Referência:</span>
@@ -171,6 +185,20 @@
                         <span class="text-[#0248AB] block text-[11px] font-bold">Total Vagas</span>
                         <span class="text-xl font-black text-[#171B55]">{{ submission.vagas_solicitadas }}</span>
                     </div>
+                </div>
+                <div class="flex flex-wrap gap-2 text-[11px] pt-1">
+                    {% with fem_maes=submission.vagas_femininas|add:submission.vagas_maes_nutrizes %}
+                        {% if fem_maes > 0 %}
+                            <span class="badge {% if fem_maes >= 5 %}badge-atende{% else %}badge-naoenviado{% endif %}">
+                                {% if fem_maes >= 5 %}&check;{% else %}&#9888;{% endif %} Mães + Feminino: {{ fem_maes }} (ref. &ge; 5)
+                            </span>
+                        {% endif %}
+                    {% endwith %}
+                    {% if submission.vagas_masculinas > 0 %}
+                        <span class="badge {% if submission.vagas_masculinas >= 10 and submission.vagas_masculinas <= 60 %}badge-atende{% else %}badge-naoenviado{% endif %}">
+                            {% if submission.vagas_masculinas >= 10 and submission.vagas_masculinas <= 60 %}&check;{% else %}&#9888;{% endif %} Masculino: {{ submission.vagas_masculinas }} (ref. 10 a 60)
+                        </span>
+                    {% endif %}
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
                     <div>

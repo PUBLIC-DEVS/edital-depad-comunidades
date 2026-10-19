@@ -1,7 +1,11 @@
 """Formulários de captação e distribuição de processos."""
 
+from datetime import datetime
+
 from django import forms
+from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.editais.models import Edital, TargetGroup
@@ -19,7 +23,15 @@ class SubmissionIntakeForm(forms.ModelForm):
         max_length=20,
         label="CNPJ da candidatura / declarado no Anexo I",
         validators=[cnpj_validator],
-        widget=forms.TextInput(attrs={"placeholder": "00.000.000/0000-00", "class": "form-input"}),
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "00.000.000/0000-00",
+                "class": "form-input",
+                "autocorrect": "off",
+                "autocapitalize": "off",
+                "spellcheck": "false",
+            }
+        ),
     )
     institution_name = forms.CharField(
         max_length=255,
@@ -30,25 +42,51 @@ class SubmissionIntakeForm(forms.ModelForm):
     institution_email = forms.EmailField(
         required=False,
         label="E-mail de contato",
-        widget=forms.EmailInput(attrs={"class": "form-input"}),
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-input",
+                "autocomplete": "email",
+                "autocorrect": "off",
+                "autocapitalize": "off",
+                "spellcheck": "false",
+            }
+        ),
     )
     institution_phone = forms.CharField(
         required=False,
         max_length=50,
         label="Telefone",
-        widget=forms.TextInput(attrs={"class": "form-input"}),
+        widget=forms.TextInput(attrs={"class": "form-input", "autocomplete": "tel"}),
     )
     institution_address = forms.CharField(
         required=False,
         max_length=255,
         label="Endereço",
-        widget=forms.TextInput(attrs={"class": "form-input"}),
+        widget=forms.TextInput(attrs={"class": "form-input", "autocomplete": "street-address"}),
     )
     institution_postal_code = forms.CharField(
         required=False,
         max_length=9,
         label="CEP",
-        widget=forms.TextInput(attrs={"class": "form-input", "placeholder": "00000-000"}),
+        widget=forms.TextInput(
+            attrs={"class": "form-input", "placeholder": "00000-000", "autocomplete": "postal-code"}
+        ),
+    )
+    received_date = forms.DateField(
+        required=False,
+        label="Data de Recebimento",
+        widget=forms.DateInput(
+            attrs={"type": "date", "class": "form-input"},
+            format="%Y-%m-%d",
+        ),
+    )
+    received_time = forms.TimeField(
+        required=False,
+        label="Hora de Recebimento",
+        widget=forms.TimeInput(
+            attrs={"type": "time", "step": "1", "class": "form-input"},
+            format="%H:%M:%S",
+        ),
     )
 
     class Meta:
@@ -66,17 +104,24 @@ class SubmissionIntakeForm(forms.ModelForm):
             "target_group_definition",
         ]
         widgets = {
-            "received_at": forms.DateTimeInput(
-                attrs={"type": "datetime-local", "class": "form-input"}
-            ),
+            "received_at": forms.HiddenInput(),
             "edital": forms.Select(attrs={"class": "form-select"}),
             "municipality": forms.Select(attrs={"class": "form-select"}),
-            "processo_sei": forms.TextInput(attrs={"class": "form-input"}),
+            "processo_sei": forms.TextInput(
+                attrs={
+                    "class": "form-input",
+                    "autocorrect": "off",
+                    "autocapitalize": "off",
+                    "spellcheck": "false",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
         operational_edital = kwargs.pop("operational_edital", None)
         super().__init__(*args, **kwargs)
+        self.fields["received_at"].required = False
+        self.fields["received_at"].widget = forms.HiddenInput()
         self.fields["edital"].queryset = Edital.objects.filter(status=Edital.Status.ACTIVE)
         if operational_edital:
             self.initial["edital"] = operational_edital.pk
@@ -118,6 +163,12 @@ class SubmissionIntakeForm(forms.ModelForm):
                 institution_phone=self.instance.institution.contact_phone,
                 institution_address=self.instance.institution.address,
                 institution_postal_code=self.instance.institution.postal_code,
+                received_date=self.instance.received_date,
+                received_time=(
+                    self.instance.received_time.strftime("%H:%M:%S")
+                    if self.instance.received_time
+                    else ""
+                ),
             )
             for field in (
                 "institution_email",
@@ -135,6 +186,36 @@ class SubmissionIntakeForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        r_date = cleaned_data.get("received_date")
+        r_time = cleaned_data.get("received_time")
+        r_at = cleaned_data.get("received_at")
+
+        if r_date is not None and r_time is not None:
+            combined = datetime.combine(r_date, r_time)
+            if settings.USE_TZ and timezone.is_naive(combined):
+                combined = timezone.make_aware(combined, timezone.get_current_timezone())
+            cleaned_data["received_at"] = combined
+            self.instance.received_at = combined
+        elif r_date is not None and r_time is None:
+            if "received_time" not in self.errors:
+                self.add_error("received_time", "Informe a hora de recebimento.")
+        elif r_time is not None and r_date is None:
+            if "received_date" not in self.errors:
+                self.add_error("received_date", "Informe a data de recebimento.")
+        elif r_at is not None:
+            local_dt = timezone.localtime(r_at) if timezone.is_aware(r_at) else r_at
+            cleaned_data["received_date"] = local_dt.date()
+            cleaned_data["received_time"] = local_dt.time()
+            self.instance.received_at = r_at
+        else:
+            if (
+                "received_date" not in self.errors
+                and "received_time" not in self.errors
+                and "received_at" not in self.errors
+            ):
+                self.add_error("received_date", "Informe a data de recebimento.")
+                self.add_error("received_time", "Informe a hora de recebimento.")
+
         fem = cleaned_data.get("vagas_femininas") or 0
         masc = cleaned_data.get("vagas_masculinas") or 0
         mae = cleaned_data.get("vagas_maes_nutrizes") or 0

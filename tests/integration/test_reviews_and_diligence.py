@@ -81,16 +81,28 @@ class TestReviewsAndDiligenceIntegration:
 
     def test_review_queue_and_detail_views(self, client, setup_data):
         client.force_login(setup_data["reviewer"])
+        # Registra um CNPJ de filial no CheckResult para validar a detecção Matriz <-> Filial na revisão
+        CheckResult.objects.filter(evaluation=setup_data["eval_obj"]).update(
+            document_cnpj="00000000000272"
+        )
         # Lista de revisões
         res_list = client.get(reverse("review-list"))
         assert res_list.status_code == 200
-        assert "71000.333/2024" in res_list.content.decode("utf-8")
+        list_html = res_list.content.decode("utf-8")
+        assert "71000.333/2024" in list_html
+        assert "Matriz (0001)" in list_html
 
         # Detalhe da revisão
         url_det = reverse("review-detail", kwargs={"review_id": setup_data["review"].id})
         res_det = client.get(url_det)
         assert res_det.status_code == 200
-        assert "DOC-1234" in res_det.content.decode("utf-8")
+        det_html = res_det.content.decode("utf-8")
+        assert "DOC-1234" in det_html
+        assert "review-summary-bar" in det_html
+        assert "Conferência Matriz e Filial do Requerimento" in det_html
+        assert "Filial (0002)" in det_html
+        assert "Data de Recebimento" in det_html
+        assert "Hora de Recebimento" in det_html
 
     def test_review_item_decision_agreement_and_divergence(self, setup_data):
         review = setup_data["review"]

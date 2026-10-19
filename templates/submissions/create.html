@@ -69,52 +69,74 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                    <label class="block font-semibold text-slate-700 mb-1">Município de Execução:</label>
+                    <label for="{{ form.municipality.id_for_label }}" class="block font-semibold text-slate-700 mb-1">Município de Execução:</label>
                     {{ form.municipality }}
                     {{ form.municipality.errors }}
                 </div>
                 <div>
-                    <label class="block font-semibold text-slate-700 mb-1">Data e Hora de Recebimento:</label>
-                    {{ form.received_at }}
-                    {{ form.received_at.errors }}
+                    <label for="{{ form.received_date.id_for_label }}" class="block font-semibold text-slate-700 mb-1">Data de Recebimento:</label>
+                    {{ form.received_date }}
+                    {{ form.received_date.errors }}
+                </div>
+                <div>
+                    <label for="{{ form.received_time.id_for_label }}" class="block font-semibold text-slate-700 mb-1">Hora de Recebimento:</label>
+                    {{ form.received_time }}
+                    {{ form.received_time.errors }}
                 </div>
             </div>
+            {{ form.received_at }}
+            {{ form.received_at.errors }}
 
-            <div class="border-t border-slate-100 pt-4">
-                <h3 class="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-3">Distribuição de Vagas Solicitadas</h3>
+            <fieldset class="border-t border-slate-100 pt-4" x-data="{
+                fem: {{ form.vagas_femininas.value|default:0 }},
+                masc: {{ form.vagas_masculinas.value|default:0 }},
+                maes: {{ form.vagas_maes_nutrizes.value|default:0 }},
+                get somaFemMaes() { return (parseInt(this.fem) || 0) + (parseInt(this.maes) || 0); },
+                get numMasc() { return parseInt(this.masc) || 0; },
+                get warnFemMaes() { return this.somaFemMaes > 0 && this.somaFemMaes < 5; },
+                get warnMasc() { return this.numMasc > 0 && (this.numMasc < 10 || this.numMasc > 60); }
+            }">
+                <legend class="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1">Distribuição de Vagas Solicitadas</legend>
+                <p id="vacancy-rules-hint" class="text-[11px] text-slate-500 mb-3">
+                    Faixas de referência para triagem: <strong>Mães + Feminino &ge; 5</strong> &middot; <strong>10 &le; Masculino &le; 60</strong> (valores fora da faixa geram alerta de triagem sem bloquear o cadastro).
+                </p>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                        <label class="block text-slate-600 mb-1">Vagas Femininas:</label>
-                        {{ form.vagas_femininas }}
+                        <label for="{{ form.vagas_femininas.id_for_label }}" class="block text-slate-600 mb-1">Vagas Femininas:</label>
+                        <input type="number" name="{{ form.vagas_femininas.html_name }}" id="{{ form.vagas_femininas.id_for_label }}" value="{{ form.vagas_femininas.value|default:0 }}" min="0" class="form-input" x-model="fem" aria-describedby="vacancy-rules-hint">
                         {{ form.vagas_femininas.errors }}
                     </div>
                     <div>
-                        <label class="block text-slate-600 mb-1">Vagas Masculinas:</label>
-                        {{ form.vagas_masculinas }}
+                        <label for="{{ form.vagas_masculinas.id_for_label }}" class="block text-slate-600 mb-1">Vagas Masculinas:</label>
+                        <input type="number" name="{{ form.vagas_masculinas.html_name }}" id="{{ form.vagas_masculinas.id_for_label }}" value="{{ form.vagas_masculinas.value|default:0 }}" min="0" class="form-input" x-model="masc" aria-describedby="vacancy-rules-hint">
                         {{ form.vagas_masculinas.errors }}
                     </div>
                     <div>
-                        <label class="block text-slate-600 mb-1">Mães Nutrizes:</label>
-                        {{ form.vagas_maes_nutrizes }}
+                        <label for="{{ form.vagas_maes_nutrizes.id_for_label }}" class="block text-slate-600 mb-1">Mães Nutrizes:</label>
+                        <input type="number" name="{{ form.vagas_maes_nutrizes.html_name }}" id="{{ form.vagas_maes_nutrizes.id_for_label }}" value="{{ form.vagas_maes_nutrizes.value|default:0 }}" min="0" class="form-input" x-model="maes" aria-describedby="vacancy-rules-hint">
                         {{ form.vagas_maes_nutrizes.errors }}
                     </div>
                     <div>
-                        <label class="block text-slate-600 mb-1 font-semibold">Total Solicitado:</label>
+                        <label for="{{ form.vagas_solicitadas.id_for_label }}" class="block text-slate-600 mb-1 font-semibold">Total Solicitado:</label>
                         {{ form.vagas_solicitadas }}
                         {{ form.vagas_solicitadas.errors }}
                     </div>
                 </div>
-            </div>
+                <div x-show="warnFemMaes || warnMasc" class="mt-3 p-2.5 bg-amber-50 border border-amber-300 rounded text-amber-900 text-xs space-y-1" role="status" aria-live="polite">
+                    <p x-show="warnFemMaes">&#9888; <strong>Atenção (Triagem):</strong> A soma de Mães + Feminino (<span x-text="somaFemMaes"></span>) está abaixo do mínimo de referência (&ge; 5).</p>
+                    <p x-show="warnMasc">&#9888; <strong>Atenção (Triagem):</strong> Vagas Masculinas (<span x-text="numMasc"></span>) fora da faixa de referência (10 &le; Masculino &le; 60).</p>
+                </div>
+            </fieldset>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
                 <div>
-                    <label class="block text-slate-600 mb-1">Capacidade Total:</label>
+                    <label for="{{ form.capacidade_total.id_for_label }}" class="block text-slate-600 mb-1">Capacidade Total:</label>
                     {{ form.capacidade_total }}
                 </div>
                 <div>
-                    <label class="block text-slate-600 mb-1">Grupo para classificação manual:</label>
+                    <label for="{{ form.target_group_definition.id_for_label }}" class="block text-slate-600 mb-1">Grupo para classificação manual:</label>
                     {{ form.target_group_definition }}
                     {{ form.target_group_definition.errors }}
                 </div>

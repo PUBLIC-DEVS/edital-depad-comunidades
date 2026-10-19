@@ -23,6 +23,7 @@ from apps.evaluations.models import Evaluation
 from apps.evaluations.services import EvaluationService, InconsistentEvaluationError
 from apps.evaluations.validation_rules import ValidationRuleEvaluator
 from apps.submissions.models import Submission
+from apps.submissions.services.validation import SubmissionAnomalyDetector
 
 
 @login_required
@@ -294,6 +295,7 @@ def workspace_context(request, evaluation, bound_forms=None):
                     "form": form,
                     "number": f"{section['number']}.{len(section['checks']) + 1}",
                     "validations": alerts,
+                    "cnpj_rel": result.cnpj_relationship,
                     "detail_fields": [
                         field for field in form if field.name not in {"status", "notes"}
                     ],
@@ -318,4 +320,6 @@ def workspace_context(request, evaluation, bound_forms=None):
         else 0,
         "counts": counts,
         "validation_outcomes": outcomes,
+        "related_root_submissions": list(evaluation.submission.related_root_submissions),
+        "submission_alerts": SubmissionAnomalyDetector.check_submission(evaluation.submission),
     }

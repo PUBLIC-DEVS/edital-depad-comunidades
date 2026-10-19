@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Submission(models.Model):
@@ -131,6 +132,57 @@ class Submission(models.Model):
     @property
     def computed_total_vagas(self) -> int:
         return self.vagas_femininas + self.vagas_masculinas + self.vagas_maes_nutrizes
+
+    @property
+    def received_date(self):
+        """Retorna a data de recebimento (no fuso local configurado)."""
+        if not self.received_at:
+            return None
+        dt = (
+            timezone.localtime(self.received_at)
+            if timezone.is_aware(self.received_at)
+            else self.received_at
+        )
+        return dt.date()
+
+    @property
+    def received_time(self):
+        """Retorna o horário de recebimento (no fuso local configurado)."""
+        if not self.received_at:
+            return None
+        dt = (
+            timezone.localtime(self.received_at)
+            if timezone.is_aware(self.received_at)
+            else self.received_at
+        )
+        return dt.time()
+
+    @property
+    def total_vagas(self) -> int:
+        """Retorna o total de vagas solicitadas (ou a soma por público quando não informado)."""
+        if self.vagas_solicitadas:
+            return int(self.vagas_solicitadas)
+        return (
+            int(self.vagas_femininas or 0)
+            + int(self.vagas_maes_nutrizes or 0)
+            + int(self.vagas_masculinas or 0)
+        )
+
+    @property
+    def related_root_submissions(self):
+        """Retorna outros requerimentos no mesmo edital pertencentes à mesma raiz de CNPJ (Matriz/Filial)."""
+        root = self.institution.cnpj_root if self.institution_id else ""
+        if len(root) != 8 or not self.edital_id:
+            return Submission.objects.none()
+        return (
+            Submission.objects.filter(
+                edital_id=self.edital_id,
+                institution__cnpj__startswith=root,
+            )
+            .exclude(pk=self.pk)
+            .select_related("institution", "municipality")
+            .order_by("received_at", "processo_sei")
+        )
 
 
 class Assignment(models.Model):

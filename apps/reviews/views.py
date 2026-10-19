@@ -13,10 +13,12 @@ from apps.accounts.permissions import RolePermissionPolicy, require_role
 from apps.editais.operational import operational_edital_required
 from apps.evaluations.assessment import blocking_results, definition_rows
 from apps.evaluations.models import CheckResult
+from apps.evaluations.validation_rules import ValidationRuleEvaluator
 from apps.reviews.forms import DiligenceCreateForm, DiligenceResponseForm, ReviewConcludeForm
 from apps.reviews.models import Diligence, Review
 from apps.reviews.services import ReviewService
 from apps.submissions.models import Submission
+from apps.submissions.services.validation import SubmissionAnomalyDetector
 from apps.submissions.services.workflow import WorkflowService
 
 
@@ -73,6 +75,7 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
     review = get_object_or_404(
         Review.objects.select_related(
             "submission",
+            "submission__edital",
             "submission__institution",
             "submission__municipality",
             "evaluation",
@@ -91,36 +94,85 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
     decisions_map = {d.check_result_id: d for d in review.item_decisions.all()}
     sections = {}
     rows = definition_rows(evaluation)
+    matriz_filial_items = []
+    total_checks_count = 0
+    attention_checks_count = 0
+
     for req, definition, result in rows:
         section = sections.setdefault(
-            req.pk, {"requirement": req, "number": len(sections) + 1, "checks": []}
+            req.pk,
+            {
+                "requirement": req,
+                "number": len(sections) + 1,
+                "checks": [],
+                "has_attention": False,
+                "has_matriz_filial": False,
+            },
         )
         if result:
-            section["checks"].append(
-                {
-                    "check": definition,
-                    "result": result,
-                    "decision": decisions_map.get(result.pk),
-                    "number": f"{section['number']}.{len(section['checks']) + 1}",
-                    "effective_status": decisions_map[result.pk].reviewer_status
-                    if result.pk in decisions_map
-                    and not decisions_map[result.pk].agrees_with_analyst
-                    else result.status,
-                    "status_choices": [
-                        (v, label)
-                        for v, label in CheckResult.Status.choices
-                        if v in definition.allowed_statuses
-                        and v not in {"NAO_ENVIADO", "EM_BRANCO"}
-                    ],
-                }
+            total_checks_count += 1
+            decision = decisions_map.get(result.pk)
+            effective_status = (
+                decision.reviewer_status
+                if decision and not decision.agrees_with_analyst
+                else result.status
             )
+            validations = [
+                outcome
+                for outcome in ValidationRuleEvaluator.evaluate_result(result)
+                if outcome.status != "PASS"
+            ]
+            cnpj_rel = result.cnpj_relationship
+            is_attention = bool(
+                result.status in {"NAO_ATENDE", "NAO_ENVIADO"}
+                or (decision and not decision.agrees_with_analyst)
+                or cnpj_rel.get("is_matriz_filial")
+            )
+            if is_attention:
+                attention_checks_count += 1
+                section["has_attention"] = True
+            if cnpj_rel.get("is_matriz_filial"):
+                section["has_matriz_filial"] = True
+
+            check_item = {
+                "check": definition,
+                "result": result,
+                "decision": decision,
+                "number": f"{section['number']}.{len(section['checks']) + 1}",
+                "effective_status": effective_status,
+                "validations": validations,
+                "cnpj_rel": cnpj_rel,
+                "is_attention": is_attention,
+                "needs_attention": is_attention,
+                "is_matriz_filial": bool(cnpj_rel.get("is_matriz_filial")),
+                "status_choices": [
+                    (v, label)
+                    for v, label in CheckResult.Status.choices
+                    if v in definition.allowed_statuses and v not in {"NAO_ENVIADO", "EM_BRANCO"}
+                ],
+            }
+            section["checks"].append(check_item)
+            if cnpj_rel.get("is_matriz_filial"):
+                matriz_filial_items.append(
+                    {
+                        "requirement_name": req.name,
+                        "number": check_item["number"],
+                        "check_number": check_item["number"],
+                        "check": definition,
+                        "check_name": definition.name,
+                        "result_id": result.pk,
+                        "cnpj_rel": cnpj_rel,
+                        "relationship": cnpj_rel,
+                    }
+                )
     req_sections = list(sections.values())
 
     conclude_form = ReviewConcludeForm(instance=review)
     can_edit = RolePermissionPolicy.can_edit_review(request.user, review)
-    unresolved_checks = [
-        result for result in blocking_results(evaluation) if result.pk not in decisions_map
-    ]
+    blocking_list = blocking_results(evaluation)
+    unresolved_checks = [result for result in blocking_list if result.pk not in decisions_map]
+    related_root_submissions = list(review.submission.related_root_submissions)
+    submission_alerts = SubmissionAnomalyDetector.check_submission(review.submission)
 
     context = {
         "review": review,
@@ -130,7 +182,14 @@ def review_detail_view(request: HttpRequest, review_id: int) -> HttpResponse:
         "conclude_form": conclude_form,
         "can_edit": can_edit,
         "can_claim": review.status == Review.Status.PENDING and review.reviewer_id is None,
+        "blocking_count": len(blocking_list),
+        "resolved_blocking_count": len(blocking_list) - len(unresolved_checks),
         "unresolved_checks": unresolved_checks,
+        "total_checks_count": total_checks_count,
+        "attention_checks_count": attention_checks_count,
+        "matriz_filial_items": matriz_filial_items,
+        "related_root_submissions": related_root_submissions,
+        "submission_alerts": submission_alerts,
         "assessment": ReviewService.effective_assessment(review, rows=rows),
     }
     return render(request, "reviews/detail.html", context)

@@ -115,6 +115,146 @@ def compare_cnpj(cnpj1: Any, cnpj2: Any) -> bool:
     return normalize_cnpj(cnpj1) == normalize_cnpj(cnpj2)
 
 
+def extract_cnpj_root(value: Any) -> str:
+    """Extrai a raiz de 8 caracteres do CNPJ (identificador base da entidade)."""
+    norm = normalize_cnpj(value)
+    if len(norm) != 14:
+        return ""
+    return norm[:8]
+
+
+def extract_cnpj_branch(value: Any) -> str:
+    """Extrai o código de ordem de 4 caracteres do CNPJ (0001 = Matriz, 0002+ = Filial)."""
+    norm = normalize_cnpj(value)
+    if len(norm) != 14:
+        return ""
+    return norm[8:12]
+
+
+def format_cnpj_root(value: Any) -> str:
+    """Formata a raiz de 8 caracteres do CNPJ no padrão XX.XXX.XXX."""
+    root = extract_cnpj_root(value)
+    if len(root) != 8:
+        return root
+    return f"{root[:2]}.{root[2:5]}.{root[5:8]}"
+
+
+def is_matriz_cnpj(value: Any) -> bool:
+    """Retorna True se o CNPJ informado corresponder à Matriz (ordem 0001)."""
+    return extract_cnpj_branch(value) == "0001"
+
+
+def cnpj_branch_label(value: Any) -> str:
+    """Retorna rótulo legível identificando Matriz (0001) ou Filial (XXXX)."""
+    branch = extract_cnpj_branch(value)
+    if not branch:
+        return ""
+    if branch == "0001":
+        return "Matriz (0001)"
+    return f"Filial ({branch})"
+
+
+def classify_cnpj_relationship(canonical_cnpj: Any, document_cnpj: Any) -> dict[str, Any]:
+    """Classifica a relação entre o CNPJ da inscrição (Anexo I) e o CNPJ de um documento."""
+    canon = normalize_cnpj(canonical_cnpj)
+    doc = normalize_cnpj(document_cnpj)
+    canon_label = cnpj_branch_label(canon)
+    doc_label = cnpj_branch_label(doc)
+    root_fmt = format_cnpj_root(canon)
+
+    if len(canon) != 14 or len(doc) != 14:
+        return {
+            "status": "INCOMPLETE",
+            "relation": "MISSING_DOCUMENT",
+            "same_root": False,
+            "is_exact": False,
+            "exact_match": False,
+            "is_matriz_filial": False,
+            "is_matriz_filial_pair": False,
+            "canonical_formatted": format_cnpj(canon),
+            "document_formatted": format_cnpj(doc),
+            "canonical_label": canon_label,
+            "document_label": doc_label,
+            "canonical_branch_label": canon_label,
+            "document_branch_label": doc_label,
+            "root_formatted": root_fmt,
+            "badge_label": "",
+            "summary": "",
+        }
+
+    if canon == doc:
+        return {
+            "status": "EXACT",
+            "relation": "EXACT_MATCH",
+            "same_root": True,
+            "is_exact": True,
+            "exact_match": True,
+            "is_matriz_filial": False,
+            "is_matriz_filial_pair": False,
+            "canonical_formatted": format_cnpj(canon),
+            "document_formatted": format_cnpj(doc),
+            "canonical_label": canon_label,
+            "document_label": doc_label,
+            "canonical_branch_label": canon_label,
+            "document_branch_label": doc_label,
+            "root_formatted": root_fmt,
+            "badge_label": f"Mesmo CNPJ · {canon_label}",
+            "summary": f"CNPJ do documento coincide exatamente com o da inscrição ({canon_label}).",
+        }
+
+    if canon[:8] == doc[:8]:
+        has_matriz = "0001" in (canon[8:12], doc[8:12])
+        status = "MATRIZ_FILIAL" if has_matriz else "FILIAL_FILIAL"
+        badge = (
+            f"Vínculo Matriz ↔ Filial (Raiz {root_fmt})"
+            if has_matriz
+            else f"Mesma Raiz CNPJ · Filiais Distintas ({root_fmt})"
+        )
+        return {
+            "status": status,
+            "relation": "SAME_ROOT_MATRIZ_FILIAL",
+            "same_root": True,
+            "is_exact": False,
+            "exact_match": False,
+            "is_matriz_filial": True,
+            "is_matriz_filial_pair": has_matriz,
+            "canonical_formatted": format_cnpj(canon),
+            "document_formatted": format_cnpj(doc),
+            "canonical_label": canon_label,
+            "document_label": doc_label,
+            "canonical_branch_label": canon_label,
+            "document_branch_label": doc_label,
+            "root_formatted": root_fmt,
+            "badge_label": badge,
+            "summary": (
+                f"Mesma raiz CNPJ ({root_fmt}): inscrição é {canon_label} "
+                f"e documento pertence à {doc_label}."
+            ),
+        }
+
+    return {
+        "status": "DIFFERENT_ROOT",
+        "relation": "DIFFERENT_ROOT",
+        "same_root": False,
+        "is_exact": False,
+        "exact_match": False,
+        "is_matriz_filial": False,
+        "is_matriz_filial_pair": False,
+        "canonical_formatted": format_cnpj(canon),
+        "document_formatted": format_cnpj(doc),
+        "canonical_label": canon_label,
+        "document_label": doc_label,
+        "canonical_branch_label": canon_label,
+        "document_branch_label": doc_label,
+        "root_formatted": root_fmt,
+        "badge_label": "Raiz de CNPJ distinta (outra entidade)",
+        "summary": (
+            f"Raiz de CNPJ divergente: inscrição ({format_cnpj_root(canon)} · {canon_label}) "
+            f"difere do documento ({format_cnpj_root(doc)} · {doc_label})."
+        ),
+    }
+
+
 def cnpj_validator(value: Any) -> None:
     """Validador para uso em campos de modelos e formulários do Django."""
     norm = normalize_cnpj(value)

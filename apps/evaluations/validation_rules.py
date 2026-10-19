@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 
 from apps.editais.models import RequirementValidationRule
-from apps.institutions.cnpj import normalize_cnpj
+from apps.institutions.cnpj import classify_cnpj_relationship, normalize_cnpj
 
 
 @dataclass(frozen=True)
@@ -44,10 +44,12 @@ class ValidationRuleEvaluator:
                         rule, "PENDING", "Informe o CNPJ declarado no documento.", "", expected
                     )
                 if actual != expected:
+                    rel = classify_cnpj_relationship(expected, actual)
+                    detail = f" {rel['summary']}" if rel.get("summary") else ""
                     return ValidationOutcome(
                         rule,
                         "FAIL",
-                        "CNPJ do documento diverge do CNPJ da candidatura.",
+                        f"CNPJ do documento diverge do CNPJ da candidatura.{detail}",
                         result.document_cnpj,
                         result.evaluation.submission.institution.cnpj,
                     )

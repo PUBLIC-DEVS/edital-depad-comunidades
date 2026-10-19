@@ -182,6 +182,23 @@ class CheckResult(models.Model):
             else f"requirement_{self.requirement_id}_"
         )
 
+    @property
+    def formatted_document_cnpj(self) -> str:
+        from apps.institutions.cnpj import format_cnpj
+
+        return format_cnpj(self.document_cnpj)
+
+    @property
+    def cnpj_relationship(self) -> dict:
+        from apps.institutions.cnpj import classify_cnpj_relationship
+
+        if not self.document_cnpj:
+            return {}
+        return classify_cnpj_relationship(
+            self.evaluation.submission.institution.cnpj,
+            self.document_cnpj,
+        )
+
     def clean(self):
         super().clean()
         if self.requirement_check_id:

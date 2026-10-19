@@ -2,9 +2,15 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.institutions.cnpj import (
+    classify_cnpj_relationship,
+    cnpj_branch_label,
     cnpj_validator,
     compare_cnpj,
+    extract_cnpj_branch,
+    extract_cnpj_root,
     format_cnpj,
+    format_cnpj_root,
+    is_matriz_cnpj,
     normalize_cnpj,
     validate_alphanumeric_cnpj,
     validate_cnpj,
@@ -16,6 +22,7 @@ class TestCNPJModule:
     # CNPJ de teste com dígitos válidos (ex: Banco do Brasil)
     VALID_NUMERIC_CNPJ = "00.000.000/0001-91"
     VALID_NUMERIC_RAW = "00000000000191"
+    VALID_FILIAL_CNPJ = "00.000.000/0002-72"
 
     # CNPJ com dígitos repetidos
     INVALID_REPEATED = "11.111.111/1111-11"
@@ -68,3 +75,38 @@ class TestCNPJModule:
 
         # Não deve levantar exceção para CNPJ válido
         cnpj_validator(self.VALID_NUMERIC_CNPJ)
+
+    def test_cnpj_root_and_branch_helpers(self):
+        assert extract_cnpj_root(self.VALID_NUMERIC_CNPJ) == "00000000"
+        assert format_cnpj_root(self.VALID_NUMERIC_CNPJ) == "00.000.000"
+        assert extract_cnpj_branch(self.VALID_NUMERIC_CNPJ) == "0001"
+        assert extract_cnpj_branch(self.VALID_FILIAL_CNPJ) == "0002"
+        assert is_matriz_cnpj(self.VALID_NUMERIC_CNPJ) is True
+        assert is_matriz_cnpj(self.VALID_FILIAL_CNPJ) is False
+        assert cnpj_branch_label(self.VALID_NUMERIC_CNPJ) == "Matriz (0001)"
+        assert cnpj_branch_label(self.VALID_FILIAL_CNPJ) == "Filial (0002)"
+
+    def test_classify_cnpj_relationship_matriz_filial(self):
+        rel_same_root = classify_cnpj_relationship(
+            self.VALID_NUMERIC_CNPJ,
+            self.VALID_FILIAL_CNPJ,
+        )
+        assert rel_same_root["relation"] == "SAME_ROOT_MATRIZ_FILIAL"
+        assert rel_same_root["same_root"] is True
+        assert rel_same_root["exact_match"] is False
+        assert rel_same_root["is_matriz_filial_pair"] is True
+
+        rel_exact = classify_cnpj_relationship(
+            self.VALID_NUMERIC_CNPJ,
+            self.VALID_NUMERIC_RAW,
+        )
+        assert rel_exact["relation"] == "EXACT_MATCH"
+        assert rel_exact["exact_match"] is True
+
+        rel_diff = classify_cnpj_relationship(
+            self.VALID_NUMERIC_CNPJ,
+            "11.222.333/0001-81",
+        )
+        assert rel_diff["relation"] == "DIFFERENT_ROOT"
+        assert rel_diff["same_root"] is False
+

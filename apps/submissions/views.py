@@ -265,8 +265,11 @@ def submission_anomalies_view(request: HttpRequest) -> HttpResponse:
             "exception_types": (
                 "ACTIVE_CONTRACT_RESTRICTION",
                 "DUPLICATE_CNPJ",
+                "SAME_CNPJ_ROOT_MATRIZ_FILIAL",
                 "INVALID_CNPJ",
                 "NO_TARGET_GROUP",
+                "MIN_VACANCIES_FEMALE_MOTHERS",
+                "MALE_VACANCIES_OUT_OF_RANGE",
             ),
         },
     )
@@ -380,9 +383,8 @@ def submission_import_csv_view(request):
             except (UnicodeError, csv.Error) as exc:
                 errors.append(f"CSV inválido: {exc}")
                 rows = []
-            expected = {
+            base_expected = {
                 "processo_sei",
-                "recebido_em",
                 "cnpj",
                 "instituicao",
                 "ibge",
@@ -392,19 +394,32 @@ def submission_import_csv_view(request):
                 "vagas_solicitadas",
                 "capacidade_total",
             }
-            optional = {"grupo_codigo", "contato_email", "contato_telefone", "endereco"}
+            optional = {
+                "recebido_em",
+                "data_recebimento",
+                "hora_recebimento",
+                "grupo_codigo",
+                "contato_email",
+                "contato_telefone",
+                "endereco",
+            }
             headers = (
                 set(csv.DictReader(io.StringIO(stream.getvalue())).fieldnames or [])
                 if not errors
                 else set()
             )
-            if not rows or not expected.issubset(headers):
+            has_received = "recebido_em" in headers or (
+                "data_recebimento" in headers and "hora_recebimento" in headers
+            )
+            expected = base_expected | {"recebido_em"}
+            if not rows or not base_expected.issubset(headers) or not has_received:
                 errors.append(
                     "CSV vazio ou sem colunas obrigatórias: " + ", ".join(sorted(expected))
                 )
-            elif headers - expected - optional:
+            elif headers - base_expected - optional:
                 errors.append(
-                    "Colunas não reconhecidas: " + ", ".join(sorted(headers - expected - optional))
+                    "Colunas não reconhecidas: "
+                    + ", ".join(sorted(headers - base_expected - optional))
                 )
             elif any(None in row or any(value is None for value in row.values()) for row in rows):
                 errors.append("CSV com número incorreto de colunas em alguma linha.")
@@ -446,6 +461,8 @@ def submission_import_csv_view(request):
                                 "municipality": municipality.pk,
                                 "processo_sei": row.get("processo_sei", ""),
                                 "received_at": row.get("recebido_em", ""),
+                                "received_date": row.get("data_recebimento", ""),
+                                "received_time": row.get("hora_recebimento", ""),
                                 "institution_cnpj": row.get("cnpj", ""),
                                 "institution_name": row.get("instituicao", ""),
                                 "institution_email": row.get("contato_email", ""),
