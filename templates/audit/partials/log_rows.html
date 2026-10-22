@@ -27,8 +27,12 @@
                 </span>
             </td>
             <td class="whitespace-nowrap">
-                <span class="font-medium">{{ e.actor.get_full_name|default:e.actor.username|default:"SISTEMA" }}</span>
+                {% if e.actor %}
+                <span class="font-medium">{{ e.actor.get_full_name|default:e.actor.username }}</span>
                 {% if e.actor.email %}<span class="block text-[10px] text-slate-400">{{ e.actor.email }}</span>{% endif %}
+                {% else %}
+                <span class="font-medium">SISTEMA</span>
+                {% endif %}
             </td>
             <td class="whitespace-nowrap font-mono text-slate-600">{{ e.action }}</td>
             <td>

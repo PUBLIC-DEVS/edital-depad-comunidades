@@ -3,6 +3,7 @@
 import pytest
 from django.urls import reverse
 
+from apps.submissions.models import Submission
 from tests.operational_helpers import publish_fixture
 
 pytestmark = pytest.mark.django_db
@@ -46,3 +47,26 @@ def test_distribution_overview_filter_without_assignment(client, domain):
     # sem distribuição: a submissão atribuída NÃO aparece
     without = client.get(reverse("distribution-overview"), {"dist": "sem"})
     assert domain["sub"].processo_sei not in without.content.decode()
+
+
+@pytest.mark.parametrize(
+    "status,expected",
+    [
+        (Submission.WorkflowStatus.ASSIGNED, 1),
+        (Submission.WorkflowStatus.UNDER_ANALYSIS, 1),
+        (Submission.WorkflowStatus.PENDING_REVIEW, 0),
+        (Submission.WorkflowStatus.ELIGIBLE_FOR_RANKING, 0),
+        (Submission.WorkflowStatus.INELIGIBLE, 0),
+        (Submission.WorkflowStatus.RANKED, 0),
+        (Submission.WorkflowStatus.CLOSED, 0),
+    ],
+)
+def test_workload_only_counts_processes_awaiting_analyst(client, domain, status, expected):
+    publish_fixture(domain["edital"])
+    submission = domain["sub"]
+    submission.workflow_status = status
+    submission.save(update_fields=["workflow_status"])
+    client.force_login(domain["admin"])
+    response = client.get(reverse("distribution-overview"))
+    assert sum(row["total"] for row in response.context["workload"]) == expected
+    assert submission.processo_sei in response.content.decode()

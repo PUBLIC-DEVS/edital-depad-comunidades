@@ -5,7 +5,11 @@
 {% block content %}
 <div class="max-w-2xl mx-auto space-y-6">
     <div class="text-xs text-slate-500">
+        {% if request.user.role == 'ANALISTA' %}
+        <a href="{% url 'my-evaluations' %}" class="text-[#0248AB] hover:underline font-medium">&larr; Minhas análises</a>
+        {% else %}
         <a href="{% url 'submission-list' %}" class="text-[#0248AB] hover:underline font-medium">&larr; Voltar para Processos</a>
+        {% endif %}
     </div>
 
     <div class="card p-8 text-center space-y-4 border-l-4 border-l-[#0248AB]">

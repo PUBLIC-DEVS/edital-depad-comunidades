@@ -46,7 +46,7 @@
      <fieldset {% if not can_edit %}disabled{% endif %}>
       <legend class="check-title">
        {{ item.number }} {{ item.check.name }}
-       {% if item.check.code == 'ANEXO_I' %}
+       {% if section.requirement.code == 'ANEXO_I' %}
        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-sky-100 text-sky-900 ml-1" title="CNPJ Base do Requerimento: {{ submission.institution.formatted_cnpj }}">
         CNPJ Base: {{ submission.institution.cnpj_hierarchy_label|default:"Requerente" }}
        </span>

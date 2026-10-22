@@ -86,7 +86,15 @@ def test_operational_home_is_not_metrics_redirect(client, operational, role):
     [
         (
             "admin",
-            ["Início", "Processos", "Revisão", "Classificação", "Métricas", "Administração", "Logs"],
+            [
+                "Início",
+                "Processos",
+                "Revisão",
+                "Classificação",
+                "Métricas",
+                "Administração",
+                "Logs",
+            ],
         ),
         (
             "coord",
@@ -170,9 +178,7 @@ def test_edital_configuration_enabled_for_admin_blocked_for_operational(client, 
     bloqueada para papéis operacionais (ex.: analista)."""
     client.force_login(operational["admin"])
     assert client.get(reverse("edital-list")).status_code == 200
-    assert (
-        client.get(reverse("edital-detail", args=[operational["edital"].pk])).status_code == 200
-    )
+    assert client.get(reverse("edital-detail", args=[operational["edital"].pk])).status_code == 200
     client.force_login(operational["analyst"])
     assert client.get(reverse("edital-list")).status_code == 403
 

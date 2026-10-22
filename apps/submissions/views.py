@@ -110,7 +110,14 @@ def distribution_overview_view(request: HttpRequest) -> HttpResponse:
         rows.append({"submission": sub, "active": active, "total": sub.assignment_count})
 
     workload = (
-        Assignment.objects.filter(submission__edital=edital, status=Assignment.Status.ACTIVE)
+        Assignment.objects.filter(
+            submission__edital=edital,
+            status=Assignment.Status.ACTIVE,
+            submission__workflow_status__in=[
+                Submission.WorkflowStatus.ASSIGNED,
+                Submission.WorkflowStatus.UNDER_ANALYSIS,
+            ],
+        )
         .values("analyst__username", "analyst__first_name", "analyst__last_name")
         .annotate(total=Count("id"))
         .order_by("-total")

@@ -134,6 +134,7 @@
                 <div>
                     <label for="{{ form.capacidade_total.id_for_label }}" class="block text-slate-600 mb-1">Capacidade Total:</label>
                     {{ form.capacidade_total }}
+                    {{ form.capacidade_total.errors }}
                 </div>
                 <div>
                     <label for="{{ form.target_group_definition.id_for_label }}" class="block text-slate-600 mb-1">Grupo para classificação manual:</label>

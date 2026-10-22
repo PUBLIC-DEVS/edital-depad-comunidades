@@ -6,8 +6,6 @@ Restrito a administradores. Oferece:
   - exportação CSV do conjunto filtrado.
 """
 
-import csv
-
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -19,9 +17,18 @@ from django.utils.dateparse import parse_date
 from apps.accounts.models import User
 from apps.accounts.permissions import require_role
 from apps.audit.models import AuditEvent
+from apps.csv_utils import SafeCsvWriter
 
 PAGE_SIZE = 50
 EXPORT_LIMIT = 100_000
+
+
+def _filter_date(value: str):
+    """Ignore datas inválidas, inclusive datas ISO com dia ou mês inexistente."""
+    try:
+        return parse_date(value)
+    except ValueError:
+        return None
 
 
 def _filtered_events(request: HttpRequest):
@@ -54,10 +61,10 @@ def _filtered_events(request: HttpRequest):
             | Q(action__icontains=search)
         )
 
-    date_from = parse_date(request.GET.get("from", "") or "")
+    date_from = _filter_date(request.GET.get("from", ""))
     if date_from:
         events = events.filter(timestamp__date__gte=date_from)
-    date_to = parse_date(request.GET.get("to", "") or "")
+    date_to = _filter_date(request.GET.get("to", ""))
     if date_to:
         events = events.filter(timestamp__date__lte=date_to)
 
@@ -109,7 +116,7 @@ class _Echo:
 def audit_export_csv_view(request: HttpRequest) -> StreamingHttpResponse:
     """Exporta o log filtrado em CSV (streaming, delimitado por ponto e vírgula)."""
     events = _filtered_events(request)[:EXPORT_LIMIT].iterator()
-    writer = csv.writer(_Echo(), delimiter=";")
+    writer = SafeCsvWriter(_Echo(), delimiter=";")
 
     header = [
         "timestamp",

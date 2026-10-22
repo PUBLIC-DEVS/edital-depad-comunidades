@@ -89,7 +89,7 @@
     <li>
      <a class="underline font-mono font-semibold" href="{% url 'submission-detail' rel_sub.pk %}">{{ rel_sub.processo_sei }}</a>
      — {{ rel_sub.institution.name }} (<span class="font-mono">{{ rel_sub.institution.formatted_cnpj }}</span> · <strong>{{ rel_sub.institution.cnpj_hierarchy_label }}</strong>)
-     · Status: {{ rel_sub.get_status_display }}
+     · Status: {{ rel_sub.get_workflow_status_display }}
     </li>
     {% endfor %}
    </ul>
@@ -161,7 +161,7 @@
    <fieldset {% if not can_edit %}disabled{% endif %}>
     <legend class="check-title flex flex-wrap items-center gap-2">
      <span>{{ item.number }} {{ item.check.name }}</span>
-     {% if item.check.code == 'ANEXO_I' %}
+     {% if section.requirement.code == 'ANEXO_I' %}
      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-sky-100 text-sky-900">
       Requerimento Base: {{ submission.institution.cnpj_hierarchy_label|default:"Requerente" }} ({{ submission.institution.formatted_cnpj }})
      </span>
