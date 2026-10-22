@@ -12,6 +12,7 @@ urlpatterns = [
         name="restriction-edit",
     ),
     path("importar-csv/", views.submission_import_csv_view, name="submission-import-csv"),
+    path("distribuicoes/", views.distribution_overview_view, name="distribution-overview"),
     path("novo/", views.submission_create_view, name="submission-create"),
     path(
         "<int:submission_id>/corrigir-cnpj/",

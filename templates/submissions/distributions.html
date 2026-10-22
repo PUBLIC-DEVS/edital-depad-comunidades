@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Distribuições — DEPAD / MDS{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+    <div class="flex flex-wrap items-end justify-between gap-3 pb-3 border-b border-slate-200">
+        <div>
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Edital {{ edital.number }}/{{ edital.year }}
+            </span>
+            <h1 class="text-2xl font-bold text-slate-800 mt-1">Distribuições dos processos</h1>
+            <p class="text-xs text-slate-600 mt-1">Analista responsável, quem distribuiu e carga de trabalho — de todos os processos.</p>
+        </div>
+        <a href="{% url 'submission-list' %}" class="btn-secondary text-xs font-semibold">← Processos</a>
+    </div>
+
+    {% if workload %}
+    <div class="card p-4">
+        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Carga por analista (processos ativos)</h2>
+        <div class="flex flex-wrap gap-2">
+            {% for w in workload %}
+            <span class="inline-flex items-center gap-1.5 bg-slate-100 rounded-full pl-3 pr-2 py-1 text-xs">
+                <span class="font-medium text-slate-700">{{ w.analyst__first_name|default:w.analyst__username }} {{ w.analyst__last_name }}</span>
+                <span class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-action-600 text-white text-[11px] font-bold">{{ w.total }}</span>
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="get" action="{% url 'distribution-overview' %}" class="card p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+        <div class="sm:col-span-2">
+            <label for="f-q" class="form-label text-xs">Processo / instituição</label>
+            <input id="f-q" name="q" value="{{ filters.q }}" class="form-input text-sm" placeholder="SEI ou nome da instituição">
+        </div>
+        <div>
+            <label for="f-analyst" class="form-label text-xs">Analista</label>
+            <input id="f-analyst" name="analyst" value="{{ filters.analyst }}" class="form-input text-sm" placeholder="nome do analista">
+        </div>
+        <div>
+            <label for="f-dist" class="form-label text-xs">Distribuição</label>
+            <select id="f-dist" name="dist" class="form-select text-sm">
+                <option value="" {% if not filters.dist %}selected{% endif %}>Todos</option>
+                <option value="com" {% if filters.dist == 'com' %}selected{% endif %}>Com analista</option>
+                <option value="sem" {% if filters.dist == 'sem' %}selected{% endif %}>Sem distribuição</option>
+            </select>
+        </div>
+        <div class="sm:col-span-4 flex gap-2">
+            <button type="submit" class="btn-primary text-xs font-semibold">Filtrar</button>
+            <a href="{% url 'distribution-overview' %}" class="btn-secondary text-xs">Limpar</a>
+            <span class="ml-auto self-center text-xs text-slate-500">{{ total_processos }} processo(s)</span>
+        </div>
+    </form>
+
+    <div class="table-wrapper overflow-x-auto">
+    <table class="operational-table w-full text-xs">
+        <thead>
+            <tr>
+                <th>Processo</th>
+                <th>Instituição</th>
+                <th>Município</th>
+                <th>Analista responsável</th>
+                <th>Distribuído por</th>
+                <th>Status</th>
+                <th class="text-center">Distrib.</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in page %}
+            <tr>
+                <td class="whitespace-nowrap">
+                    <a class="font-mono font-semibold text-action-700" href="{% url 'submission-detail' row.submission.pk %}">{{ row.submission.processo_sei }}</a>
+                </td>
+                <td>{{ row.submission.institution.name }}</td>
+                <td class="whitespace-nowrap">{{ row.submission.municipality.name }}/{{ row.submission.municipality.state }}</td>
+                <td class="whitespace-nowrap">
+                    {% if row.active %}
+                        <span class="font-medium text-slate-800">{{ row.active.analyst.get_full_name|default:row.active.analyst.username }}</span>
+                    {% else %}
+                        <span class="text-amber-700 font-medium">— sem distribuição</span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap text-slate-500">
+                    {% if row.active %}{{ row.active.assigned_by.username|default:"—" }}<span class="block text-[10px] text-slate-400">{{ row.active.assigned_at|date:"d/m/Y H:i" }}</span>{% else %}—{% endif %}
+                </td>
+                <td class="whitespace-nowrap">{{ row.submission.get_workflow_status_display }}</td>
+                <td class="text-center">
+                    {% if row.total > 1 %}
+                        <span class="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-bold" title="Houve redistribuição">{{ row.total }}×</span>
+                    {% else %}
+                        <span class="text-slate-400">{{ row.total }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center text-slate-400 py-6">Nenhum processo para os filtros atuais.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+
+    {% if page.paginator.num_pages > 1 %}
+    <nav class="flex items-center gap-2 text-xs" aria-label="Paginação">
+        {% if page.has_previous %}<a class="btn-secondary btn-sm" href="?{{ base_querystring }}&page={{ page.previous_page_number }}">← Anteriores</a>{% endif %}
+        <span class="text-slate-500">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a class="btn-secondary btn-sm" href="?{{ base_querystring }}&page={{ page.next_page_number }}">Próximos →</a>{% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

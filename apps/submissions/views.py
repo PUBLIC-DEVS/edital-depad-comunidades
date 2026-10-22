@@ -6,7 +6,9 @@ import io
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -30,7 +32,7 @@ from apps.submissions.forms import (
     SubmissionCnpjCorrectionForm,
     SubmissionIntakeForm,
 )
-from apps.submissions.models import ParticipationRestriction, Submission
+from apps.submissions.models import Assignment, ParticipationRestriction, Submission
 from apps.submissions.selectors import operational_process_context
 from apps.submissions.services.distribution import DistributionService
 from apps.submissions.services.eligibility import ParticipationEligibilityService
@@ -54,6 +56,82 @@ def submission_list_view(request: HttpRequest) -> HttpResponse:
     if request.headers.get("HX-Request") and not request.headers.get("HX-Boosted"):
         return render(request, "submissions/partials/table.html", context)
     return render(request, "submissions/list.html", context)
+
+
+@login_required
+@require_role(User.Role.DISTRIBUIDOR, User.Role.COORDENADOR, User.Role.ADMINISTRADOR)
+@operational_edital_required
+def distribution_overview_view(request: HttpRequest) -> HttpResponse:
+    """Visão consolidada das distribuições de todos os processos do edital ativo.
+
+    Mostra, por processo, o analista responsável atual, quem distribuiu, o nº de
+    (re)distribuições e o status, além da carga de trabalho por analista.
+    """
+    edital = request.operational_edital
+    submissions = (
+        Submission.objects.filter(edital=edital)
+        .select_related("institution", "municipality")
+        .prefetch_related(
+            Prefetch(
+                "assignments",
+                queryset=Assignment.objects.select_related("analyst", "assigned_by").order_by(
+                    "-assigned_at"
+                ),
+            )
+        )
+        .annotate(assignment_count=Count("assignments"))
+        .order_by("processo_sei")
+    )
+
+    search = request.GET.get("q", "").strip()
+    if search:
+        submissions = submissions.filter(
+            Q(processo_sei__icontains=search) | Q(institution__name__icontains=search)
+        )
+
+    analyst_q = request.GET.get("analyst", "").strip().lower()
+    dist = request.GET.get("dist", "").strip()  # 'com' | 'sem' | ''
+
+    rows = []
+    for sub in submissions:
+        active = next(
+            (a for a in sub.assignments.all() if a.status == Assignment.Status.ACTIVE), None
+        )
+        if dist == "com" and not active:
+            continue
+        if dist == "sem" and active:
+            continue
+        if analyst_q and active:
+            name = f"{active.analyst.username} {active.analyst.get_full_name()}".lower()
+            if analyst_q not in name:
+                continue
+        elif analyst_q and not active:
+            continue
+        rows.append({"submission": sub, "active": active, "total": sub.assignment_count})
+
+    workload = (
+        Assignment.objects.filter(submission__edital=edital, status=Assignment.Status.ACTIVE)
+        .values("analyst__username", "analyst__first_name", "analyst__last_name")
+        .annotate(total=Count("id"))
+        .order_by("-total")
+    )
+
+    params = request.GET.copy()
+    params.pop("page", None)
+    page = Paginator(rows, 40).get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "submissions/distributions.html",
+        {
+            "edital": edital,
+            "page": page,
+            "workload": workload,
+            "total_processos": len(rows),
+            "filters": {"q": search, "analyst": request.GET.get("analyst", ""), "dist": dist},
+            "base_querystring": params.urlencode(),
+        },
+    )
 
 
 @login_required
