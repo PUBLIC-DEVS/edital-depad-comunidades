@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.accounts.models import User
@@ -174,9 +174,19 @@ def catalog_form(request, catalog, object_id=None):
         else:
             created = not obj.pk
             try:
-                obj.save()
+                # Savepoint: uma violação de unicidade (ex.: duas requisições quase
+                # simultâneas) é tratada como erro de formulário, sem derrubar a
+                # transação externa nem estourar 500.
+                with transaction.atomic():
+                    obj.save()
             except ValidationError as exc:
                 form.add_error(None, "; ".join(exc.messages))
+            except IntegrityError:
+                form.add_error(
+                    None,
+                    "Já existe um cadastro com um valor único informado "
+                    "(por exemplo, nome de usuário, e-mail ou CNPJ).",
+                )
             else:
                 AuditEvent.objects.create(
                     actor=request.user,
