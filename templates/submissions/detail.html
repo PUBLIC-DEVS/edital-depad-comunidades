@@ -57,35 +57,6 @@
         </section>
     {% endif %}
 
-    {% if can_correct_cnpj %}
-        <section class="card p-5 bg-amber-50/50 border-amber-200">
-            <h2 class="font-bold text-amber-900 text-sm">Corrigir CNPJ da candidatura</h2>
-            <p class="text-xs text-slate-600 mt-1">
-                A correção substitui a instituição exclusivamente nesta inscrição, exige justificativa formal e gera registro permanente na trilha de auditoria. O CNPJ nunca é alterado automaticamente a partir de um documento.
-            </p>
-            <form method="post" action="{% url 'submission-cnpj-correction' submission.pk %}" class="mt-4 grid gap-3">
-                {% csrf_token %}
-                <div>
-                    <label for="correct-cnpj" class="form-label">CNPJ correto declarado no Anexo I:</label>
-                    <input class="form-input text-xs" id="correct-cnpj" name="cnpj" placeholder="00.000.000/0000-00" required>
-                </div>
-                <div>
-                    <label for="correction-reason" class="form-label">Justificativa da Correção:</label>
-                    <textarea class="form-input text-xs" id="correction-reason" name="reason" minlength="10" rows="2" placeholder="Informe a fundamentação da alteração cadastral..." required></textarea>
-                </div>
-                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                    <input type="checkbox" name="confirm" required>
-                    <span>Confirmo a correção formal; documentos serão preservados e o CNPJ será revalidado.</span>
-                </label>
-                <div>
-                    <button type="submit" class="btn-primary text-xs bg-amber-700 hover:bg-amber-800 border-amber-800">
-                        Registrar Correção Auditada
-                    </button>
-                </div>
-            </form>
-        </section>
-    {% endif %}
-
     {% if can_release_restriction %}
         <section class="card p-5 bg-amber-50/50 border-amber-200">
             <h2 class="font-bold text-amber-900 text-sm">Liberar Bloqueio Pré-Análise</h2>
@@ -277,5 +248,35 @@
             </div>
         </div>
     </div>
+
+    {# Ação sensível e rara: fica no final da página, fora de destaque. #}
+    {% if can_correct_cnpj %}
+        <section class="card p-5 bg-amber-50/50 border-amber-200">
+            <h2 class="font-bold text-amber-900 text-sm">Corrigir CNPJ da candidatura</h2>
+            <p class="text-xs text-slate-600 mt-1">
+                A correção substitui a instituição exclusivamente nesta inscrição, exige justificativa formal e gera registro permanente na trilha de auditoria. O CNPJ nunca é alterado automaticamente a partir de um documento.
+            </p>
+            <form method="post" action="{% url 'submission-cnpj-correction' submission.pk %}" class="mt-4 grid gap-3">
+                {% csrf_token %}
+                <div>
+                    <label for="correct-cnpj" class="form-label">CNPJ correto declarado no Anexo I:</label>
+                    <input class="form-input text-xs" id="correct-cnpj" name="cnpj" placeholder="00.000.000/0000-00" required>
+                </div>
+                <div>
+                    <label for="correction-reason" class="form-label">Justificativa da Correção:</label>
+                    <textarea class="form-input text-xs" id="correction-reason" name="reason" minlength="10" rows="2" placeholder="Informe a fundamentação da alteração cadastral..." required></textarea>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                    <input type="checkbox" name="confirm" required>
+                    <span>Confirmo a correção formal; documentos serão preservados e o CNPJ será revalidado.</span>
+                </label>
+                <div>
+                    <button type="submit" class="btn-primary text-xs bg-amber-700 hover:bg-amber-800 border-amber-800">
+                        Registrar Correção Auditada
+                    </button>
+                </div>
+            </form>
+        </section>
+    {% endif %}
 </div>
 {% endblock %}
