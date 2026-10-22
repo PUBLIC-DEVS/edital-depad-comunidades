@@ -1,0 +1,60 @@
+{% load tz %}
+<div class="flex items-center justify-between mb-2">
+    <p class="text-xs text-slate-500">
+        {{ page.paginator.count }} evento(s){% if page.paginator.num_pages > 1 %} · página {{ page.number }}/{{ page.paginator.num_pages }}{% endif %}
+    </p>
+    <p class="text-[11px] text-slate-400" aria-live="polite">atualizado {% now "H:i:s" %}</p>
+</div>
+
+<div class="table-wrapper overflow-x-auto">
+<table class="operational-table w-full text-xs">
+    <thead>
+        <tr>
+            <th>Quando</th>
+            <th>Categoria</th>
+            <th>Usuário</th>
+            <th>Ação</th>
+            <th>Detalhe</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in page %}
+        <tr>
+            <td class="whitespace-nowrap font-mono">{{ e.timestamp|timezone:"America/Sao_Paulo"|date:"d/m/Y H:i:s" }}</td>
+            <td>
+                <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold {% if e.is_access %}bg-sky-100 text-sky-800{% else %}bg-amber-100 text-amber-900{% endif %}">
+                    {{ e.category_label }}
+                </span>
+            </td>
+            <td class="whitespace-nowrap">
+                <span class="font-medium">{{ e.actor.get_full_name|default:e.actor.username|default:"SISTEMA" }}</span>
+                {% if e.actor.email %}<span class="block text-[10px] text-slate-400">{{ e.actor.email }}</span>{% endif %}
+            </td>
+            <td class="whitespace-nowrap font-mono text-slate-600">{{ e.action }}</td>
+            <td>
+                {% if e.is_access %}
+                    entrou em <span class="font-mono text-action-700">{{ e.entity_id }}</span>{% if e.metadata.view %} <span class="text-slate-400">({{ e.metadata.view }})</span>{% endif %}
+                {% else %}
+                    <span class="font-mono">{{ e.entity_type }}#{{ e.entity_id }}</span>
+                    {% if e.field %}<span class="block text-[11px] text-slate-500">{{ e.field }}: <span class="text-red-700">{{ e.old_value|default:"—"|truncatechars:40 }}</span> → <span class="text-emerald-700">{{ e.new_value|default:"—"|truncatechars:40 }}</span></span>{% endif %}
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-slate-400 py-6">Nenhum evento para os filtros atuais.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="flex items-center gap-2 mt-3 text-xs" aria-label="Paginação do log">
+    {% if page.has_previous %}
+        <a class="btn-secondary btn-sm" href="{% url 'audit-log' %}?{{ base_querystring }}&page={{ page.previous_page_number }}">← Anteriores</a>
+    {% endif %}
+    <span class="text-slate-500">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+        <a class="btn-secondary btn-sm" href="{% url 'audit-log' %}?{{ base_querystring }}&page={{ page.next_page_number }}">Próximos →</a>
+    {% endif %}
+</nav>
+{% endif %}

@@ -79,6 +79,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Registra acessos às páginas no log de auditoria (precisa do request.user).
+    "apps.audit.middleware.AccessLogMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

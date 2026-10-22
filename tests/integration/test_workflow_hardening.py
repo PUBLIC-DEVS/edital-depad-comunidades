@@ -37,12 +37,13 @@ def test_completion_routes(domain, status, target, reviews):
 @pytest.mark.parametrize("role", ["analyst", "consulta", "distributor", "coord"])
 def test_workspace_get_never_writes(client, domain, role):
     client.force_login(domain[role])
-    before = AuditEvent.objects.count()
+    # Ignora eventos de ACESSO (log de página): o invariante é não mudar o domínio.
+    before = AuditEvent.objects.exclude(action="ACCESS").count()
     res = client.get(reverse("evaluation-workspace", args=[domain["sub"].pk]))
     assert res.status_code == 200
     assert not Evaluation.objects.exists()
     assert not CheckResult.objects.exists()
-    assert AuditEvent.objects.count() == before
+    assert AuditEvent.objects.exclude(action="ACCESS").count() == before
     domain["sub"].refresh_from_db()
     assert domain["sub"].workflow_status == "ASSIGNED"
 

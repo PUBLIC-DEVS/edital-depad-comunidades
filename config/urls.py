@@ -30,5 +30,6 @@ urlpatterns = [
     path("diligencias/", include("apps.reviews.diligence_urls")),
     path("classificacao/", include("apps.ranking.urls")),
     path("metricas/", include("apps.reporting.urls")),
+    path("logs/", include("apps.audit.urls")),
     path("", dashboard, name="dashboard"),
 ]

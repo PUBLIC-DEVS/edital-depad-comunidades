@@ -86,7 +86,7 @@ def test_operational_home_is_not_metrics_redirect(client, operational, role):
     [
         (
             "admin",
-            ["Início", "Processos", "Revisão", "Classificação", "Métricas", "Administração"],
+            ["Início", "Processos", "Revisão", "Classificação", "Métricas", "Administração", "Logs"],
         ),
         (
             "coord",

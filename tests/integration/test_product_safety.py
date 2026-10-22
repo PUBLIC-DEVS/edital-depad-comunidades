@@ -276,6 +276,23 @@ def test_institution_create_requires_review_before_save(domain, client):
 
 
 @pytest.mark.django_db
+def test_duplicate_username_shows_error_not_500(domain, client):
+    """Cadastro de usuário com username já existente vira erro de formulário, não 500."""
+    client.force_login(domain["admin"])
+    response = client.post(
+        reverse("catalog-create", args=["usuarios"]),
+        {
+            "username": domain["analyst"].username,
+            "role": "CONSULTA",
+            "new_password": "SenhaForte#2027",
+            "is_active": True,
+        },
+    )
+    assert response.status_code == 200
+    assert "já existe" in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_manual_group_is_scoped_to_selected_edital(domain):
     edital = domain["edital"]
     edital.classification_policy.policy_type = "MANUAL_TARGET_POLICY_V1"

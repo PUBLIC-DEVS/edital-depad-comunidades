@@ -172,11 +172,12 @@ def test_identity_reuses_existing_institution_and_records_duplicate(identity_cas
 def test_identity_recovery_action_visible_after_start_and_detail_get_is_safe(client, identity_case):
     domain, evaluation, result = identity_case
     client.force_login(domain["coord"])
-    before = AuditEvent.objects.count()
+    # Ignora eventos de ACESSO (log de página): o invariante é não mudar o domínio.
+    before = AuditEvent.objects.exclude(action="ACCESS").count()
     response = client.get(reverse("submission-detail", args=[domain["sub"].pk]))
     assert response.status_code == 200
     assert "Corrigir CNPJ da candidatura" in response.content.decode()
-    assert AuditEvent.objects.count() == before
+    assert AuditEvent.objects.exclude(action="ACCESS").count() == before
     assert Evaluation.objects.count() == 1
     result.refresh_from_db()
     assert result.canonical_cnpj_confirmed

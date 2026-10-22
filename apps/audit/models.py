@@ -69,10 +69,27 @@ class AuditEvent(models.Model):
         verbose_name_plural = "Eventos de Auditoria"
         ordering = ["-timestamp"]
 
+    # Ação usada para registrar acesso/visualização de páginas (não é modificação).
+    ACCESS_ACTION = "ACCESS"
+
     def __str__(self):
         actor_name = self.actor.username if self.actor else "SISTEMA"
         ts = f"{self.timestamp:%d/%m/%Y %H:%M:%S}"
         return f"[{ts}] {actor_name} -> {self.action} on {self.entity_type}#{self.entity_id}"
+
+    @property
+    def is_access(self) -> bool:
+        return self.action == self.ACCESS_ACTION
+
+    @property
+    def category(self) -> str:
+        """Categoria para o visualizador de logs: 'acesso' ou 'modificacao'."""
+        return "acesso" if self.is_access else "modificacao"
+
+    @property
+    def category_label(self) -> str:
+        """Prefixo exibido no log, ex.: '[acesso]' ou '[modificação]'."""
+        return "[acesso]" if self.is_access else "[modificação]"
 
     def save(self, *args, **kwargs):
         if self.pk is not None:
