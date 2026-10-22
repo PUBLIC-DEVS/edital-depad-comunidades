@@ -165,12 +165,14 @@ def test_diligence_service_and_transition_off(domain):
     assert AuditEvent.objects.count() == before
 
 
-def test_retired_configuration_does_not_mutate(client, operational):
+def test_edital_configuration_enabled_for_admin_blocked_for_operational(client, operational):
+    """A configuração de editais fica acessível a administradores, mas segue
+    bloqueada para papéis operacionais (ex.: analista)."""
     client.force_login(operational["admin"])
-    response = client.post(reverse("edital-clone", args=[operational["edital"].pk]))
-    assert response.status_code == 302
-    assert response.url == "/administracao/"
-    assert Edital.objects.count() == 1
+    assert client.get(reverse("edital-list")).status_code == 200
+    assert (
+        client.get(reverse("edital-detail", args=[operational["edital"].pk])).status_code == 200
+    )
     client.force_login(operational["analyst"])
     assert client.get(reverse("edital-list")).status_code == 403
 

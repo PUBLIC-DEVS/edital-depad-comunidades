@@ -10,7 +10,7 @@ from config.views import dashboard, health_check
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("administracao/", include("apps.administration.urls")),
-    path("admin-editais/", include("apps.editais.operational_urls")),
+    path("admin-editais/", include("apps.editais.urls")),
     path("health/", health_check, name="health-check"),
     path(
         "login/",

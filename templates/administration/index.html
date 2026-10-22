@@ -11,6 +11,12 @@
     </div>
 
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <a class="card p-6 hover:border-[#0B57C5] hover:shadow-md transition group ring-1 ring-[#0B57C5]/20 bg-[#F0F6FF]/40" href="{% url 'edital-list' %}">
+            <h2 class="font-bold text-slate-900 group-hover:text-[#0248AB] transition text-base">Configuração de Editais</h2>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">Criar e editar editais, grupos, requisitos e checagens, valores (financeiro), programas e municípios — e <strong>publicar/ativar</strong> o edital.</p>
+            <div class="mt-4 text-xs font-semibold text-[#0248AB] group-hover:underline">Configurar &rarr;</div>
+        </a>
+
         <a class="card p-6 hover:border-[#0B57C5] hover:shadow-md transition group" href="{% url 'catalog-list' 'instituicoes' %}">
             <h2 class="font-bold text-slate-900 group-hover:text-[#0248AB] transition text-base">Instituições (OSCs)</h2>
             <p class="text-xs text-slate-500 mt-2 leading-relaxed">Catálogo de entidades de apoio e acolhimento, verificação de CNPJ e histórico cadastral.</p>
