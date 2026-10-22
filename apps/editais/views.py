@@ -66,6 +66,7 @@ def program_form(request, program_id=None):
         except ValidationError as exc:
             form.add_error(None, "; ".join(exc.messages))
         else:
+            messages.success(request, "Programa salvo com sucesso.")
             return redirect("program-list")
     return render(
         request,
@@ -117,6 +118,7 @@ def edital_form(request, edital_id=None):
         except ValidationError as exc:
             form.add_error(None, "; ".join(exc.messages))
         else:
+            messages.success(request, "Edital salvo com sucesso.")
             return redirect("edital-detail", edital_id=edital.pk)
     return render(
         request,
@@ -198,6 +200,7 @@ def section_form(request, edital_id, section, object_id=None):
         except ValidationError as exc:
             form.add_error(None, "; ".join(exc.messages))
         else:
+            messages.success(request, "Item de configuração salvo com sucesso.")
             return redirect("edital-section", edital_id=edital.pk, section=section)
     return render(
         request,
@@ -239,6 +242,8 @@ def section_action(request, edital_id, section, object_id, action):
             raise ValidationError("Operação inválida.")
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages))
+    else:
+        messages.success(request, "Operação realizada com sucesso.")
     return redirect("edital-section", edital_id=edital.pk, section=section)
 
 
@@ -276,6 +281,7 @@ def edital_clone(request, edital_id):
         except ValidationError as exc:
             form.add_error(None, "; ".join(exc.messages))
         else:
+            messages.success(request, "Edital duplicado com sucesso.")
             return redirect("edital-detail", edital_id=clone.pk)
     return render(
         request,
@@ -298,6 +304,8 @@ def edital_status(request, edital_id):
         EditalConfigurationService.set_status(edital, request.POST.get("status"), request.user)
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages))
+    else:
+        messages.success(request, "Status do edital atualizado.")
     return redirect("edital-detail", edital_id=edital.pk)
 
 

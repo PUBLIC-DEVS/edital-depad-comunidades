@@ -4,59 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sistema de Gestão e Análise de Edital — DEPAD / MDS{% endblock %}</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#F0F2F8',
-                            100: '#E4E8F4',
-                            200: '#CBD5F5',
-                            600: '#3F4AB7',
-                            700: '#343DA5',
-                            800: '#2B3291',
-                            900: '#222873',
-                            950: '#171B55',
-                        },
-                        action: {
-                            50: '#F0F6FF',
-                            100: '#E0ECFF',
-                            500: '#1769D2',
-                            600: '#0B57C5',
-                            700: '#0248AB',
-                            800: '#003682',
-                        },
-                        accentred: {
-                            50: '#FEF2F2',
-                            100: '#FEE2E2',
-                            500: '#E33A40',
-                            600: '#D12B32',
-                            700: '#B4232A',
-                            800: '#93191E',
-                        },
-                        govblue: {
-                            50: '#F0F2F8',
-                            100: '#E0ECFF',
-                            600: '#0B57C5',
-                            700: '#0248AB',
-                            800: '#222873',
-                            900: '#171B55',
-                        },
-                        status: {
-                            atende: '#16a34a',
-                            naoatende: '#dc2626',
-                            naoenviado: '#d97706',
-                            naoaplicavel: '#64748b',
-                            emanalise: '#0B57C5',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Tailwind CSS pré-compilado (substitui o CDN cdn.tailwindcss.com, que
+         baixava ~400KB de JS e compilava no navegador a cada página). -->
+    <link rel="stylesheet" href="/static/css/tailwind.build.css">
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <!-- Alpine.js for lightweight declarative UI only -->
@@ -64,6 +14,7 @@
     <link rel="stylesheet" href="/static/css/tokens.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/styles.css">
+    <style>[x-cloak]{display:none!important}</style>
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full flex flex-col text-[#182230] antialiased bg-[#F6F7FB]" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
@@ -136,11 +87,22 @@
 
     <main id="main-content" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {% if messages %}
-            <div class="mb-4 space-y-2" role="region" aria-label="Mensagens do sistema">
+            <div class="fixed top-20 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] space-y-2" role="region" aria-label="Notificações do sistema" aria-live="assertive">
                 {% for message in messages %}
-                    <div class="p-3.5 text-sm rounded-lg shadow-xs flex items-start gap-2.5 {% if message.tags == 'error' %}bg-red-50 text-red-900 border-l-4 border-[#B4232A]{% elif message.tags == 'success' %}bg-emerald-50 text-emerald-900 border-l-4 border-emerald-600{% else %}bg-blue-50 text-blue-900 border-l-4 border-[#0B57C5]{% endif %}">
-                        <span class="font-bold">{% if message.tags == 'error' %}!{% elif message.tags == 'success' %}&check;{% else %}&#8505;{% endif %}</span>
-                        <div>{{ message }}</div>
+                    <div x-data="{ show: false }"
+                         x-init="$nextTick(() => show = true); setTimeout(() => show = false, 5000)"
+                         x-show="show" x-cloak
+                         x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0 translate-x-8"
+                         x-transition:enter-end="opacity-100 translate-x-0"
+                         x-transition:leave="transition ease-in duration-200"
+                         x-transition:leave-start="opacity-100 translate-x-0"
+                         x-transition:leave-end="opacity-0 translate-x-8"
+                         role="alert"
+                         class="flex items-start gap-2.5 p-3.5 rounded-lg shadow-lg bg-white border-l-4 text-sm {% if message.tags == 'error' %}border-[#B4232A] text-red-900{% elif message.tags == 'success' %}border-emerald-600 text-emerald-900{% else %}border-[#0B57C5] text-blue-900{% endif %}">
+                        <span class="font-bold text-base leading-none mt-0.5">{% if message.tags == 'error' %}!{% elif message.tags == 'success' %}&check;{% else %}&#8505;{% endif %}</span>
+                        <div class="flex-1 leading-snug">{{ message }}</div>
+                        <button type="button" @click="show = false" aria-label="Fechar notificação" class="text-slate-400 hover:text-slate-700 font-bold leading-none text-lg -mt-1">&times;</button>
                     </div>
                 {% endfor %}
             </div>
