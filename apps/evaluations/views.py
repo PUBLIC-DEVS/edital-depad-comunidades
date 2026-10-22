@@ -226,7 +226,7 @@ def evaluation_reopen_view(request: HttpRequest, evaluation_id: int) -> HttpResp
     except (ValidationError, PermissionDenied) as exc:
         messages.error(request, "; ".join(getattr(exc, "messages", None) or [str(exc)]))
     else:
-        messages.success(request, "Análise reaberta para edição.")
+        messages.success(request, "Análise reaberta para edição com sucesso!")
     return redirect("evaluation-workspace", submission_id=evaluation.submission_id)
 
 
@@ -242,7 +242,7 @@ def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpRe
             EvaluationService.conclude_evaluation(evaluation, actor=request.user, notes=notes)
             messages.success(
                 request,
-                f"Análise do processo {evaluation.submission.processo_sei} concluída com sucesso com parecer '{evaluation.get_result_display()}'.",
+                f"Análise do processo {evaluation.submission.processo_sei} concluída! Parecer: {evaluation.get_result_display()}.",
             )
             if request.headers.get("HX-Request"):
                 response = HttpResponse()

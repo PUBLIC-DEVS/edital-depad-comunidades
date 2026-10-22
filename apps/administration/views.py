@@ -214,7 +214,7 @@ def catalog_form(request, catalog, object_id=None):
                         entity_id=str(obj.pk),
                         action="PASSWORD_SET",
                     )
-                messages.success(request, "Cadastro salvo.")
+                messages.success(request, "Cadastro salvo com sucesso!")
                 return redirect("catalog-list", catalog=catalog)
     return render(
         request,

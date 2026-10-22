@@ -98,7 +98,7 @@ def ranking_generate_snapshot_view(request: HttpRequest) -> HttpResponse:
 
         messages.success(
             request,
-            f"Snapshot de Ranking '{snapshot.get_snapshot_type_display()}' gerado com sucesso com {snapshot.entries.count()} inscrições.",
+            f"Classificação '{snapshot.get_snapshot_type_display()}' gerada com sucesso! ({snapshot.entries.count()} inscrições)",
         )
         return redirect(f"/classificacao/?edital={edital.id}&snapshot_id={snapshot.id}")
     return redirect("ranking-index")

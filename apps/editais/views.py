@@ -257,7 +257,7 @@ def edital_publish(request, edital_id):
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages))
     else:
-        messages.success(request, "Edital publicado. Configuração e versão preservadas.")
+        messages.success(request, "Edital publicado com sucesso!")
     return redirect("edital-detail", edital_id=edital.pk)
 
 
@@ -305,7 +305,7 @@ def edital_status(request, edital_id):
     except ValidationError as exc:
         messages.error(request, "; ".join(exc.messages))
     else:
-        messages.success(request, "Status do edital atualizado.")
+        messages.success(request, "Status do edital atualizado com sucesso!")
     return redirect("edital-detail", edital_id=edital.pk)
 
 

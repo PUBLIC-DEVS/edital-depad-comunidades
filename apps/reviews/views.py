@@ -236,7 +236,7 @@ def review_item_decision_view(
             )
             messages.success(
                 request,
-                f"Decisão registrada para o item {decision.check_result.definition.code}.",
+                f"Decisão registrada com sucesso! (item {decision.check_result.definition.code})",
             )
         except ValidationError as exc:
             messages.error(request, str(exc))
@@ -316,7 +316,7 @@ def diligence_create_view(request: HttpRequest, submission_id: int) -> HttpRespo
                 form.add_error(None, exc)
             else:
                 messages.success(
-                    request, f"Diligência aberta para o processo {submission.processo_sei}."
+                    request, f"Diligência aberta com sucesso! (processo {submission.processo_sei})"
                 )
                 return redirect("diligence-list")
     else:
@@ -354,7 +354,7 @@ def diligence_detail_view(request: HttpRequest, diligence_id: int) -> HttpRespon
             else:
                 messages.success(
                     request,
-                    f"Diligência do processo {diligence.submission.processo_sei} concluída.",
+                    f"Diligência do processo {diligence.submission.processo_sei} concluída com sucesso!",
                 )
                 return redirect("diligence-list")
     else:

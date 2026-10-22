@@ -152,7 +152,7 @@ def submission_create_view(request: HttpRequest) -> HttpResponse:
                 )
             else:
                 messages.success(
-                    request, f"Processo {submission.processo_sei} cadastrado com sucesso."
+                    request, f"Processo {submission.processo_sei} cadastrado com sucesso!"
                 )
             return redirect("submission-detail", submission_id=submission.id)
     else:
@@ -236,7 +236,7 @@ def submission_cnpj_correction_view(request, submission_id):
                 "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc),
             )
         else:
-            messages.success(request, "CNPJ corrigido com justificativa e trilha de auditoria.")
+            messages.success(request, "CNPJ corrigido com sucesso!")
     else:
         errors = [message for values in form.errors.values() for message in values]
         messages.error(request, "; ".join(errors))
@@ -262,7 +262,7 @@ def submission_assign_view(request: HttpRequest, submission_id: int) -> HttpResp
                     "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc),
                 )
             else:
-                messages.success(request, f"Processo atribuído a {analyst.username}.")
+                messages.success(request, f"Processo atribuído a {analyst.username} com sucesso!")
     return redirect("submission-detail", submission_id=submission.id)
 
 
@@ -292,7 +292,9 @@ def submission_bulk_assign_view(request: HttpRequest) -> HttpResponse:
                     "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc),
                 )
             else:
-                messages.success(request, f"{count} processos atribuídos a {analyst.username}.")
+                messages.success(
+                    request, f"{count} processo(s) atribuído(s) a {analyst.username} com sucesso!"
+                )
         else:
             messages.error(
                 request,
@@ -386,7 +388,7 @@ def restriction_form_view(request, restriction_id=None):
         except ValidationError as exc:
             form.add_error(None, "; ".join(exc.messages))
         else:
-            messages.success(request, "Restrição salva e auditada.")
+            messages.success(request, "Restrição salva com sucesso!")
             return redirect("restriction-list")
     return render(
         request,
@@ -432,7 +434,7 @@ def submission_edit_view(request, submission_id):
                     new_value=str(new),
                 )
         ClassificationService.classify_and_update(submission, request.user)
-        messages.success(request, "Dados do processo atualizados.")
+        messages.success(request, "Dados do processo atualizados com sucesso!")
         return redirect("submission-detail", submission_id=submission.pk)
     return render(
         request,
@@ -568,7 +570,7 @@ def submission_import_csv_view(request):
                 except (CsvRowError, ValidationError) as exc:
                     errors.append(str(exc))
                 else:
-                    messages.success(request, f"{len(rows)} processos importados e enquadrados.")
+                    messages.success(request, f"{len(rows)} processo(s) importado(s) com sucesso!")
                     return redirect("submission-list")
     return render(
         request,
@@ -598,5 +600,5 @@ def submission_restriction_release_view(request, submission_id):
                 request, "; ".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
             )
         else:
-            messages.success(request, "Processo liberado para nova distribuição, com auditoria.")
+            messages.success(request, "Processo liberado para nova distribuição com sucesso!")
     return redirect("submission-detail", submission_id=submission_id)
