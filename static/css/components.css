@@ -461,19 +461,33 @@ tbody tr:hover {
    9. SCROLLBARS OPERACIONAIS
    ========================================================================== */
 
+html,
+.table-wrapper {
+  scrollbar-width: auto;
+  scrollbar-color: var(--text-muted) var(--surface-subtle);
+}
+
+@media (prefers-contrast: more) {
+  html,
+  .table-wrapper {
+    scrollbar-color: var(--text-primary) var(--surface-subtle);
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 14px;
+  height: 14px;
 }
 ::-webkit-scrollbar-track {
   background: var(--surface-subtle);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
+  background: var(--text-muted);
   border-radius: var(--radius-xs);
+  border: 2px solid var(--surface-subtle);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--text-secondary);
 }
 /* Single edital: compact navigation and spreadsheet operation. */
 .nav-link {color: var(--text-inverse-subtle); padding: .5rem .75rem; white-space: nowrap; border-radius: .35rem;}
