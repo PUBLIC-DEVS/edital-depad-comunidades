@@ -256,3 +256,27 @@ class TestEvaluationWorkspaceIntegration:
             CheckResult.objects.get(evaluation=eval_obj, requirement_check=check).status
             == CheckResult.Status.ATENDE
         )
+
+    def test_workspace_shows_open_details_pending_items_and_footer_conclude(
+        self, client, setup_data
+    ):
+        from apps.evaluations.services import EvaluationService, InconsistentEvaluationError
+
+        analyst_a = setup_data["a"]
+        sub = setup_data["sub"]
+        check = setup_data["check"]
+
+        client.force_login(analyst_a)
+        eval_obj = EvaluationService.start_evaluation(sub, analyst=analyst_a)
+        cr = CheckResult.objects.get(evaluation=eval_obj, requirement_check=check)
+
+        res = client.get(reverse("evaluation-workspace", kwargs={"submission_id": sub.id}))
+        html = res.content.decode("utf-8")
+        assert '<details class="document-details" open>' in html
+        assert f'id="check-card-{cr.pk}"' in html
+        assert f'href="#check-card-{cr.pk}"' in html
+        assert "1.1 Requerimento — Assinatura" in html
+        assert 'id="analysis-footer-summary"' in html
+
+        with pytest.raises(InconsistentEvaluationError, match=r"1\.1 Assinatura"):
+            EvaluationService.conclude_evaluation(eval_obj, actor=analyst_a)

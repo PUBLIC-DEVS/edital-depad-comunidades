@@ -334,10 +334,27 @@ class EvaluationService:
             .get(pk=evaluation.pk)
         )
         cls.enforce_edit(evaluation, actor)
-        assessment = cls.calculate_assessment(evaluation)
+        from apps.evaluations.assessment import definition_rows, is_required, status_rules
+
+        rows = definition_rows(evaluation)
+        assessment = cls.calculate_assessment(evaluation, rows=rows)
 
         if not assessment.is_complete:
-            msg = f"Existem {assessment.pending_checks} itens obrigatórios ainda não avaliados (pendentes)."
+            pending_labels = []
+            seen_reqs: dict[int, dict[str, int]] = {}
+            for req, definition, result in rows:
+                if req.pk not in seen_reqs:
+                    seen_reqs[req.pk] = {"num": len(seen_reqs) + 1, "count": 0}
+                seen_reqs[req.pk]["count"] += 1
+                item_num = f"{seen_reqs[req.pk]['num']}.{seen_reqs[req.pk]['count']}"
+                status = result.status if result else "EM_BRANCO"
+                accepted, failures = status_rules(definition)
+                if is_required(req, definition) and (
+                    status in {"EM_BRANCO", "NAO_ENVIADO"} or status not in {*accepted, *failures}
+                ):
+                    pending_labels.append(f"{item_num} {definition.name}")
+            details = f": {', '.join(pending_labels)}" if pending_labels else ""
+            msg = f"Existem {assessment.pending_checks} itens obrigatórios ainda não avaliados (pendentes){details}."
             raise InconsistentEvaluationError(msg)
         # Human documentary checks are authoritative. Declarative validators remain
         # available as supporting alerts, including their historical configuration.

@@ -18,7 +18,7 @@ from apps.accounts.permissions import (
     require_role,
 )
 from apps.editais.operational import operational_edital_required
-from apps.evaluations.assessment import definition_rows
+from apps.evaluations.assessment import definition_rows, is_required, status_rules
 from apps.evaluations.forms import CheckResultForm
 from apps.evaluations.models import Evaluation
 from apps.evaluations.services import EvaluationService, InconsistentEvaluationError
@@ -211,6 +211,7 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
                 "draft_saved": valid,
                 "validation_errors": errors,
                 "oob_items": oob_items,
+                "oob_footer": True,
             },
         )
         response["X-Draft-Saved"] = "true" if valid else "false"
@@ -284,6 +285,7 @@ def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpRe
                     {
                         **workspace_context(request, evaluation),
                         "validation_errors": [str(exc)],
+                        "oob_footer": True,
                     },
                 )
             messages.error(request, str(exc))
@@ -299,12 +301,14 @@ def workspace_context(request, evaluation, bound_forms=None):
     rows = definition_rows(evaluation)
     sections = {}
     outcomes = []
+    pending_items = []
     counts = {"ATENDE": 0, "NAO_ATENDE": 0, "NAO_APLICAVEL": 0, "EM_BRANCO": 0, "NAO_ENVIADO": 0}
     for requirement, definition, result in rows:
         section = sections.setdefault(
             requirement.pk, {"requirement": requirement, "number": len(sections) + 1, "checks": []}
         )
         if result:
+            item_number = f"{section['number']}.{len(section['checks']) + 1}"
             form = (bound_forms or {}).get(result.pk) or CheckResultForm(
                 result=result, can_edit=can_edit
             )
@@ -315,12 +319,25 @@ def workspace_context(request, evaluation, bound_forms=None):
             ]
             outcomes.extend(alerts)
             counts[result.status] = counts.get(result.status, 0) + 1
+            accepted, failures = status_rules(definition)
+            if is_required(requirement, definition) and (
+                result.status in {"EM_BRANCO", "NAO_ENVIADO"}
+                or result.status not in {*accepted, *failures}
+            ):
+                pending_items.append(
+                    {
+                        "number": item_number,
+                        "requirement_name": requirement.name,
+                        "check_name": definition.name,
+                        "result_pk": result.pk,
+                    }
+                )
             section["checks"].append(
                 {
                     "check": definition,
                     "result": result,
                     "form": form,
-                    "number": f"{section['number']}.{len(section['checks']) + 1}",
+                    "number": item_number,
                     "validations": alerts,
                     "cnpj_rel": result.cnpj_relationship,
                     "detail_fields": [
@@ -346,6 +363,7 @@ def workspace_context(request, evaluation, bound_forms=None):
         if assessment.total_checks
         else 0,
         "counts": counts,
+        "pending_items": pending_items,
         "validation_outcomes": outcomes,
         "related_root_submissions": list(evaluation.submission.related_root_submissions),
         "submission_alerts": SubmissionAnomalyDetector.check_submission(evaluation.submission),
