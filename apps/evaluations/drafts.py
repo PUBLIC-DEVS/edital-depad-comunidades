@@ -1,6 +1,8 @@
 from django.core.exceptions import ValidationError
 
 from apps.audit.models import AuditEvent
+from apps.editais.models import RequirementValidationRule
+from apps.evaluations.validation_rules import ValidationRuleEvaluator
 from apps.institutions.cnpj import cnpj_validator, normalize_cnpj
 
 EVIDENCE_FIELDS = (
@@ -21,7 +23,12 @@ def audit_value(value):
 
 
 def update_result(evaluation, payload, actor):
-    results = evaluation.check_results.select_related("requirement_check", "requirement")
+    results = evaluation.check_results.select_related(
+        "requirement_check",
+        "requirement",
+        "evaluation__submission__edital",
+        "evaluation__submission__institution",
+    ).prefetch_related("requirement_check__validation_rules")
     if payload.get("check_result_id"):
         result = results.filter(pk=payload["check_result_id"]).first()
     elif payload.get("requirement_check_id"):
@@ -52,6 +59,22 @@ def update_result(evaluation, payload, actor):
     old_values = {name: getattr(result, name) for name in values}
     for name, value in values.items():
         setattr(result, name, value)
+    if (
+        result.status == "EM_BRANCO"
+        and "NAO_ATENDE" in allowed
+        and result.requirement_check_id
+        and (values.get("valid_until") is not None or values.get("opened_on") is not None)
+    ):
+        auto_fail_types = {
+            RequirementValidationRule.RuleType.DATE_NOT_EXPIRED,
+            RequirementValidationRule.RuleType.CNPJ_MINIMUM_AGE,
+        }
+        for rule in result.requirement_check.validation_rules.all():
+            if rule.active and rule.rule_type in auto_fail_types:
+                if ValidationRuleEvaluator.evaluate_rule(rule, result).status == "FAIL":
+                    old_values.setdefault("status", "EM_BRANCO")
+                    result.status = "NAO_ATENDE"
+                    break
     result.full_clean()
     changed = {
         name: (old, getattr(result, name))

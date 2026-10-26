@@ -56,10 +56,11 @@ class EvaluationService:
         from apps.submissions.services.eligibility import ParticipationEligibilityService
 
         ParticipationEligibilityService.require_assignable(submission)
+        target_analyst = submission.assigned_analyst or analyst
         evaluation, created = Evaluation.objects.get_or_create(
             submission=submission,
             defaults={
-                "analyst": analyst,
+                "analyst": target_analyst,
                 "status": Evaluation.Status.DRAFT,
                 "result": Evaluation.Result.EM_ANALISE,
                 "started_at": timezone.now(),
@@ -70,7 +71,11 @@ class EvaluationService:
                 .last(),
             },
         )
-        if evaluation.analyst_id != analyst.pk:
+        is_coord_or_admin = analyst.is_superuser or analyst.role in {
+            User.Role.ADMINISTRADOR,
+            User.Role.COORDENADOR,
+        }
+        if evaluation.analyst_id != analyst.pk and not is_coord_or_admin:
             raise PermissionDenied("Avaliação pertence a outro analista.")
 
         # Se já existia mas não possuía checks criados, inicializa
@@ -118,16 +123,33 @@ class EvaluationService:
     @transaction.atomic
     def start_evaluation(cls, submission, analyst):
         submission = Submission.objects.select_for_update().get(pk=submission.pk)
-        if analyst.role != User.Role.ANALISTA or submission.assigned_analyst != analyst:
+        is_coord_or_admin = analyst.is_superuser or analyst.role in {
+            User.Role.ADMINISTRADOR,
+            User.Role.COORDENADOR,
+        }
+        is_assigned_analyst = (
+            analyst.role == User.Role.ANALISTA and submission.assigned_analyst == analyst
+        )
+        if not (is_assigned_analyst or is_coord_or_admin):
             raise PermissionDenied("Somente o analista atribuído pode iniciar análise.")
-        if submission.workflow_status != Submission.WorkflowStatus.ASSIGNED:
+        allowed_statuses = {Submission.WorkflowStatus.ASSIGNED}
+        if is_coord_or_admin:
+            allowed_statuses.add(Submission.WorkflowStatus.RECEIVED)
+        if submission.workflow_status not in allowed_statuses:
             raise ValidationError("Processo não está no estágio de início da análise.")
         from apps.submissions.services.eligibility import ParticipationEligibilityService
 
         ParticipationEligibilityService.require_assignable(submission)
-        evaluation = cls.initialize_evaluation(submission, analyst)
         from apps.submissions.services.workflow import WorkflowService
 
+        if submission.workflow_status == Submission.WorkflowStatus.RECEIVED:
+            WorkflowService.transition(
+                submission,
+                Submission.WorkflowStatus.ASSIGNED,
+                analyst,
+                reason="Atribuição implícita para início de análise pela coordenação/administração.",
+            )
+        evaluation = cls.initialize_evaluation(submission, analyst)
         WorkflowService.transition(
             submission,
             Submission.WorkflowStatus.UNDER_ANALYSIS,

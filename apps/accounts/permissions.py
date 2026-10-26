@@ -91,17 +91,15 @@ class RolePermissionPolicy:
 
     @staticmethod
     def can_edit_evaluation(user: User, evaluation: Evaluation) -> bool:
-        """Analista só pode editar sua própria avaliação enquanto ela estiver em rascunho (DRAFT)."""
+        """Analista atribuído, Coordenação ou Administração podem editar avaliação em rascunho (DRAFT)."""
         if not user.is_authenticated:
             return False
-        # Administrador ou superusuário pode auditar, mas alteração operacional é do analista
+        if evaluation.status != Evaluation.Status.DRAFT:
+            return False
+        if user.is_superuser or user.role in {User.Role.ADMINISTRADOR, User.Role.COORDENADOR}:
+            return True
         if user.role == User.Role.ANALISTA:
-            if evaluation.analyst_id != user.id:
-                return False
-            # Não pode editar avaliação já concluída
-            return evaluation.status == Evaluation.Status.DRAFT
-        if user.is_superuser:
-            return evaluation.status == Evaluation.Status.DRAFT
+            return evaluation.analyst_id == user.id
         return False
 
     @staticmethod

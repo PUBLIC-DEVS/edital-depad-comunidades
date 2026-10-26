@@ -65,6 +65,12 @@ class CheckResultForm(forms.Form):
 
     def clean(self):
         data = super().clean()
+        status = data.get("status") or self.data.get(self.add_prefix("status"))
+        if status in {"NAO_ATENDE", "NAO_APLICAVEL"}:
+            for optional_field in ("document_cnpj", "valid_until", "opened_on", "numeric_value"):
+                if optional_field in self._errors:
+                    self._errors.pop(optional_field, None)
+                    data[optional_field] = getattr(self.result, optional_field)
         for field in EVIDENCE_FIELDS:
             if field not in self.fields and self.data.get(self.add_prefix(field)):
                 raise forms.ValidationError("Campo de evidência não configurado para este item.")

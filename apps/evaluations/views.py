@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.accounts.models import User
@@ -108,10 +109,18 @@ def evaluation_workspace_view(request: HttpRequest, submission_id: int) -> HttpR
         .first()
     )
     if evaluation is None:
+        is_coord_or_admin = request.user.is_superuser or request.user.role in {
+            User.Role.ADMINISTRADOR,
+            User.Role.COORDENADOR,
+        }
         can_start = (
             request.user.role == User.Role.ANALISTA
             and submission.assigned_analyst == request.user
             and submission.workflow_status == Submission.WorkflowStatus.ASSIGNED
+        ) or (
+            is_coord_or_admin
+            and submission.workflow_status
+            in {Submission.WorkflowStatus.RECEIVED, Submission.WorkflowStatus.ASSIGNED}
         )
         return render(
             request,
@@ -138,6 +147,7 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
     evaluation = enforce_evaluation_edit_access(request, evaluation_id)
 
     forms = {}
+    posted_statuses = {}
     payloads = []
     valid = True
     allowed_prefixes = set()
@@ -148,7 +158,9 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
         form = CheckResultForm(request.POST, result=result)
         forms[result.pk] = form
         if form.is_valid():
-            payloads.append(form.payload())
+            payload = form.payload()
+            posted_statuses[result.pk] = payload.get("status")
+            payloads.append(payload)
         else:
             valid = False
     unexpected = [
@@ -182,6 +194,15 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
         )
     if request.headers.get("HX-Request"):
         context = workspace_context(request, evaluation)
+        oob_items = []
+        for section in context["document_sections"]:
+            for item in section["checks"]:
+                r_pk = item["result"].pk
+                if r_pk in forms:
+                    item["oob_swap_status"] = (
+                        r_pk in posted_statuses and item["result"].status != posted_statuses[r_pk]
+                    )
+                    oob_items.append(item)
         response = render(
             request,
             "evaluations/partials/summary_panel.html",
@@ -189,6 +210,7 @@ def evaluation_save_draft_view(request: HttpRequest, evaluation_id: int) -> Http
                 **context,
                 "draft_saved": valid,
                 "validation_errors": errors,
+                "oob_items": oob_items,
             },
         )
         response["X-Draft-Saved"] = "true" if valid else "false"
@@ -244,11 +266,16 @@ def evaluation_conclude_view(request: HttpRequest, evaluation_id: int) -> HttpRe
                 request,
                 f"Análise do processo {evaluation.submission.processo_sei} concluída! Parecer: {evaluation.get_result_display()}.",
             )
+            redirect_url = (
+                reverse("my-evaluations")
+                if request.user.role == User.Role.ANALISTA
+                else reverse("submission-detail", args=[evaluation.submission_id])
+            )
             if request.headers.get("HX-Request"):
                 response = HttpResponse()
-                response["HX-Redirect"] = "/minhas-analises/"
+                response["HX-Redirect"] = redirect_url
                 return response
-            return redirect("my-evaluations")
+            return redirect(redirect_url)
         except InconsistentEvaluationError as exc:
             if request.headers.get("HX-Request"):
                 return render(

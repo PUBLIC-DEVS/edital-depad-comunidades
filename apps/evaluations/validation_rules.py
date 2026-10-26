@@ -152,12 +152,18 @@ class ValidationRuleEvaluator:
 
     @classmethod
     def evaluate_result(cls, result):
+        status = getattr(result, "status", None)
+        if status in {"NAO_ATENDE", "NAO_APLICAVEL"}:
+            return []
         rules = (
             [rule for rule in result.requirement_check.validation_rules.all() if rule.active]
             if result.requirement_check_id
             else RequirementValidationRule.objects.none()
         )
-        return [cls.evaluate_rule(rule, result) for rule in rules]
+        outcomes = [cls.evaluate_rule(rule, result) for rule in rules]
+        if status in {"EM_BRANCO", "NAO_ENVIADO"}:
+            return [outcome for outcome in outcomes if outcome.status == "FAIL"]
+        return outcomes
 
     @classmethod
     def evaluate_evaluation(cls, evaluation):
