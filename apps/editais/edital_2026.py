@@ -23,7 +23,7 @@ DOCUMENTS_2026 = (
                     "document_cnpj": True,
                     "canonical_cnpj_confirmed": True,
                 },
-                "validators": [("CNPJ_MATCH_CANONICAL", "CRITICAL", True, {})],
+                "validators": [("CNPJ_MATCH_CANONICAL", "CRITICAL", False, {})],
             }
         ],
     },
@@ -31,7 +31,14 @@ DOCUMENTS_2026 = (
         "code": "ANEXO_II",
         "name": "Anexo II — Ficha Cadastral da Entidade",
         "section": "Participação",
-        "checks": [{"code": "FICHA_CADASTRAL", "name": "Anexo II atende?"}],
+        "checks": [
+            {
+                "code": "FICHA_CADASTRAL",
+                "name": "Anexo II atende?",
+                "evidence": {"document_cnpj": True},
+                "validators": [("CNPJ_MATCH_CANONICAL", "WARNING", False, {})],
+            }
+        ],
     },
     {
         "code": "ANEXO_III",
@@ -79,11 +86,11 @@ DOCUMENTS_2026 = (
                 "name": "SICAF de VI níveis atende?",
                 "evidence": {"document_cnpj": True, "valid_until": True},
                 "validators": [
-                    ("CNPJ_MATCH_CANONICAL", "CRITICAL", True, {}),
+                    ("CNPJ_MATCH_CANONICAL", "CRITICAL", False, {}),
                     (
                         "DATE_NOT_EXPIRED",
                         "CRITICAL",
-                        True,
+                        False,
                         {"reference_date": "EDITAL_REFERENCE_DATE"},
                     ),
                 ],
@@ -108,7 +115,7 @@ DOCUMENTS_2026 = (
                 "code": "ENDERECO_ACOLHIMENTO",
                 "name": "Comprovante de endereço do local de acolhimento",
                 "evidence": {"document_cnpj": True},
-                "validators": [("CNPJ_MATCH_CANONICAL", "CRITICAL", True, {})],
+                "validators": [("CNPJ_MATCH_CANONICAL", "CRITICAL", False, {})],
             }
         ],
     },
@@ -140,14 +147,14 @@ DOCUMENTS_2026 = (
                     (
                         "CNPJ_MINIMUM_AGE",
                         "CRITICAL",
-                        True,
+                        False,
                         {"years": 3, "reference_date": "EDITAL_REFERENCE_DATE"},
                     ),
                     (
                         "CNAE_REQUIRED",
                         "WARNING",
                         False,
-                        {"expected_cnae": "87.20-4-99", "match_mode": "UNRESOLVED"},
+                        {"expected_cnae": "87.20-4-99", "match_mode": "CONTAINS"},
                     ),
                 ],
             }
@@ -163,11 +170,11 @@ DOCUMENTS_2026 = (
                 "name": "Alvará do Corpo de Bombeiros",
                 "evidence": {"document_cnpj": True, "valid_until": True},
                 "validators": [
-                    ("CNPJ_MATCH_CANONICAL", "CRITICAL", True, {}),
+                    ("CNPJ_MATCH_CANONICAL", "CRITICAL", False, {}),
                     (
                         "DATE_NOT_EXPIRED",
                         "CRITICAL",
-                        True,
+                        False,
                         {"reference_date": "EDITAL_REFERENCE_DATE"},
                     ),
                 ],
@@ -184,11 +191,11 @@ DOCUMENTS_2026 = (
                 "name": "Alvará Sanitário",
                 "evidence": {"document_cnpj": True, "valid_until": True},
                 "validators": [
-                    ("CNPJ_MATCH_CANONICAL", "CRITICAL", True, {}),
+                    ("CNPJ_MATCH_CANONICAL", "CRITICAL", False, {}),
                     (
                         "DATE_NOT_EXPIRED",
                         "CRITICAL",
-                        True,
+                        False,
                         {"reference_date": "EDITAL_REFERENCE_DATE"},
                     ),
                 ],
@@ -210,7 +217,7 @@ DOCUMENTS_2026 = (
                 "code": "RESPONSAVEL_TECNICO",
                 "name": "Assinada por técnico habilitado (engenheiro ou arquiteto)",
                 "evidence": {"document_cnpj": True},
-                "validators": [("CNPJ_MATCH_CANONICAL", "CRITICAL", True, {})],
+                "validators": [("CNPJ_MATCH_CANONICAL", "CRITICAL", False, {})],
             }
         ],
     },

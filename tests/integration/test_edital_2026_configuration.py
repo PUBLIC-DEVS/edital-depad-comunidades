@@ -177,6 +177,8 @@ def test_2026_typed_validators_use_canonical_cnpj_and_reference_date(edital_2026
         rule_type=RequirementValidationRule.RuleType.CNAE_REQUIRED
     )
     result.cnae = "87.20-4-99"
+    assert ValidationRuleEvaluator.evaluate_rule(cnae_rule, result).status == "PASS"
+    cnae_rule.config = {"expected_cnae": "87.20-4-99", "match_mode": "UNRESOLVED"}
     assert ValidationRuleEvaluator.evaluate_rule(cnae_rule, result).status == "UNRESOLVED"
     cnae_rule.config = {"expected_cnae": "87.20-4-99", "match_mode": "EXACT"}
     assert ValidationRuleEvaluator.evaluate_rule(cnae_rule, result).status == "PASS"
@@ -185,6 +187,12 @@ def test_2026_typed_validators_use_canonical_cnpj_and_reference_date(edital_2026
     assert ValidationRuleEvaluator.evaluate_rule(cnae_rule, result).status == "PASS"
     result.cnae = "62.01-5-01"
     assert ValidationRuleEvaluator.evaluate_rule(cnae_rule, result).status == "FAIL"
+
+    anexo_ii_check = edital.requirements.get(code="ANEXO_II").checks.get(code="FICHA_CADASTRAL")
+    assert anexo_ii_check.collect_document_cnpj is True
+    assert anexo_ii_check.validation_rules.filter(
+        rule_type=RequirementValidationRule.RuleType.CNPJ_MATCH_CANONICAL
+    ).exists()
 
 
 @pytest.mark.django_db

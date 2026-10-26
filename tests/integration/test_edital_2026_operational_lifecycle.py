@@ -31,7 +31,7 @@ def test_edital_2026_operational_lifecycle_without_workbook(client):
         RequirementValidationRule.objects.filter(
             requirement_check__requirement__edital=edital, active=True
         ).count()
-        == 11
+        == 12
     )
     assert edital.requires_financial_rules is False
 
