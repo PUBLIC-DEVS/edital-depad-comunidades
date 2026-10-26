@@ -139,3 +139,26 @@ def test_other_analyst_cannot_reopen(domain):
     assert RolePermissionPolicy.can_reopen_evaluation(domain["other_analyst"], ev) is False
     with pytest.raises(PermissionDenied):
         EvaluationService.reopen_evaluation(ev, domain["other_analyst"])
+
+
+def test_ensure_team_provisions_analysts_and_reviewers_and_binds_email_later():
+    from django.core.management import call_command
+
+    call_command("ensure_team")
+    assert User.objects.filter(role=User.Role.ANALISTA, is_active=True).count() == 12
+    assert User.objects.filter(role=User.Role.REVISOR, is_active=True).count() == 6
+
+    # Preparado para vincular o e-mail @mds.gov.br quando disponível e autenticar via Entra ID
+    call_command("ensure_team", email_mappings=["heloise=heloise.mds@mds.gov.br"])
+    heloise = User.objects.get(username="heloise")
+    assert heloise.email == "heloise.mds@mds.gov.br"
+    assert heloise.role == User.Role.REVISOR
+
+    adapter = MicrosoftAuthAdapter()
+    linked = adapter.authenticate_request(
+        None, id_token="x", claims=_claims("oid-heloise", "heloise.mds@mds.gov.br")
+    )
+    assert linked is not None
+    assert linked.pk == heloise.pk
+    assert linked.role == User.Role.REVISOR
+    assert linked.azure_oid == "oid-heloise"

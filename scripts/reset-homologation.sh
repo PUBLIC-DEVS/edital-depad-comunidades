@@ -32,14 +32,17 @@ if [ ! -x "$PY" ]; then
   exit 1
 fi
 
-echo ">> [1/3] Apagando todos os dados (flush)..."
+echo ">> [1/4] Apagando todos os dados (flush)..."
 "$PY" manage.py flush --noinput
 
-echo ">> [2/3] Usuários por papel + edital 2026 completo e publicado (seed_homologation)..."
+echo ">> [2/4] Usuários por papel + edital 2026 completo e publicado (seed_homologation)..."
 "$PY" manage.py seed_homologation
 
-echo ">> [3/3] Garantindo administradores institucionais (ensure_admins)..."
+echo ">> [3/4] Garantindo administradores institucionais (ensure_admins)..."
 "$PY" manage.py ensure_admins
+
+echo ">> [4/4] Garantindo analistas e revisores da equipe (ensure_team)..."
+"$PY" manage.py ensure_team --password "Homolog.Edital#2026"
 
 cat <<'EOF'
 
