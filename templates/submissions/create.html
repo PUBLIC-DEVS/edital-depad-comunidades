@@ -104,22 +104,22 @@
                 </p>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                        <label for="{{ form.vagas_femininas.id_for_label }}" class="block text-slate-600 mb-1">Vagas Femininas:</label>
+                        <label for="{{ form.vagas_femininas.id_for_label }}" class="block font-bold text-slate-700 mb-1">Vagas Femininas:</label>
                         <input type="number" name="{{ form.vagas_femininas.html_name }}" id="{{ form.vagas_femininas.id_for_label }}" value="{{ form.vagas_femininas.value|default:0 }}" min="0" class="form-input" x-model="fem" aria-describedby="vacancy-rules-hint">
                         {{ form.vagas_femininas.errors }}
                     </div>
                     <div>
-                        <label for="{{ form.vagas_masculinas.id_for_label }}" class="block text-slate-600 mb-1">Vagas Masculinas:</label>
+                        <label for="{{ form.vagas_masculinas.id_for_label }}" class="block font-bold text-slate-700 mb-1">Vagas Masculinas:</label>
                         <input type="number" name="{{ form.vagas_masculinas.html_name }}" id="{{ form.vagas_masculinas.id_for_label }}" value="{{ form.vagas_masculinas.value|default:0 }}" min="0" class="form-input" x-model="masc" aria-describedby="vacancy-rules-hint">
                         {{ form.vagas_masculinas.errors }}
                     </div>
                     <div>
-                        <label for="{{ form.vagas_maes_nutrizes.id_for_label }}" class="block text-slate-600 mb-1">Mães Nutrizes:</label>
+                        <label for="{{ form.vagas_maes_nutrizes.id_for_label }}" class="block font-bold text-slate-700 mb-1">Mães Nutrizes:</label>
                         <input type="number" name="{{ form.vagas_maes_nutrizes.html_name }}" id="{{ form.vagas_maes_nutrizes.id_for_label }}" value="{{ form.vagas_maes_nutrizes.value|default:0 }}" min="0" class="form-input" x-model="maes" aria-describedby="vacancy-rules-hint">
                         {{ form.vagas_maes_nutrizes.errors }}
                     </div>
                     <div>
-                        <label for="{{ form.vagas_solicitadas.id_for_label }}" class="block text-slate-600 mb-1 font-semibold">Total Solicitado:</label>
+                        <label for="{{ form.vagas_solicitadas.id_for_label }}" class="block font-bold text-slate-700 mb-1">Total Solicitado:</label>
                         {{ form.vagas_solicitadas }}
                         {{ form.vagas_solicitadas.errors }}
                     </div>
@@ -130,20 +130,21 @@
                 </div>
             </fieldset>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
                 <div>
-                    <label for="{{ form.capacidade_total.id_for_label }}" class="block text-slate-600 mb-1">Capacidade Total:</label>
+                    <label for="{{ form.capacidade_total.id_for_label }}" class="block font-bold text-slate-700 mb-1">Capacidade Total:</label>
                     {{ form.capacidade_total }}
                     {{ form.capacidade_total.errors }}
                 </div>
+                {% if not form.target_group_definition.is_hidden %}
                 <div>
-                    <label for="{{ form.target_group_definition.id_for_label }}" class="block text-slate-600 mb-1">Grupo para classificação manual:</label>
+                    <label for="{{ form.target_group_definition.id_for_label }}" class="block font-bold text-slate-700 mb-1">Grupo para classificação manual:</label>
                     {{ form.target_group_definition }}
                     {{ form.target_group_definition.errors }}
                 </div>
-                <div class="flex items-center text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-200">
-                    <p>Valor global e patrimônio mínimo serão calculados pelas regras do edital.</p>
-                </div>
+                {% else %}
+                    {{ form.target_group_definition }}
+                {% endif %}
             </div>
 
             <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100">
