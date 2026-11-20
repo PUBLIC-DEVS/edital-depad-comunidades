@@ -58,7 +58,7 @@ def test_intake_manual_csv_same_screening(client, domain, kind):
     client.force_login(domain["distributor"])
     data = {
         "edital": edital.pk,
-        "municipality": domain["sub"].municipality_id,
+        "municipality_ibge": domain["sub"].municipality.ibge_code,
         "processo_sei": "MANUAL",
         "received_at": "2026-06-01T10:00",
         "institution_cnpj": cnpj,

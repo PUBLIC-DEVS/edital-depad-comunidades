@@ -75,7 +75,7 @@ def test_edital_2026_operational_lifecycle_without_workbook(client):
                 "institution_name": name,
                 "institution_address": "Rua de teste, 10",
                 "institution_postal_code": "01000-000",
-                "municipality": municipality.pk,
+                "municipality_ibge": municipality.ibge_code,
                 "vagas_femininas": female,
                 "vagas_masculinas": male,
                 "vagas_maes_nutrizes": mothers,

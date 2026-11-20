@@ -207,7 +207,7 @@ class TestSubmissionsIntakeAndDistribution:
                 "received_time": "14:35",
                 "institution_cnpj": "00.000.000/0001-91",
                 "institution_name": "OSC Matriz",
-                "municipality": setup_data["mun"].pk,
+                "municipality_ibge": setup_data["mun"].ibge_code,
                 "vagas_femininas": 2,
                 "vagas_maes_nutrizes": 1,  # Soma 3 (< 5), mas não bloqueia o salvamento
                 "vagas_masculinas": 5,  # < 10, mas não bloqueia o salvamento

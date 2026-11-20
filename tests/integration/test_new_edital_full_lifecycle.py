@@ -170,7 +170,7 @@ def test_new_edital_full_lifecycle(client):
                 "received_at": f"2027-01-10T09:0{index}",
                 "institution_cnpj": cnpj,
                 "institution_name": f"Instituição nova {index}",
-                "municipality": municipality.pk,
+                "municipality_ibge": municipality.ibge_code,
                 "vagas_femininas": 0,
                 "vagas_masculinas": 5,
                 "vagas_maes_nutrizes": 0,

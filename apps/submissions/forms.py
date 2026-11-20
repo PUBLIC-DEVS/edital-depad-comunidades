@@ -10,7 +10,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.editais.models import Edital, TargetGroup
 from apps.institutions.cnpj import cnpj_validator, normalize_cnpj
-from apps.institutions.models import Institution
+from apps.institutions.models import Institution, Municipality
 from apps.institutions.postal import normalize_postal_code
 from apps.submissions.models import ParticipationRestriction, Submission
 from apps.submissions.services.funding import FundingRuleNotFoundError, FundingService
@@ -72,6 +72,24 @@ class SubmissionIntakeForm(forms.ModelForm):
             attrs={"class": "form-input", "placeholder": "00000-000", "autocomplete": "postal-code"}
         ),
     )
+    municipality_ibge = forms.CharField(
+        required=False,
+        max_length=7,
+        label="Código IBGE do Município de Execução",
+        help_text="Código IBGE de 7 dígitos do município de execução (deve estar cadastrado na base).",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-input",
+                "placeholder": "Ex.: 5300108",
+                "inputmode": "numeric",
+                "maxlength": "7",
+                "pattern": r"\d{7}",
+                "autocorrect": "off",
+                "autocapitalize": "off",
+                "spellcheck": "false",
+            }
+        ),
+    )
     received_date = forms.DateField(
         required=False,
         label="Data de Recebimento",
@@ -83,9 +101,10 @@ class SubmissionIntakeForm(forms.ModelForm):
     received_time = forms.TimeField(
         required=False,
         label="Hora de Recebimento",
+        input_formats=["%H:%M", "%H:%M:%S"],
         widget=forms.TimeInput(
-            attrs={"type": "time", "step": "1", "class": "form-input"},
-            format="%H:%M:%S",
+            attrs={"type": "time", "class": "form-input"},
+            format="%H:%M",
         ),
     )
 
@@ -95,7 +114,6 @@ class SubmissionIntakeForm(forms.ModelForm):
             "edital",
             "processo_sei",
             "received_at",
-            "municipality",
             "vagas_femininas",
             "vagas_masculinas",
             "vagas_maes_nutrizes",
@@ -106,7 +124,14 @@ class SubmissionIntakeForm(forms.ModelForm):
         widgets = {
             "received_at": forms.HiddenInput(),
             "edital": forms.Select(attrs={"class": "form-select"}),
-            "municipality": forms.Select(attrs={"class": "form-select"}),
+            "vagas_solicitadas": forms.NumberInput(
+                attrs={
+                    "class": "form-input bg-slate-100 cursor-not-allowed",
+                    "readonly": True,
+                    "tabindex": "-1",
+                    "aria-readonly": "true",
+                }
+            ),
             "processo_sei": forms.TextInput(
                 attrs={
                     "class": "form-input",
@@ -163,9 +188,14 @@ class SubmissionIntakeForm(forms.ModelForm):
                 institution_phone=self.instance.institution.contact_phone,
                 institution_address=self.instance.institution.address,
                 institution_postal_code=self.instance.institution.postal_code,
+                municipality_ibge=(
+                    self.instance.municipality.ibge_code
+                    if self.instance.municipality_id and self.instance.municipality.ibge_code
+                    else ""
+                ),
                 received_date=self.instance.received_date,
                 received_time=(
-                    self.instance.received_time.strftime("%H:%M:%S")
+                    self.instance.received_time.strftime("%H:%M")
                     if self.instance.received_time
                     else ""
                 ),
@@ -183,6 +213,22 @@ class SubmissionIntakeForm(forms.ModelForm):
 
     def clean_institution_postal_code(self):
         return normalize_postal_code(self.cleaned_data.get("institution_postal_code", ""))
+
+    def clean_municipality_ibge(self):
+        code = (self.cleaned_data.get("municipality_ibge") or "").strip()
+        if not code:
+            # Vazio: no cadastro novo não há vínculo; na edição administrativa
+            # preserva o município já vinculado (ex.: legado sem código IBGE).
+            if not self.instance.pk:
+                self.instance.municipality = None
+            return code
+        if not (code.isdigit() and len(code) == 7):
+            raise ValidationError("Informe um código IBGE válido de 7 dígitos.")
+        municipality = Municipality.objects.filter(ibge_code=code).first()
+        if municipality is None:
+            raise ValidationError("Código IBGE não cadastrado na base de municípios.")
+        self.instance.municipality = municipality
+        return code
 
     def clean(self):
         cleaned_data = super().clean()
@@ -219,13 +265,9 @@ class SubmissionIntakeForm(forms.ModelForm):
         fem = cleaned_data.get("vagas_femininas") or 0
         masc = cleaned_data.get("vagas_masculinas") or 0
         mae = cleaned_data.get("vagas_maes_nutrizes") or 0
-        solic = cleaned_data.get("vagas_solicitadas") or 0
+        solic = fem + masc + mae
+        cleaned_data["vagas_solicitadas"] = solic
 
-        if solic > 0 and (fem + masc + mae) != solic:
-            self.add_error(
-                "vagas_solicitadas",
-                f"O total solicitado ({solic}) difere da soma das vagas individuais ({fem + masc + mae}).",
-            )
         if solic > (cleaned_data.get("capacidade_total") or 0):
             self.add_error("capacidade_total", "Capacidade inferior às vagas solicitadas.")
         edital = cleaned_data.get("edital")
@@ -281,7 +323,7 @@ class SubmissionIntakeForm(forms.ModelForm):
     def save(self, commit=True):
         cnpj = self.cleaned_data["institution_cnpj"]
         name = self.cleaned_data["institution_name"]
-        municipality = self.cleaned_data["municipality"]
+        municipality = self.instance.municipality
 
         institution, _ = Institution.objects.get_or_create(
             cnpj=cnpj,

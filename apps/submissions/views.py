@@ -545,7 +545,7 @@ def submission_import_csv_view(request):
                                 )
                             data = {
                                 "edital": edital.pk,
-                                "municipality": municipality.pk,
+                                "municipality_ibge": municipality.ibge_code or "",
                                 "processo_sei": row.get("processo_sei", ""),
                                 "received_at": row.get("recebido_em", ""),
                                 "received_date": row.get("data_recebimento", ""),
